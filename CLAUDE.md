@@ -76,10 +76,16 @@ Agent path scoping is trust-based (system prompt instructions), not structurally
 
 ## Development Workflow
 
-- **Use `/mikey:tdd` when writing code.** All new code is written via TDD with Given/When/Then specs. Pass the relevant scenarios file as the spec path (e.g., `/mikey:tdd docs/scenarios/v1/01-initialization.md`).
-- **Use `/mikey:testify` when validating code.** Review and align tests with test philosophy after writing.
-- **Keep scope small per change.** Avoid drift from intention. One concern per change.
-- **NEVER modify existing scenarios in `docs/scenarios/` without user confirmation.** Adding new scenarios is OK.
+When implementing a milestone:
+
+1. **Read the manifest.** Load `docs/milestones/m{N}.md` — the single entry point for scope, constraints, and spec references. Do NOT read all spec docs upfront.
+2. **Implement via TDD.** Use `/mikey:tdd <scenario-file>` against the scenarios listed in the manifest. Work through one scenario at a time.
+3. **Validate code.** Use `/mikey:testify` to review code design and test quality alignment after each scenario.
+4. **Verify.** Use `/verify-milestone {N}` after all scenarios are implemented. Fix any failures before reporting completion.
+
+**Constraints:**
+- Keep scope small per change. Avoid drift from intention. One concern per change.
+- NEVER modify existing scenarios in `docs/scenarios/` without user confirmation. Adding new scenarios is OK.
 
 ## Instructions
 

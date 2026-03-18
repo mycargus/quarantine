@@ -54,12 +54,32 @@ cd cli && go test ./...
 cd cli && go vet ./...
 ```
 
-## Development Workflow
+## Operating Procedure
 
-- **Use `/mikey:tdd` when writing code.** All new code is written via TDD with Given/When/Then specs. Pass the relevant scenarios file as the spec path (e.g., `/mikey:tdd docs/scenarios/v1/01-initialization.md`).
-- **Use `/mikey:testify` when validating code.** Review and align tests with test philosophy after writing.
-- **Keep scope small per change.** Avoid drift from intention. One concern per change.
-- **NEVER modify existing scenarios in `docs/scenarios/` without user confirmation.** Adding new scenarios is OK.
+When given a milestone to implement:
+
+1. **Read the manifest.** Load `docs/milestones/m{N}.md`. This is your
+   single source of truth for scope, constraints, and specifications.
+   Do NOT read all spec docs upfront — load them on demand as the
+   manifest directs.
+
+2. **Implement via TDD.** For each scenario listed in the manifest's
+   Acceptance Scenarios section, use `/mikey:tdd <scenario-file>` to
+   implement against those scenarios. Work through one scenario at a time.
+
+3. **Validate code.** After implementing each scenario, use
+   `/mikey:testify` to review code design and test quality alignment.
+
+4. **Verify.** After all scenarios are implemented, use
+   `/verify-milestone {N}` to run the structured verification checklist.
+   Fix any failures before reporting completion.
+
+5. **Report.** Summarize what was implemented, what was verified, and
+   any deviations from the manifest.
+
+**Constraints:**
+- Keep scope small per change. Avoid drift from intention. One concern per change.
+- NEVER modify existing scenarios in `docs/scenarios/` without user confirmation. Adding new scenarios is OK.
 
 ## Reference docs
 
