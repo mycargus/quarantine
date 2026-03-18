@@ -4,7 +4,7 @@ Quarantine automatically detects, quarantines, and tracks flaky tests in CI pipe
 
 ## Architecture
 
-See `docs/architecture.md` for the full system design. Key points:
+See `docs/planning/architecture.md` for the full system design. Key points:
 
 - **Model C (ADR-011):** GitHub-native CLI + standalone dashboard. The CI-critical path depends only on GitHub. The dashboard is non-critical.
 - **CLI (Go):** Wraps test commands, parses JUnit XML, retries failures, suppresses quarantined tests, updates state on a dedicated GitHub branch (`quarantine/state`), creates GitHub Issues, posts PR comments, uploads results as GitHub Artifacts.
@@ -37,14 +37,14 @@ Strict boundaries -- do not expand without discussion:
 
 ## Documentation
 
-All design decisions are documented:
+Docs are organized by purpose:
 
-- `docs/architecture.md` -- System design, data flows, data model, deployment, security, roadmap
-- `docs/requirements.md` -- Functional and non-functional requirements with version labels
-- `docs/scenarios/index.md` -- 66 given-when-then scenarios (v1) + 9 v2+ scenarios, organized by topic
-- `docs/competitive-landscape.md` -- Market analysis and positioning
-- `docs/pre-implementation-tasks.md` -- Tasks to complete before/during implementation
-- `docs/adr/001-018` -- Architecture Decision Records for every major decision
+- `docs/specs/` -- Implementation references (cli-spec, config-schema, github-api-inventory, error-handling, sequence-diagrams, test-strategy)
+- `docs/planning/` -- Architecture, milestones, functional and non-functional requirements
+- `docs/research/` -- Decision inputs (junit-xml-research, ci-artifact-api-research, competitive-landscape)
+- `docs/scenarios/` -- 66 given-when-then scenarios (v1) + 9 v2+ scenarios, organized by topic
+- `docs/milestones/` -- Milestone manifests: the entry point for agents implementing a milestone
+- `docs/adr/` -- 21 Architecture Decision Records
 
 ## Agents and Skills
 
@@ -60,8 +60,7 @@ Agent path scoping is trust-based (system prompt instructions), not structurally
 
 ## Implementation Notes
 
-- **Pre-implementation tasks** are in `docs/pre-implementation-tasks.md`. P0 tasks (CLI spec, API inventory, milestones, config schema) should be completed before coding.
-- **Milestones** are proposed in that doc (M1-M8). M1 is CLI core (run tests, parse XML). No GitHub integration until M3.
+- **Milestones** are in `docs/planning/milestones.md` (M1-M8). Milestone manifests in `docs/milestones/` are the entry point for agents.
 - **Rate limits:** `GITHUB_TOKEN` = 1,000 req/hr. PAT = 5,000/hr. GitHub App = 5,000-12,500/hr. Design for the lowest.
 - **Concurrency:** quarantine.json uses SHA-based compare-and-swap via GitHub Contents API. Retry on 409, max 3. Issue creation uses check-before-create with deterministic labels.
 - **JUnit XML caveats:** No official schema exists. Jest needs `jest-junit`, RSpec needs `rspec_junit_formatter`, Vitest has built-in support. Rerun commands require framework-specific classname-to-invocation mapping.

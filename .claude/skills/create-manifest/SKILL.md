@@ -30,7 +30,7 @@ These principles are grounded in published research on AI agent context engineer
 
 ### 1. Gather milestone definition
 
-Read `docs/milestones.md` and extract for M$1:
+Read `docs/planning/milestones.md` and extract for M$1:
 - Title
 - Scope (what it builds)
 - Acceptance criteria
@@ -49,13 +49,14 @@ Based on the milestone scope, determine which of these source docs are relevant:
 
 | Source doc | When to include |
 |------------|-----------------|
-| `docs/cli-spec.md` | Any milestone that implements CLI commands |
-| `docs/config-schema.md` | M1, or any milestone touching config |
-| `docs/github-api-inventory.md` | Any milestone making GitHub API calls |
-| `docs/error-handling.md` | Any milestone with error handling requirements |
-| `docs/sequence-diagrams.md` | Any milestone with multi-step flows |
-| `docs/requirements.md` | Always — every milestone traces to requirements |
-| `docs/test-strategy.md` | If the milestone has special testing concerns |
+| `docs/specs/cli-spec.md` | Any milestone that implements CLI commands |
+| `docs/specs/config-schema.md` | M1, or any milestone touching config |
+| `docs/specs/github-api-inventory.md` | Any milestone making GitHub API calls |
+| `docs/specs/error-handling.md` | Any milestone with error handling requirements |
+| `docs/specs/sequence-diagrams.md` | Any milestone with multi-step flows |
+| `docs/planning/functional-requirements.md` | Always — every milestone traces to functional requirements |
+| `docs/planning/non-functional-requirements.md` | Always — every milestone traces to NFRs |
+| `docs/specs/test-strategy.md` | If the milestone has special testing concerns |
 | `docs/adr/*.md` | Only ADRs directly relevant to this milestone's decisions |
 
 ### 4. Verify anchors exist
@@ -65,10 +66,11 @@ For every link you plan to include in the manifest, verify the target anchor exi
 ### 5. Identify verification invariants
 
 Read the relevant sections of these docs to find concrete, testable invariants for the Verification section:
-- `docs/sequence-diagrams.md` — endpoint call order, branching logic
-- `docs/requirements.md` — specific FR/NFR IDs that map to this milestone
-- `docs/error-handling.md` — exit codes, degraded mode behavior
-- `docs/cli-spec.md` — output format, flag behavior
+- `docs/specs/sequence-diagrams.md` — endpoint call order, branching logic
+- `docs/planning/functional-requirements.md` — specific FR IDs that map to this milestone
+- `docs/planning/non-functional-requirements.md` — specific NFR IDs that map to this milestone
+- `docs/specs/error-handling.md` — exit codes, degraded mode behavior
+- `docs/specs/cli-spec.md` — output format, flag behavior
 
 Verification MUST contain specific invariants, NOT vague statements. Good: "MUST call endpoints in this order: GET /repos, GET /git/ref". Bad: "MUST match the spec".
 
@@ -101,9 +103,16 @@ Write the file to `docs/milestones/m$1.md` using this exact structure:
 
 ## Acceptance criteria
 
-From [milestones.md](../milestones.md#[anchor]):
+From [milestones.md](../planning/milestones.md#[anchor]):
 
-[Numbered list — copied from milestones.md since these are the contract]
+[Numbered list — copied from milestones.md since these are the contract.
+Each criterion MUST include the FR/NFR IDs it satisfies in parentheses.
+Read docs/planning/functional-requirements.md and
+docs/planning/non-functional-requirements.md to find matching IDs.
+Example: "1. `quarantine init` creates a valid quarantine.yml... (FR-1.4.1, FR-1.11.1)"]
+
+Requirements: [functional](../planning/functional-requirements.md),
+[non-functional](../planning/non-functional-requirements.md).
 
 ## Specifications
 
@@ -126,13 +135,14 @@ Use these with `/mikey:tdd`:
 ## Verification
 
 **Flow correctness:** The implementation MUST match the sequence in
-[sequence-diagrams.md#anchor](../sequence-diagrams.md#anchor).
+[sequence-diagrams.md#anchor](../specs/sequence-diagrams.md#anchor).
 Specifically:
 - [concrete invariant with MUST]
 - [concrete invariant with MUST]
 
-**Requirements:** The implementation MUST satisfy [FR-X.Y.Z, NFR-X.Y.Z]
-in [requirements.md](../requirements.md).
+**Requirements:** The implementation MUST satisfy [FR-X.Y.Z]
+in [functional-requirements.md](../planning/functional-requirements.md)
+and [NFR-X.Y.Z] in [non-functional-requirements.md](../planning/non-functional-requirements.md).
 
 **Build:** `make cli-build && make cli-test && make cli-lint` MUST pass.
 ```

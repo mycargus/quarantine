@@ -13,7 +13,7 @@ Quarantine needs a stable, unique identifier for each test to track flakiness ac
 - **Cross-framework:** Works for all v1 frameworks (Jest, RSpec, Vitest) and extensible to v2 frameworks.
 - **Derivable from JUnit XML:** The ID must be constructable from data available in JUnit XML output, since that is the CLI's sole interface with test results.
 
-Research found that there is no official JUnit XML schema. Framework implementations vary in how they populate `classname`, `name`, and `file` attributes. See `docs/junit-xml-research.md` for full findings.
+Research found that there is no official JUnit XML schema. Framework implementations vary in how they populate `classname`, `name`, and `file` attributes. See `docs/research/junit-xml-research.md` for full findings.
 
 ## Decision
 

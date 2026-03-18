@@ -7,7 +7,7 @@
 > and degraded-mode fallbacks.
 >
 > Related docs:
-> - `docs/architecture.md` -- system design and data flows
+> - `docs/planning/architecture.md` -- system design and data flows
 > - `docs/adr/006-state-storage.md` -- quarantine.json storage strategy
 > - `docs/adr/008-auth-strategy.md` -- authentication strategy
 > - `docs/adr/012-concurrency-strategy.md` -- concurrency and CAS

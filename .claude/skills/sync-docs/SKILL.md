@@ -19,8 +19,8 @@ Scope: $1 (default: all) — valid values: 'all', 'architecture', 'requirements'
    - Check `quarantine.yml` example or schema if it exists
 
 2. Based on the scope argument, read the relevant docs:
-   - `all` or `architecture`: Read `docs/architecture.md`
-   - `all` or `requirements`: Read `docs/requirements.md`
+   - `all` or `architecture`: Read `docs/planning/architecture.md`
+   - `all` or `requirements`: Read `docs/planning/functional-requirements.md`
    - `all` or `scenarios`: Read `docs/scenarios/index.md` and relevant section files in `docs/scenarios/v1/`
    - `all` or `adrs`: Read all files in `docs/adr/`
 
