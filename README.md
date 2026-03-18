@@ -43,21 +43,37 @@ Quarantining flaky tests manually is tedious and error-prone, especially as a te
 
 ## Quick Start
 
-1. Add `quarantine.yml` to your repo root:
+1. Run `quarantine init` in your repo root:
+
+```sh
+quarantine init
+```
+
+This interactively creates `quarantine.yml` and the `quarantine/state` branch on GitHub. The minimal config it produces looks like:
 
 ```yaml
-github:
-  owner: my-org
-  repo: my-repo
-retries: 3
+version: 1
+framework: jest  # or rspec or vitest
 ```
+
+`github.owner` and `github.repo` are auto-detected from your git remote.
 
 2. Set `QUARANTINE_GITHUB_TOKEN` (or `GITHUB_TOKEN`) in your CI environment.
 
-3. Wrap your test command:
+3. Wrap your test command in CI:
 
-```sh
-quarantine run -- <your test command>
+```yaml
+- name: Run tests
+  run: quarantine run -- jest --ci --reporters=default --reporters=jest-junit
+  env:
+    QUARANTINE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+- name: Upload quarantine results
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: quarantine-results-${{ github.run_id }}
+    path: .quarantine/results.json
 ```
 
 That's it. Quarantine handles detection, quarantine state, GitHub Issues, and PR comments automatically.
@@ -66,12 +82,22 @@ That's it. Quarantine handles detection, quarantine state, GitHub Issues, and PR
 
 - **Zero-friction integration:** one command wraps your existing test runner
 - **Flaky detection:** re-runs failing tests N times (default 3); a test that fails then passes is flagged as flaky
-- **Build protection:** quarantined failures become skips in JUnit XML output; build exits 0 if only quarantined tests failed
+- **Build protection:** build exits 0 if only newly-quarantined tests failed; quarantined tests are excluded from future builds entirely (*supported test frameworks only)
 - **GitHub-native state:** quarantine state stored on a dedicated `quarantine/state` branch — no external database
 - **GitHub Issues:** one issue per flaky test; closing the issue unquarantines the test
 - **PR comments:** summary of flaky test results posted on each PR
-- **Dashboard:** React Router v7 web UI with trends, cross-repo analytics, and quarantine management (pulls from GitHub Artifacts)
+- **Dashboard:** Web UI with trends and cross-repo analytics (pulls from GitHub Artifacts; read-only in v1)
 - **Supported frameworks:** RSpec, Jest, Vitest
+- **Frameworks with automatic exclusion of flaky tests from new builds:** Jest, Vitest
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `quarantine init` | Initialize quarantine for a repo (creates `quarantine.yml` and the state branch) |
+| `quarantine run -- <cmd>` | Wrap your test command with flaky detection and quarantine enforcement |
+| `quarantine validate` | Validate `quarantine.yml` and print the resolved configuration |
+| `quarantine version` | Print the CLI version |
 
 ## Architecture
 
