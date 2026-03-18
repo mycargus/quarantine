@@ -41,7 +41,7 @@ doc.
 
 ```
 quarantine run [flags] -- <test command>
-quarantine validate [flags]
+quarantine doctor [flags]
 quarantine version
 ```
 
@@ -68,7 +68,7 @@ For each command, specify:
   - 0 = success (tests passed; includes degraded mode where tests passed)
   - 1 = test failure (real, non-flaky failures exist)
   - 2 = quarantine error (not initialized, bad command, `--strict` infrastructure failure)
-  - `validate` and `init`: 0 = success, 2 = failure
+  - `doctor` and `init`: 0 = success, 2 = failure
   - Exit code 1 exclusively means "your tests failed." No ambiguity.
   - Research pending: CI runner conventions for exit codes 0/1/2.
 - **`--strict` mode:** v1. Infrastructure errors cause exit 2 instead of
@@ -83,7 +83,7 @@ For each command, specify:
 ```
 quarantine init
 quarantine run [flags] -- <test command>
-quarantine validate [flags]
+quarantine doctor [flags]
 quarantine version
 ```
 
@@ -91,7 +91,7 @@ quarantine version
 - Full flag inventory for `quarantine run` (at minimum: `--retries`, `--config`,
   `--junitxml`, `--dry-run`, `--verbose`, `--quiet`, `--strict`, `--pr`,
   `--exclude`)
-- `quarantine validate` output format
+- `quarantine doctor` output format
 - `quarantine init` interactive prompts and validation steps
 - Framework-specific test exclusion mechanisms (Jest, RSpec, Vitest)
 
@@ -243,7 +243,7 @@ Phase 3 -- Integration and polish (sequential):
   M8: Polish and hardening
       - Comprehensive error handling (see task 7)
       - Degraded mode testing
-      - quarantine validate command
+      - quarantine doctor command
       - CLI Docker image
       - Documentation (README, setup guide)
       Acceptance: v1 feature-complete, tested, documented

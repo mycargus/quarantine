@@ -12,7 +12,7 @@
 ```
 quarantine init
 quarantine run [flags] -- <test command>
-quarantine validate [flags]
+quarantine doctor [flags]
 quarantine version
 ```
 
@@ -107,7 +107,7 @@ Initialize quarantine for a repository. This command is required before
             name: quarantine-results-${{ github.run_id }}
             path: .quarantine/results.json
 
-     2. Run `quarantine validate` to verify your configuration.
+     2. Run `quarantine doctor` to verify your configuration.
    ```
 
 ### Flags
@@ -305,7 +305,7 @@ quarantine run --exclude "test/integration/**" --exclude "**::SlowServiceTest::*
 
 ---
 
-## `quarantine validate [flags]`
+## `quarantine doctor [flags]`
 
 Validate `quarantine.yml` configuration. Reads and validates all fields against
 the schema, prints the resolved configuration (including auto-detected values),
@@ -377,7 +377,7 @@ Warnings:
 ### Example
 
 ```bash
-$ quarantine validate
+$ quarantine doctor
 quarantine.yml is valid.
 
 Resolved configuration:

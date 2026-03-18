@@ -79,7 +79,7 @@ Phase 1 is sequential. Each milestone builds on the prior one. A single agent
   - Prints summary and next steps (workflow snippet).
   - Exit codes: 0 = success, 2 = failure.
   - `init` does NOT use degraded mode. Failures are fatal with diagnostics.
-- `quarantine validate` command:
+- `quarantine doctor` command:
   - Reads and validates `quarantine.yml` against config schema rules.
   - Resolves auto-detected values (`github.owner`, `github.repo` from git
     remote; framework-specific `junitxml` default).
@@ -116,7 +116,7 @@ Phase 1 is sequential. Each milestone builds on the prior one. A single agent
 
 1. `quarantine init` interactively creates a valid `quarantine.yml` and
    `quarantine/state` branch with empty `quarantine.json`.
-2. `quarantine validate` reports errors for invalid config and prints resolved
+2. `quarantine doctor` reports errors for invalid config and prints resolved
    config for valid config.
 3. `quarantine version` prints the version string.
 4. `make cli-build` produces a binary. `make cli-test` passes. `make cli-lint`

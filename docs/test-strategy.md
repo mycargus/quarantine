@@ -104,7 +104,7 @@ These run on every CI build. A mock HTTP server stands in for the GitHub API, re
 - Full `quarantine run` flow: read state, execute tests, parse XML, retry failures, update state, create issues, post PR comment
 - `quarantine init` flow: interactive prompts produce config, branch creation via API
 - `quarantine run` without prior `init`: refuses with exit 2
-- `quarantine validate`: reports errors and warnings correctly
+- `quarantine doctor`: reports errors and warnings correctly
 - Degraded mode: mock returns 503 for Contents API, CLI falls back to cache then runs without state
 - `--strict` mode: mock returns errors, CLI exits 2 instead of degrading
 - `--dry-run`: no API writes occur

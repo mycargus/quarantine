@@ -48,7 +48,7 @@ creates GitHub issues, and provides a dashboard for visibility.
 |----|-------------|---------|
 | FR-1.4.1 | Configuration is stored in `quarantine.yml` in the repository root. | [v1] |
 | FR-1.4.2 | Configurable options include: retries, framework (auto-detected if omitted), and github owner/repo (auto-detected from git remote). | [v1] |
-| FR-1.4.3 | `quarantine validate` command checks configuration for correctness. | [v1] |
+| FR-1.4.3 | `quarantine doctor` command checks configuration for correctness. | [v1] |
 
 ### 1.5 Dashboard
 

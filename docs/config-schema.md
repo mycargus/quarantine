@@ -438,7 +438,7 @@ The CLI checks `QUARANTINE_GITHUB_TOKEN` first. If not set, it falls back to
 - The CLI looks for `quarantine.yml` in the current working directory (repo root).
 - The `--config` flag on `quarantine run` overrides the path.
 - `quarantine init` creates the file interactively.
-- `quarantine validate` parses and validates the file, printing resolved values
+- `quarantine doctor` parses and validates the file, printing resolved values
   (including auto-detected `github.owner`, `github.repo`, and
   framework-specific defaults).
 
@@ -446,7 +446,7 @@ The CLI checks `QUARANTINE_GITHUB_TOKEN` first. If not set, it falls back to
 
 ## Validation Summary
 
-`quarantine validate` checks all of the following and reports errors or
+`quarantine doctor` checks all of the following and reports errors or
 warnings:
 
 | Check                                | Severity |

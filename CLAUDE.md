@@ -75,6 +75,13 @@ Agent path scoping is trust-based (system prompt instructions), not structurally
 - Do not assume Docker is required -- it is a deployment convenience
 - Do not store secrets in `quarantine.yml` -- tokens come from env vars only
 
+## Development Workflow
+
+- **Use `/mikey:tdd` when writing code.** All new code is written via TDD with Given/When/Then specs. Pass the relevant scenarios from `docs/user-scenarios.md` as the spec path (e.g., `/mikey:tdd docs/user-scenarios.md`).
+- **Use `/mikey:testify` when validating code.** Review and align tests with test philosophy after writing.
+- **Keep scope small per change.** Avoid drift from intention. One concern per change.
+- **NEVER modify existing scenarios in `docs/user-scenarios.md` without user confirmation.** Adding new scenarios is OK.
+
 ## Instructions
 
 - NEVER make assumptions

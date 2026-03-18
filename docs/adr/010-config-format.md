@@ -62,11 +62,11 @@ Key changes from original decision:
 4. **`exclude` field added** for v1. Quarantine ignores matched tests entirely -- no retry, no quarantine, no issue creation.
 5. **`quarantine init` creates the config** interactively, prompting for framework, retries, and JUnit XML path.
 
-CLI also supports a `quarantine validate` command to verify config and print resolved values (including auto-detected fields like `github.owner` and `github.repo`).
+CLI also supports a `quarantine doctor` command to verify config and print resolved values (including auto-detected fields like `github.owner` and `github.repo`).
 
 ## Alternatives Considered
 
-- **JSON:** No comments (significant drawback for config files), familiar but more verbose (braces, quotes). `yq` validates YAML equivalently to `jq` for JSON, and `quarantine validate` provides built-in validation.
+- **JSON:** No comments (significant drawback for config files), familiar but more verbose (braces, quotes). `yq` validates YAML equivalently to `jq` for JSON, and `quarantine doctor` provides built-in validation.
 - **TOML:** Good format, supports comments, but less familiar in CI ecosystem (CI configs are predominantly YAML). Lower tooling availability.
 - **No config file (all CLI flags):** Works for simple cases but does not scale for project-level defaults. CLI flags still override config file values.
 
@@ -78,6 +78,6 @@ CLI also supports a `quarantine validate` command to verify config and print res
 - (+) Well-supported in Go (gopkg.in/yaml.v3).
 - (+) Forward-compatible fields allow v2 to expand allowed values without schema changes.
 - (+) `quarantine init` ensures the config is valid from the start.
-- (-) Indentation sensitivity can cause subtle errors. Mitigated by `quarantine validate` command.
+- (-) Indentation sensitivity can cause subtle errors. Mitigated by `quarantine doctor` command.
 - (-) YAML has well-known footguns (the Norway problem, implicit type coercion). Mitigated by strict parsing mode and limited schema.
 - (-) Forward-compatible fields with restricted values may confuse users who try to set v2 values. Mitigated by clear error messages (e.g., "jira is not supported in v1. Supported values: github").
