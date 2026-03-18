@@ -1,10 +1,10 @@
 # Quarantine -- Architecture Document
 
-> Last updated: 2026-03-14
+> Last updated: 2026-03-17
 
 ## 1. Overview
 
-Quarantine is a developer tool that automatically detects, disables (quarantines), and tracks flaky (non-deterministic) tests in CI pipelines. The system follows a GitHub-native architecture (ADR-011, "Model C"): a Go CLI handles the CI-critical path with no dependencies beyond GitHub, while a separate React Router v7 (framework mode, successor to Remix) dashboard provides analytics and visibility as a non-critical component. When a test fails, the CLI re-runs it to confirm flakiness, modifies test output so quarantined failures do not break builds, stores quarantine state on a dedicated GitHub branch, uploads results as GitHub Artifacts, and creates GitHub Issues for tracking. The dashboard pulls data from GitHub on a polling schedule to surface trends and cross-repo analytics.
+Quarantine is a developer tool that automatically detects, disables (quarantines), and tracks flaky (non-deterministic) tests in CI pipelines. The system follows a GitHub-native architecture (ADR-011, "Model C"): a Go CLI handles the CI-critical path with no dependencies beyond GitHub, while a separate React Router v7 (framework mode, successor to Remix) dashboard provides analytics and visibility as a non-critical component. When a test fails, the CLI re-runs it to confirm flakiness, excludes quarantined tests before execution via framework-specific flags so they never run, stores quarantine state on a dedicated GitHub branch, uploads results as GitHub Artifacts, and creates GitHub Issues for tracking. The dashboard pulls data from GitHub on a polling schedule to surface trends and cross-repo analytics.
 
 ## 2. System Architecture
 
@@ -17,9 +17,9 @@ Quarantine is a developer tool that automatically detects, disables (quarantines
 |  |   (Go binary)       | |  (1)  |  | (quarantine.json)         |  |
 |  +---------------------+ |       |  +----------------------------+  |
 |    |              |       |       |                                  |
-|    | (2) run      | (5)   |       |  +----------------------------+  |
-|    | tests        | modify|  (3)  |  | GitHub Artifacts          |  |
-|    v              | XML   |------>|  | (test run results, 90d)   |  |
+|    | (2) run      |       |       |  +----------------------------+  |
+|    | tests with   |       |  (3)  |  | GitHub Artifacts          |  |
+|    v  exclusions  |       |------>|  | (test run results, 90d)   |  |
 |  +-------------+  |      |       |  +----------------------------+  |
 |  | Test Runner |  |      |       |                                  |
 |  | (jest,      |  |      |  (4)  |  +----------------------------+  |
@@ -28,9 +28,9 @@ Quarantine is a developer tool that automatically detects, disables (quarantines
 |        |          |      |       |  +----------------------------+  |
 |        v          v      |       |                                  |
 |  +---------------------+ |       +-----------------|----------------+
-|  | Modified JUnit XML  | |                         |
-|  | (quarantined fails  | |                         | (6) poll
-|  |  become skips)      | |                         |    artifacts
+|  | JUnit XML           | |                         |
+|  | (quarantined tests  | |                         | (6) poll
+|  |  already excluded)  | |                         |    artifacts
 |  +---------------------+ |                         |
 +---------------------------+                         |
                                                       v
@@ -46,10 +46,10 @@ Quarantine is a developer tool that automatically detects, disables (quarantines
 
 Numbered flows:
   (1) Read/write quarantine.json via GitHub Contents API (SHA-based CAS)
-  (2) CLI wraps test command, captures JUnit XML output
+  (2) CLI wraps test command (with exclusion flags for Jest/Vitest), captures JUnit XML output
   (3) Upload test run results as GitHub Artifacts
   (4) Create/check GitHub Issues for flaky tests
-  (5) Rewrite JUnit XML: quarantined failures -> skips, exit 0
+  (5) [Removed -- quarantined tests are excluded before execution per ADR-003]
   (6) Dashboard polls GitHub Artifacts API (every 5 min, staggered)
 ```
 
@@ -74,9 +74,9 @@ Numbered flows:
   - **vitest:** Rerun via `vitest run --reporter=junit {test_file} -t "{test_name}"`. Vitest has built-in JUnit XML support via `--reporter=junit` (no third-party package needed). Uses the same `--testNamePattern` / `-t` flag as Jest for filtering by test name.
   - [v2+] **pytest:** JUnit XML classnames use dots (e.g., `tests.test_payment`) which must be converted to path format (`tests/test_payment.py::test_name`). The CLI transforms dot-separated classnames to file paths and appends `.py`.
   - See ADR-003 for the full rerun command registry.
-- **Quarantine enforcement [v1]:** Read quarantine list from `quarantine.json`. Rewrite JUnit XML so that quarantined test failures become skips. Exit 0 if only quarantined tests failed (ADR-003).
+- **Quarantine enforcement [v1]:** Read quarantine list from `quarantine.json`. Framework-adaptive enforcement (ADR-003): for Jest/Vitest, construct exclusion flags so quarantined tests never execute; for RSpec, let quarantined tests run and suppress their failures from the exit code. There is no JUnit XML rewriting. Exit 0 if only quarantined tests failed.
 - **State management [v1]:** Read/write `quarantine.json` on the `quarantine/state` GitHub branch via the GitHub Contents API with SHA-based optimistic concurrency (ADR-006, ADR-012).
-- **Result upload [v1]:** Upload test run results as GitHub Artifacts (ADR-007).
+- **Result output [v1]:** Write test run results to a local JSON file. The GitHub Actions workflow uploads via `actions/upload-artifact` (ADR-007).
 - **Issue management [v1]:** Create GitHub Issues for newly detected flaky tests. On each run, check if associated issues are closed; if so, unquarantine the test.
 - **PR comments [v1]:** Post summary comments on pull requests when flaky tests are detected (ADR-009).
 - **Code sync adapter [v2+]:** Open automated PRs to add skip markers directly in source code (ADR-003).
@@ -124,20 +124,24 @@ GitHub serves as the central data plane. The CLI interacts with GitHub for all p
    (--junitxml accepts a glob pattern; the CLI merges all matching XML files)
 3. CLI reads quarantine.json from quarantine/state branch via Contents API.
    - On GitHub API failure: fall back to cached copy from Actions cache. [v1]
-4. CLI executes the test command.
-5. CLI parses JUnit XML for failures.
-6. For each failed test:
-   a. If test is in quarantine list -> mark as "quarantined failure".
+   - Prerequisite: `quarantine init` must be run once per repository (ADR-019).
+4. CLI applies framework-adaptive quarantine enforcement (ADR-003):
+   - Jest/Vitest: adds exclusion flags to the test command (quarantined tests never run).
+   - RSpec: no exclusion flags; all tests run.
+5. CLI executes the test command.
+6. CLI parses JUnit XML for failures.
+7. For each failed test:
+   a. If test is in quarantine list -> mark as "quarantined failure" (does not
+      count toward exit code, reported in PR comment).
    b. If test is NOT in quarantine list -> re-run up to N times.
-      - If it passes on any retry -> classify as flaky.
-      - If it fails all retries -> classify as genuine failure.
-7. For each newly detected flaky test:
+   - If it passes on any retry -> classify as flaky.
+   - If it fails all retries -> classify as genuine failure.
+8. For each newly detected flaky test:
    a. Add to quarantine.json, write back to quarantine/state branch
       (SHA-based compare-and-swap; retry up to 3x on 409 conflict). [v1]
    b. Create GitHub Issue (check-before-create with deterministic labels). [v1]
    c. Post PR comment summarizing findings. [v1]
-8. Rewrite JUnit XML: quarantined failures become skips.
-9. Upload results as GitHub Artifact. [v1]
+9. Write results to local JSON file. GitHub Actions workflow uploads as artifact (ADR-007). [v1]
 10. Exit code: 0 if only quarantined tests failed, nonzero if genuine failures.
 ```
 
@@ -320,7 +324,7 @@ CREATE TABLE test_results (
     test_run_id     INTEGER NOT NULL REFERENCES test_runs(id),
     test_id         INTEGER NOT NULL REFERENCES tests(id),
     status          TEXT NOT NULL,          -- passed, failed, skipped, quarantined
-    original_status TEXT,                   -- status before quarantine rewrite
+    original_status TEXT,                   -- status before quarantine exclusion
     duration_ms     INTEGER,
     retry_count     INTEGER DEFAULT 0,
     failure_message TEXT,
@@ -452,7 +456,7 @@ The system is designed so the CI-critical path (the CLI) never hard-depends on a
 - Go CLI: single binary, cross-compiled for 6 targets.
 - Distribution via GitHub Releases (direct binary download).
 - Flaky detection by re-running failures (configurable retry count, default 3).
-- JUnit XML parsing and output rewriting (supports glob patterns for multiple XML files, e.g., `--junitxml="results/*.xml"`).
+- JUnit XML parsing with pre-execution exclusion of quarantined tests (supports glob patterns for multiple XML files, e.g., `--junitxml="results/*.xml"`).
 - Quarantine state in `quarantine.json` on `quarantine/state` GitHub branch.
 - SHA-based optimistic concurrency for state updates (retry on 409, max 3).
 - Fallback to GitHub Actions cache for branch-protected repos.
