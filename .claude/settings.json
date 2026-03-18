@@ -1,0 +1,31 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/reject-v2-frameworks.sh \"$TOOL_INPUT\"",
+            "description": "Reject v2+ framework references (pytest, go test, maven)"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/reject-secrets-in-files.sh \"$TOOL_INPUT\"",
+            "description": "Reject GitHub token patterns in file content"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/warn-destructive-git.sh \"$TOOL_INPUT\"",
+            "description": "Warn before destructive git commands"
+          }
+        ]
+      }
+    ]
+  }
+}
