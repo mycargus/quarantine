@@ -9,9 +9,9 @@ Quarantine must work in any CI provider (Jenkins, GitHub Actions, GitLab CI, Bit
 
 ## Decision
 
-v1 targets GitHub Actions as the fully-featured CI provider. The CLI binary itself runs anywhere (it is just a Go binary), but GitHub Actions-specific features (artifact upload, Actions cache fallback for branch-protected repos) are only available in GitHub Actions for v1.
+v1 targets GitHub Actions as the fully-featured CI provider. The CLI binary itself runs anywhere (it is just a Go binary) and performs only local file I/O for result output (ADR-007). The workflow-based artifact upload (via `actions/upload-artifact`) and Actions cache fallback for branch-protected repos are GitHub Actions-specific, but the CLI's core functionality is CI-agnostic.
 
-In non-Actions environments, the CLI still works for core functionality (run tests, detect flakiness, update quarantine.json via GitHub API, create issues, post PR comments) but cannot upload artifacts or use Actions cache.
+In non-Actions environments, the CLI still works for core functionality (run tests, detect flakiness, write results to disk, update quarantine.json via GitHub API, create issues, post PR comments). The dashboard will not have artifact-based data unless the CI provider's own artifact mechanism is configured to upload the CLI's result file.
 
 v2 adds: Jenkins artifact storage integration, GitLab CI integration, Bitbucket Pipelines integration. The CLI will auto-detect the CI environment and use the appropriate storage backend.
 
@@ -25,7 +25,7 @@ v2 adds: Jenkins artifact storage integration, GitLab CI integration, Bitbucket 
 
 **Positive:**
 - v1 scope is focused and achievable.
-- Full feature set in GitHub Actions (artifacts, cache, optimistic concurrency).
+- Full feature set in GitHub Actions (workflow-based artifact upload, cache fallback, optimistic concurrency).
 - Core quarantine functionality still works in any CI.
 
 **Negative:**
