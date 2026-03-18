@@ -1,7 +1,6 @@
 # User Scenarios
 
-This document contains v2+ user scenarios. For v1 scenarios, see
-[`docs/user-scenarios-for-v1.md`](user-scenarios-for-v1.md).
+This document contains v2+ user scenarios. For v1 scenarios, see [`docs/scenarios/index.md`](../index.md).
 
 ---
 

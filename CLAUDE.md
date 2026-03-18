@@ -41,7 +41,7 @@ All design decisions are documented:
 
 - `docs/architecture.md` -- System design, data flows, data model, deployment, security, roadmap
 - `docs/requirements.md` -- Functional and non-functional requirements with version labels
-- `docs/user-scenarios.md` -- 32 given-when-then scenarios
+- `docs/scenarios/index.md` -- 66 given-when-then scenarios (v1) + 9 v2+ scenarios, organized by topic
 - `docs/competitive-landscape.md` -- Market analysis and positioning
 - `docs/pre-implementation-tasks.md` -- Tasks to complete before/during implementation
 - `docs/adr/001-018` -- Architecture Decision Records for every major decision
@@ -77,10 +77,10 @@ Agent path scoping is trust-based (system prompt instructions), not structurally
 
 ## Development Workflow
 
-- **Use `/mikey:tdd` when writing code.** All new code is written via TDD with Given/When/Then specs. Pass the relevant scenarios from `docs/user-scenarios.md` as the spec path (e.g., `/mikey:tdd docs/user-scenarios.md`).
+- **Use `/mikey:tdd` when writing code.** All new code is written via TDD with Given/When/Then specs. Pass the relevant scenarios file as the spec path (e.g., `/mikey:tdd docs/scenarios/v1/01-initialization.md`).
 - **Use `/mikey:testify` when validating code.** Review and align tests with test philosophy after writing.
 - **Keep scope small per change.** Avoid drift from intention. One concern per change.
-- **NEVER modify existing scenarios in `docs/user-scenarios.md` without user confirmation.** Adding new scenarios is OK.
+- **NEVER modify existing scenarios in `docs/scenarios/` without user confirmation.** Adding new scenarios is OK.
 
 ## Instructions
 
