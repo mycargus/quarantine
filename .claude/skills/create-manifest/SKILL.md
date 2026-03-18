@@ -1,12 +1,14 @@
 ---
 name: create-manifest
 description: Generate a milestone manifest file — a lightweight routing document that points agents to source docs
-argument-hint: "[milestone-number]"
+argument-hint: "[milestone-number | --validate [N]]"
 disable-model-invocation: false
 allowed-tools: Read, Grep, Glob, Write, Bash
 ---
 
-Generate a milestone manifest for M$1 at `docs/milestones/m$1.md`.
+## Mode detection
+
+If `$1` is `--validate` or starts with `--validate`, run **validation mode** (see [Validation Mode](#validation-mode) at the end). Otherwise, generate a new manifest for M$1 at `docs/milestones/m$1.md`.
 
 Milestone manifests are routing tables, NOT content copies. They point agents to existing source docs with specific anchors. The only inline content allowed is scope boundaries (MUST/MUST NOT) and acceptance criteria summaries. Everything else MUST be a link.
 
@@ -165,3 +167,54 @@ Print a summary:
 - Number of specification links
 - Number of verification invariants
 - Final line count
+
+---
+
+## Validation Mode
+
+Triggered by `/create-manifest --validate` or `/create-manifest --validate N`.
+
+- `--validate` (no number): validate ALL manifests in `docs/milestones/m*.md`
+- `--validate N`: validate only `docs/milestones/mN.md`
+
+### Validation checks
+
+For each manifest file, run these checks and report pass/fail:
+
+1. **Line count.** SHOULD NOT exceed 100 lines.
+2. **Section order.** MUST contain exactly these 6 `##` sections in order:
+   Workflow, Scope, Acceptance criteria, Specifications, Acceptance scenarios,
+   Verification. No extra `##` sections allowed.
+3. **Workflow template.** Workflow section MUST match the standard 5-step
+   template (steps 1-5 from the generation template). Custom workflows fail.
+4. **RFC 2119 language.** Scope and Verification sections MUST contain at least
+   one MUST or MUST NOT. Soft language ("try to", "ideally", "should consider")
+   MUST NOT appear anywhere in the manifest.
+5. **Anchor verification.** For every markdown link in the Specifications table
+   and Verification section, verify the target anchor exists in the target file.
+   Use Grep to check for the heading text that would produce the slug. Report
+   broken links.
+6. **FR/NFR traceability.** Acceptance criteria MUST contain at least one
+   `(FR-X.Y.Z)` or `(NFR-X.Y.Z)` reference. Verify each referenced ID exists
+   in `functional-requirements.md` or `non-functional-requirements.md`.
+7. **Scenario coverage.** Every scenario tagged with this milestone's `[MN]`
+   tag in `docs/scenarios/v1/*.md` MUST appear in the Acceptance scenarios
+   table (directly or within a range). Report any missing scenarios.
+8. **No content duplication.** Flag any block of 3+ consecutive lines in the
+   Scope section that appears verbatim in a source doc (cli-spec, milestones,
+   error-handling, etc.). Scope should summarize, not copy.
+
+### Validation output
+
+For each manifest, print:
+
+```
+M{N}: {title}
+  ✓ Line count: {count} (60-110)
+  ✗ Anchor broken: {link} → {file} has no heading matching "{slug}"
+  ✓ Sections: 6/6 in order
+  ...
+  Result: PASS | FAIL ({count} issues)
+```
+
+At the end, print a summary: `{pass}/{total} manifests passed validation.`
