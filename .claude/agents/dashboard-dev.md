@@ -61,6 +61,13 @@ cd dashboard && npm test
 cd dashboard && npm run lint
 ```
 
+## Development Workflow
+
+- **Use `/mikey:tdd` when writing code.** All new code is written via TDD with Given/When/Then specs. Pass the relevant scenarios file as the spec path (e.g., `/mikey:tdd docs/scenarios/v1/06-dashboard.md`).
+- **Use `/mikey:testify` when validating code.** Review and align tests with test philosophy after writing.
+- **Keep scope small per change.** Avoid drift from intention. One concern per change.
+- **NEVER modify existing scenarios in `docs/scenarios/` without user confirmation.** Adding new scenarios is OK.
+
 ## Reference docs
 
 If you need architectural context, read (but do not modify):

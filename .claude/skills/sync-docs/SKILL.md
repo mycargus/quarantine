@@ -21,7 +21,7 @@ Scope: $1 (default: all) — valid values: 'all', 'architecture', 'requirements'
 2. Based on the scope argument, read the relevant docs:
    - `all` or `architecture`: Read `docs/architecture.md`
    - `all` or `requirements`: Read `docs/requirements.md`
-   - `all` or `scenarios`: Read `docs/user-scenarios.md`
+   - `all` or `scenarios`: Read `docs/scenarios/index.md` and relevant section files in `docs/scenarios/v1/`
    - `all` or `adrs`: Read all files in `docs/adr/`
 
 3. Check for these categories of inconsistency:
