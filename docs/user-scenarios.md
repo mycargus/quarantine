@@ -206,7 +206,7 @@ and updates their CI workflow to replace `jest --ci --reporters=default --report
 
 ## Configuration
 
-### Scenario 22: User runs quarantine validate [v1]
+### Scenario 22: User runs quarantine doctor [v1]
 
 **Given** a `quarantine.yml` file exists in the repo root with the following content:
 
@@ -221,7 +221,7 @@ notifications:
   github_pr_comment: true
 ```
 
-**When** the developer runs `quarantine validate` from the repo root
+**When** the developer runs `quarantine doctor` from the repo root
 **Then** the CLI reads `quarantine.yml`, validates all fields against the expected schema (including `version`, `framework`, `issue_tracker`, `labels`, and `notifications`), confirms the framework is supported in v1 (`jest`, `rspec`, or `vitest`), confirms the retry count is a positive integer, confirms the issue tracker is valid for v1, validates forward-compatible fields (e.g., `issue_tracker: jira` produces "Error: 'issue_tracker: jira' is not supported in v1. Supported values: github."), and prints "quarantine.yml is valid." with exit code 0; if the file is missing, the CLI prints "Error: quarantine.yml not found in the current directory." and exits with code 1; if a field is invalid (e.g., `retries: -1`), the CLI prints "Error: 'retries' must be a positive integer." and exits with code 1
 
 ---
@@ -239,7 +239,7 @@ labels:
   - quarantine
 ```
 
-**When** the developer runs `quarantine validate` from the repo root
+**When** the developer runs `quarantine doctor` from the repo root
 **Then** the CLI reads `quarantine.yml`, detects that `issue_tracker: jira` is a known but unsupported value in v1, and prints: "Error: 'issue_tracker: jira' is not supported in v1. Supported values: github." and exits with code 1
 
 ---

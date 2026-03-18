@@ -24,7 +24,7 @@
 |------|---------|------|
 | 0 | Success | Tests passed. Includes degraded mode where tests passed. |
 | 1 | Test failure | Real, non-flaky test failures exist after retries. |
-| 2 | Quarantine error | Not initialized, invalid command/flags, `--strict` infrastructure failure, `validate` failure, `init` failure. |
+| 2 | Quarantine error | Not initialized, invalid command/flags, `--strict` infrastructure failure, `doctor` failure, `init` failure. |
 
 **Exit code 1 exclusively means "your tests failed."** There is no ambiguity.
 
@@ -41,7 +41,7 @@ help text on every flag typo.
 |---------|--------|--------|--------|
 | `quarantine run` | Tests passed (including degraded mode) | Real test failures | Not initialized; `--strict` infrastructure failure |
 | `quarantine init` | Initialization succeeded | -- | Initialization failed (bad token, no repo access, branch creation failed) |
-| `quarantine validate` | Config and state are valid | -- | Validation failed (missing config, bad YAML, unreachable state branch) |
+| `quarantine doctor` | Config and state are valid | -- | Validation failed (missing config, bad YAML, unreachable state branch) |
 | `quarantine version` | Always | -- | -- |
 
 ---

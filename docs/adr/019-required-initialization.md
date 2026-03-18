@@ -26,7 +26,7 @@ A `--yes` flag for non-interactive mode (accept defaults) is deferred to v2.
 ## Alternatives Considered
 
 - **Implicit initialization on first `quarantine run`:** Lower adoption friction (one step instead of two), but permission errors and branch creation failures surface during real CI runs. Developers must debug infrastructure issues while waiting for test results. The error messages are ambiguous (is the failure from the test suite or from quarantine setup?).
-- **Implicit initialization with `quarantine validate` as a separate step:** Relies on users remembering to run validate. Does not create the branch or config file.
+- **Implicit initialization with `quarantine doctor` as a separate step:** Relies on users remembering to run validate. Does not create the branch or config file.
 - **Config file only, no init command:** Users manually create `quarantine.yml` and the branch. Higher error rate, no validation feedback, no guided setup.
 
 ## Consequences

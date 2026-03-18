@@ -96,7 +96,7 @@ That's it. Quarantine handles detection, quarantine state, GitHub Issues, and PR
 |---------|-------------|
 | `quarantine init` | Initialize quarantine for a repo (creates `quarantine.yml` and the state branch) |
 | `quarantine run -- <cmd>` | Wrap your test command with flaky detection and quarantine enforcement |
-| `quarantine validate` | Validate `quarantine.yml` and print the resolved configuration |
+| `quarantine doctor` | Validate `quarantine.yml` and print the resolved configuration |
 | `quarantine version` | Print the CLI version |
 
 ## Architecture
