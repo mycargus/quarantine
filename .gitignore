@@ -1,0 +1,12 @@
+# CLI (Go)
+bin/
+
+# Dashboard (TypeScript)
+dashboard/node_modules/
+dashboard/.pnpm-store/
+dashboard/build/
+dashboard/.react-router/
+
+# OS / editors
+.DS_Store
+*.swp
