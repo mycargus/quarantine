@@ -5,7 +5,7 @@
 
 ## Context
 
-The system needs authentication for: CLI accessing GitHub API (to read/write quarantine.json, create issues, post PR comments, upload artifacts) and dashboard accessing GitHub API (to pull artifacts, check issue status). v2 adds dashboard web UI authentication.
+The system needs authentication for: CLI accessing GitHub API (to read/write quarantine.json, create issues, post PR comments) and dashboard accessing GitHub API (to pull artifacts, check issue status). The CLI does not upload artifacts directly — it writes results to a local file and the GitHub Actions workflow handles upload (ADR-007). v2 adds dashboard web UI authentication.
 
 ## Decision
 
