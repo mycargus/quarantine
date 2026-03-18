@@ -64,6 +64,6 @@ cd cli && go vet ./...
 ## Reference docs
 
 If you need architectural context, read (but do not modify):
-- `docs/architecture.md` — system design
-- `docs/pre-implementation-tasks.md` — milestone definitions
+- `docs/planning/architecture.md` — system design
+- `docs/planning/milestones.md` — milestone definitions
 - `docs/adr/` — decision records

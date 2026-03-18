@@ -2,8 +2,7 @@
 
 > Last updated: 2026-03-17
 >
-> Mermaid sequence diagrams for the 8 key flows identified in
-> [pre-implementation-tasks.md](pre-implementation-tasks.md) (Task 5).
+> Mermaid sequence diagrams for the 8 key flows.
 > Each diagram is self-contained and renderable in GitHub.
 
 ---

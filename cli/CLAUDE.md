@@ -25,7 +25,7 @@
 - Tests use riteway-golang for assertions: `riteway.Assert(t, riteway.Case[T]{...})`.
 - Golden test fixtures live in `testdata/` at the repo root.
 - Integration tests use build tag `integration`. E2E tests use build tag `e2e`.
-- Error handling follows `docs/error-handling.md`: never break the build due to quarantine's own failure.
+- Error handling follows `docs/specs/error-handling.md`: never break the build due to quarantine's own failure.
 - Exit codes: 0 = success, 1 = test failures, 2 = quarantine error.
 
 ## Scope

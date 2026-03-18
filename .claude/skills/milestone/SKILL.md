@@ -10,7 +10,7 @@ Set the active milestone to M$1.
 
 ## Steps
 
-1. Read `docs/pre-implementation-tasks.md` to get the full milestone definition for M$1, including its scope, acceptance criteria, and phase.
+1. Read `docs/planning/milestones.md` to get the full milestone definition for M$1, including its scope, acceptance criteria, and phase.
 
 2. Read `CLAUDE.md` to check if there is already a "Current Milestone" section.
 
@@ -19,7 +19,7 @@ Set the active milestone to M$1.
 ```
 ## Current Milestone
 
-**M$1** — [milestone title from pre-implementation-tasks.md]
+**M$1** — [milestone title from milestones.md]
 
 Scope:
 [bullet points from the milestone definition]
@@ -34,11 +34,11 @@ Do not modify files outside this milestone's scope without explicit approval.
 ```
 
 Use these mappings to determine files in scope:
-- M1 (CLI core): `cli/cmd/`, `cli/internal/parser/`, `cli/internal/config/`, `cli/internal/runner/`, `testdata/`
-- M2 (Flaky detection): `cli/internal/parser/`, `cli/internal/runner/`, `cli/internal/quarantine/`
-- M3 (GitHub state): `cli/internal/github/`, `cli/internal/quarantine/`, `schemas/quarantine-state.schema.json`
-- M4 (Issues + PR comments): `cli/internal/github/`
-- M5 (Artifacts): `cli/internal/github/`, `schemas/test-result.schema.json`
+- M1 (CLI scaffolding + init): `cli/cmd/`, `cli/internal/config/`, `cli/internal/github/`, `cli/internal/git/`
+- M2 (Test execution + XML parsing): `cli/cmd/`, `cli/internal/parser/`, `cli/internal/runner/`, `testdata/`
+- M3 (Flaky detection + retry): `cli/internal/runner/`, `cli/internal/parser/`
+- M4 (Quarantine state + exclusion): `cli/internal/github/`, `cli/internal/quarantine/`
+- M5 (Issues + PR comments + artifacts): `cli/internal/github/`
 - M6 (Dashboard ingestion): `dashboard/`
 - M7 (Dashboard UI): `dashboard/`
 - M8 (Polish): all files

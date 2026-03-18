@@ -103,7 +103,7 @@ That's it. Quarantine handles detection, quarantine state, GitHub Issues, and PR
 
 Quarantine follows a GitHub-native architecture. The CLI handles the CI-critical path with no dependencies beyond GitHub. The dashboard is non-critical and discovers data autonomously by polling GitHub Artifacts.
 
-See [`docs/architecture.md`](docs/architecture.md) for the full system design.
+See [`docs/planning/architecture.md`](docs/planning/architecture.md) for the full system design.
 
 ## Credit
 

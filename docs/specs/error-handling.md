@@ -622,7 +622,4 @@ Key test scenarios:
 - **ADR-006:** State storage (quarantine/state branch, Contents API).
 - **ADR-012:** Concurrency strategy (SHA-based CAS, quarantine wins on conflict).
 - **ADR-015:** Rate limiting and backoff.
-- `docs/architecture.md` section 7.4: Degraded mode overview.
-- `docs/pre-implementation-tasks.md` task 7: This document's origin.
-- `docs/pre-implementation-tasks.md` task 1: CLI spec (exit codes, flags).
-- `docs/pre-implementation-tasks.md` task 2: GitHub API inventory (per-endpoint error handling).
+- `docs/planning/architecture.md` section 7.4: Degraded mode overview.

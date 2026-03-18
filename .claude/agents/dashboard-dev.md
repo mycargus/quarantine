@@ -71,7 +71,7 @@ cd dashboard && npm run lint
 ## Reference docs
 
 If you need architectural context, read (but do not modify):
-- `docs/architecture.md` — system design, especially sections on dashboard (3.2), data sync (4.3), and data model (5.3)
-- `docs/pre-implementation-tasks.md` — milestone definitions
+- `docs/planning/architecture.md` — system design, especially sections on dashboard (3.2), data sync (4.3), and data model (5.3)
+- `docs/planning/milestones.md` — milestone definitions
 - `docs/adr/005-dashboard-stack.md` — dashboard tech stack decision
 - `docs/adr/007-result-storage-and-sync.md` — pull-based sync model

@@ -6,11 +6,11 @@
 > for v1 with clear dependency order.
 >
 > Related docs:
-> - `docs/cli-spec.md` -- CLI interface specification
-> - `docs/config-schema.md` -- quarantine.yml full schema
-> - `docs/github-api-inventory.md` -- GitHub API interactions
-> - `docs/error-handling.md` -- error handling strategy
-> - `docs/architecture.md` -- system design
+> - `docs/specs/cli-spec.md` -- CLI interface specification
+> - `docs/specs/config-schema.md` -- quarantine.yml full schema
+> - `docs/specs/github-api-inventory.md` -- GitHub API interactions
+> - `docs/specs/error-handling.md` -- error handling strategy
+> - `docs/planning/architecture.md` -- system design
 
 ## Design Principles
 
@@ -92,7 +92,7 @@ Phase 1 is sequential. Each milestone builds on the prior one. A single agent
 - `quarantine version` command: prints `quarantine v{version}` to stdout,
   exits 0.
 - Config parsing: `quarantine.yml` parser in `cli/internal/config/` with full
-  validation per `docs/config-schema.md`.
+  validation per `docs/specs/config-schema.md`.
 - GitHub client foundation: authenticated HTTP client with token resolution,
   `User-Agent: quarantine-cli/{version}` header, 10-second timeout.
 - GitHub API interactions used in this milestone:
@@ -129,7 +129,7 @@ Phase 1 is sequential. Each milestone builds on the prior one. A single agent
 **Key implementation notes:**
 
 - Override cobra's default exit-2 for usage errors via
-  `cmd.SetFlagErrorFunc()` per `docs/error-handling.md`.
+  `cmd.SetFlagErrorFunc()` per `docs/specs/error-handling.md`.
 - The `framework` field is required with no auto-detection. `quarantine init`
   sets it via interactive prompt.
 - Token is never stored in `quarantine.yml`. Auth is environment variables
@@ -160,7 +160,7 @@ Phase 1 is sequential. Each milestone builds on the prior one. A single agent
   - Handles framework-specific XML variations (Jest/jest-junit, RSpec/
     rspec_junit_formatter, Vitest built-in).
   - Constructs `test_id` as `file_path::classname::name` per
-    `docs/cli-spec.md`.
+    `docs/specs/cli-spec.md`.
 - Detects failures from parsed XML.
 - Writes result JSON to `.quarantine/results.json` (creates directory if
   needed). Result format follows `schemas/test-result.schema.json`.
@@ -168,7 +168,7 @@ Phase 1 is sequential. Each milestone builds on the prior one. A single agent
   - 0 = all tests passed.
   - 1 = test failures exist.
   - 2 = quarantine error (not initialized, bad command, missing XML).
-- Test runner error handling per `docs/error-handling.md` Category 2:
+- Test runner error handling per `docs/specs/error-handling.md` Category 2:
   - Command not found: exit 2 with diagnostic.
   - Non-zero exit + valid XML: exit based on parsed results.
   - No XML produced: exit with runner's exit code, log warning.
@@ -210,7 +210,7 @@ Phase 1 is sequential. Each milestone builds on the prior one. A single agent
   git/ref/heads/quarantine/state`. A 404 means not initialized.
 - JUnit XML has no official schema. Test against real framework output using
   golden fixtures from `testdata/`.
-- `file_path` extraction is framework-specific. See `docs/cli-spec.md`
+- `file_path` extraction is framework-specific. See `docs/specs/cli-spec.md`
   "Framework-Specific `file_path` Extraction" table.
 - Result JSON must include all metadata needed for dashboard ingestion
   (commit SHA, branch, PR number, timestamp, CLI version).
@@ -275,7 +275,7 @@ Phase 1 is sequential. Each milestone builds on the prior one. A single agent
   matching -- special characters in test names must be escaped.
 - RSpec `-e "{name}"` matches against `full_description` and may match
   multiple tests with similar names. This is a known limitation documented in
-  `docs/cli-spec.md`.
+  `docs/specs/cli-spec.md`.
 - The retry loop should exit early on the first passing attempt (no need to
   retry further once flakiness is confirmed).
 
@@ -314,7 +314,7 @@ ensures compatibility when integrated.
   API at the start of `quarantine run`.
 - Writes updated `quarantine.json` with optimistic concurrency (SHA-based
   compare-and-swap). Retry up to 3 times on 409 conflict with re-read and
-  merge. Merge semantics per `docs/error-handling.md`: union of test sets,
+  merge. Merge semantics per `docs/specs/error-handling.md`: union of test sets,
   quarantine wins on conflict.
 - Batch check issue status via GitHub Search API: one call returns all closed
   issues with `quarantine` label. Tests whose issues are closed are
@@ -338,7 +338,7 @@ ensures compatibility when integrated.
   `quarantine.json`. Prints summary of what would have been done.
 - `--exclude PATTERN` flag: additional exclude patterns merged with config
   `exclude` field. Patterns match against `test_id` using glob syntax.
-- Exclude pattern matching per `docs/cli-spec.md`: `*`, `**`, `?` supported.
+- Exclude pattern matching per `docs/specs/cli-spec.md`: `*`, `**`, `?` supported.
   Excluded tests are ignored entirely (no retry, no quarantine, no issue).
 - Rate limit header tracking: read `X-RateLimit-Remaining` after every API
   call, warn when below 10% of limit.
@@ -351,8 +351,8 @@ ensures compatibility when integrated.
     CAS).
   - `GET /search/issues?q=repo:{owner}/{repo}+is:issue+is:closed+label:quarantine`
     (batch check closed issues).
-- Error handling per `docs/error-handling.md` and
-  `docs/github-api-inventory.md`: 401, 403, 404, 409, 422, 429, 5xx,
+- Error handling per `docs/specs/error-handling.md` and
+  `docs/specs/github-api-inventory.md`: 401, 403, 404, 409, 422, 429, 5xx,
   timeout.
 
 **Scope -- explicitly excluded:**
@@ -417,7 +417,7 @@ ensures compatibility when integrated.
   - Comment identified by `<!-- quarantine-bot -->` HTML marker (first line).
   - Lists existing PR comments, scans for marker. If found, updates via PATCH.
     If not found, creates via POST.
-  - Comment template per `docs/cli-spec.md` "PR Comment Template": summary
+  - Comment template per `docs/specs/cli-spec.md` "PR Comment Template": summary
     table, conditional sections for flaky, quarantined, unquarantined,
     failures.
   - Skipped when `notifications.github_pr_comment: false` in config.
@@ -448,7 +448,7 @@ ensures compatibility when integrated.
   - `PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}` (update
     existing PR comment).
 - Error handling for all new API interactions per
-  `docs/github-api-inventory.md`: dedup search failure falls through to
+  `docs/specs/github-api-inventory.md`: dedup search failure falls through to
   create (worst case: duplicate issue). PR comment failure is best-effort
   (no impact on quarantine correctness). Issue creation failure logs warning,
   entry written to `quarantine.json` without `issue_number`.
@@ -525,7 +525,7 @@ No dependency on a working CLI.
         repo: other-app
     poll_interval: 300
     ```
-- SQLite schema and migrations per `docs/architecture.md` section 5.3: `orgs`,
+- SQLite schema and migrations per `docs/planning/architecture.md` section 5.3: `orgs`,
   `projects`, `tests`, `test_runs`, `test_results`, `quarantine_events`
   tables. WAL mode.
 - Artifact polling pipeline:
@@ -537,9 +537,9 @@ No dependency on a working CLI.
     `schemas/test-result.schema.json`.
   - Upserts into SQLite (keyed by `run_id` for idempotency).
   - Debounced on-demand pull: max 1 per repo per 5 minutes.
-- Circuit breaker per `docs/github-api-inventory.md`: 3 consecutive failures
+- Circuit breaker per `docs/specs/github-api-inventory.md`: 3 consecutive failures
   for a repo triggers 30-minute pause.
-- Error handling per `docs/error-handling.md` Category 3: skip cycle on API
+- Error handling per `docs/specs/error-handling.md` Category 3: skip cycle on API
   failure, mark permanently skipped on 404/410 for artifacts, validate JSON
   before ingestion.
 - Basic project listing page: shows configured repos with test run count and
@@ -659,7 +659,7 @@ hardens and documents the entire system.
 **Scope -- included:**
 
 - Comprehensive error handling testing: all error paths from
-  `docs/error-handling.md` have corresponding tests (CLI and dashboard).
+  `docs/specs/error-handling.md` have corresponding tests (CLI and dashboard).
 - Degraded mode testing: simulate GitHub API failures and verify correct
   behavior across all degraded scenarios.
 - CLI Docker image: minimal image with the Go binary, published alongside
@@ -690,7 +690,7 @@ hardens and documents the entire system.
 
 **Acceptance criteria:**
 
-1. Every error path documented in `docs/error-handling.md` has at least one
+1. Every error path documented in `docs/specs/error-handling.md` has at least one
    test.
 2. Degraded mode scenarios pass: no quarantine state, API timeout, CAS
    conflict exhaustion, token expired.
@@ -703,7 +703,7 @@ hardens and documents the entire system.
 7. Cross-compiled binaries run on their target platforms (at minimum: linux
    amd64, darwin arm64).
 8. `make test-all` passes (cli-test + dash-test + schemas-validate).
-9. v1 feature-complete per `docs/architecture.md` section 8 roadmap.
+9. v1 feature-complete per `docs/planning/architecture.md` section 8 roadmap.
 
 **Key implementation notes:**
 
@@ -743,11 +743,10 @@ M5 (issues + PR comments) M7 (dashboard analytics)
 
 ## Cross-References
 
-- `docs/pre-implementation-tasks.md` task 3: this document's origin.
-- `docs/cli-spec.md`: CLI commands, flags, exit codes, output format.
-- `docs/config-schema.md`: quarantine.yml field definitions and validation.
-- `docs/github-api-inventory.md`: API endpoints, error handling, rate limits.
-- `docs/error-handling.md`: error categories, degraded mode, `--strict`.
-- `docs/architecture.md`: system design, data model, deployment.
+- `docs/specs/cli-spec.md`: CLI commands, flags, exit codes, output format.
+- `docs/specs/config-schema.md`: quarantine.yml field definitions and validation.
+- `docs/specs/github-api-inventory.md`: API endpoints, error handling, rate limits.
+- `docs/specs/error-handling.md`: error categories, degraded mode, `--strict`.
+- `docs/planning/architecture.md`: system design, data model, deployment.
 - `schemas/test-result.schema.json`: contract between CLI and dashboard.
 - `schemas/quarantine-state.schema.json`: quarantine.json format.

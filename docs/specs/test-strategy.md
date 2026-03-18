@@ -284,6 +284,5 @@ test-all              # cli-test + dash-test + schemas-validate
 
 ---
 
-*References: [pre-implementation-tasks.md](pre-implementation-tasks.md) (task 6),
-[cli-spec.md](cli-spec.md), [architecture.md](architecture.md),
-[ADR-012](adr/012-concurrency-model.md), [ADR-016](adr/016-v1-framework-scope.md).*
+*References: [cli-spec.md](cli-spec.md), [architecture.md](../planning/architecture.md),
+[ADR-012](../adr/012-concurrency-strategy.md), [ADR-016](../adr/016-v1-framework-scope.md).*
