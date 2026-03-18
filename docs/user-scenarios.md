@@ -9,18 +9,21 @@ This document describes user scenarios for Quarantine in Given-When-Then format.
 ### Scenario 1: First-time setup [v1]
 
 **Given** a developer has a project with an existing test suite (e.g., Jest) and a GitHub Actions CI pipeline, and Quarantine CLI is not yet installed
-**When** the developer installs the CLI via `curl -sSL https://github.com/org/quarantine/releases/latest/download/quarantine-linux-amd64 -o /usr/local/bin/quarantine && chmod +x /usr/local/bin/quarantine`, creates a `quarantine.yml` in the repo root with the following content:
+**When** the developer installs the CLI via `curl -sSL https://github.com/mycargus/quarantine/releases/latest/download/quarantine-linux-amd64 -o /usr/local/bin/quarantine && chmod +x /usr/local/bin/quarantine`, runs `quarantine init` which interactively prompts for framework, retries, and JUnit XML path, creating a `quarantine.yml` in the repo root with the following content:
 
 ```yaml
+version: 1
 framework: jest
 retries: 3
 issue_tracker: github
 labels:
   - quarantine
+notifications:
+  github_pr_comment: true
 ```
 
 and updates their CI workflow to replace `jest --ci --reporters=default --reporters=jest-junit` with `quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit`
-**Then** the CLI initializes successfully on the next CI run, creates the `quarantine/state` branch in the repository if it does not exist, writes an empty `quarantine.json` (`{ "version": 1, "tests": {} }`) to that branch via the GitHub Contents API, and the build proceeds normally
+**Then** `quarantine init` validates the GitHub token and repository permissions, creates the `quarantine/state` branch in the repository if it does not exist, writes an empty `quarantine.json` (`{ "version": 1, "tests": {} }`) to that branch via the GitHub Contents API, and the build proceeds normally on the next CI run
 
 ---
 
@@ -28,7 +31,7 @@ and updates their CI workflow to replace `jest --ci --reporters=default --report
 
 **Given** the CLI is configured in CI, `quarantine.json` on the `quarantine/state` branch contains zero quarantined tests, and all tests in the suite are deterministic
 **When** the developer pushes a commit and CI executes `quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit`
-**Then** the CLI runs the test suite once, all tests pass on the first attempt, no retries are triggered, no changes are made to `quarantine.json`, the test results are uploaded as a GitHub Artifact for the run, no PR comment is posted (nothing to report), and the CI build exits with status code 0
+**Then** the CLI runs the test suite once, all tests pass on the first attempt, no retries are triggered, no changes are made to `quarantine.json`, the test results are written to disk (`.quarantine/results.json`), no PR comment is posted (nothing to report), and the CI build exits with status code 0
 
 ---
 
@@ -36,23 +39,26 @@ and updates their CI workflow to replace `jest --ci --reporters=default --report
 
 **Given** the CLI is configured in CI, `quarantine.json` has no entry for the test `PaymentService > should handle charge timeout`, and this test is non-deterministic
 **When** CI executes `quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit` and `should handle charge timeout` fails on the first run but passes on retry 2 of 3
-**Then** the CLI identifies `should handle charge timeout` as flaky, fetches the current `quarantine.json` from the `quarantine/state` branch (recording its SHA for optimistic concurrency), adds an entry for the test with timestamp and first-seen metadata, writes the updated `quarantine.json` back via the Contents API using compare-and-swap, creates a GitHub Issue titled "Flaky test: PaymentService > should handle charge timeout" with the `quarantine` label and a test-specific label (e.g., `test:should_handle_charge_timeout`), posts a PR comment summarizing the newly quarantined test, uploads results as a GitHub Artifact, and the CI build exits with status code 0 (pass, since the failure was flaky)
+**Then** the CLI identifies `should handle charge timeout` as flaky, fetches the current `quarantine.json` from the `quarantine/state` branch (recording its SHA for optimistic concurrency), adds an entry for the test with timestamp and first-seen metadata, writes the updated `quarantine.json` back via the Contents API using compare-and-swap, creates a GitHub Issue titled "Flaky test: PaymentService > should handle charge timeout" with the `quarantine` label and a test-specific label (e.g., `test:should_handle_charge_timeout`), posts a PR comment summarizing the newly quarantined test, writes results to disk (`.quarantine/results.json`), and the CI build exits with status code 0 (pass, since the failure was flaky)
 
 ---
 
-### Scenario 4: CI run with a previously quarantined test that fails again [v1]
+### Scenario 4: CI run with a previously quarantined test [v1]
 
 **Given** `quarantine.json` on the `quarantine/state` branch contains an entry for `PaymentService > should handle charge timeout` with status `quarantined`, and the corresponding GitHub Issue is still open
-**When** CI executes `quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit` and `should handle charge timeout` fails
-**Then** the CLI recognizes the test is in the quarantine list and immediately suppresses the failure without retrying (does not count it toward the build result), updates the `quarantine.json` entry with a `last_seen_flaky` timestamp, posts a PR comment noting the quarantined test still fails, uploads results as a GitHub Artifact, and the CI build exits with status code 0
+**When** CI executes `quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit`
+**Then** the CLI recognizes the test is in the quarantine list and excludes it from execution via framework-specific exclusion flags (the test does not run at all), posts a PR comment noting which tests were excluded from execution, writes results to disk (`.quarantine/results.json`), and the CI build exits with status code 0
 
 ---
 
-### Scenario 5: CI run with a previously quarantined test that now passes consistently [v1]
+### Scenario 5: quarantine init — required setup step [v1]
 
-**Given** `quarantine.json` contains an entry for `PaymentService > should handle charge timeout` with status `quarantined`, and the corresponding GitHub Issue is still open
-**When** CI executes `quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit` and `should handle charge timeout` passes on the first attempt (no retries needed)
-**Then** the CLI records a passing result for the quarantined test, updates the `quarantine.json` entry with a `last_passed` timestamp and increments a consecutive-pass counter, does NOT yet remove the test from quarantine (the issue must be closed to unquarantine), posts a PR comment noting the quarantined test is passing again, uploads results as a GitHub Artifact, and the CI build exits with status code 0
+**Given** a developer has a project with a Jest test suite and a GitHub Actions CI pipeline, and Quarantine CLI is installed but `quarantine init` has not been run
+**When** the developer runs `quarantine init` from the repo root
+**Then** the CLI interactively prompts for framework (e.g., `jest`, `rspec`, `vitest`), retry count (default: 3), and JUnit XML output path; creates a `quarantine.yml` in the repo root with the chosen values (including `version: 1`, `issue_tracker: github`, `labels: [quarantine]`, `notifications: { github_pr_comment: true }`); validates the GitHub token (`QUARANTINE_GITHUB_TOKEN` or `GITHUB_TOKEN`) and tests repository permissions; creates the `quarantine/state` branch with an empty `quarantine.json` (`{ "version": 1, "tests": {} }`); and prints a summary of what was configured and next steps for CI integration
+
+**When** the developer runs `quarantine run` without having run `quarantine init` first
+**Then** the CLI prints an error: `"Quarantine is not initialized for this repository. Run 'quarantine init' first."` and exits with code 2
 
 ---
 
@@ -60,7 +66,7 @@ and updates their CI workflow to replace `jest --ci --reporters=default --report
 
 **Given** the CLI is configured in CI, `quarantine.json` has no entry for `CheckoutService > should apply discount`, and this test has a genuine bug
 **When** CI executes `quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit` and `should apply discount` fails on all 3 retries
-**Then** the CLI determines the test is a real (deterministic) failure, does NOT add it to `quarantine.json`, does NOT create a GitHub Issue, uploads results as a GitHub Artifact, posts a PR comment noting the hard failure, and the CI build exits with a non-zero status code (build fails)
+**Then** the CLI determines the test is a real (deterministic) failure, does NOT add it to `quarantine.json`, does NOT create a GitHub Issue, writes results to disk (`.quarantine/results.json`), posts a PR comment noting the hard failure, and the CI build exits with a non-zero status code (build fails)
 
 ---
 
@@ -68,7 +74,7 @@ and updates their CI workflow to replace `jest --ci --reporters=default --report
 
 **Given** the CLI is configured in CI with `--retries 3`, and `quarantine.json` has no entries for `SearchService > should fuzzy match` or `ApiService > should handle rate limit`
 **When** CI executes `quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit` and both `should fuzzy match` (fails run 1, passes run 2) and `should handle rate limit` (fails run 1, fails run 2, passes run 3) are detected as flaky
-**Then** the CLI adds both tests to `quarantine.json` in a single write (atomic update via Contents API with SHA-based compare-and-swap), creates two separate GitHub Issues each with the `quarantine` label and their respective test-specific labels, posts a single PR comment summarizing both newly quarantined tests, uploads results as a GitHub Artifact, and the CI build exits with status code 0
+**Then** the CLI adds both tests to `quarantine.json` in a single write (atomic update via Contents API with SHA-based compare-and-swap), creates two separate GitHub Issues each with the `quarantine` label and their respective test-specific labels, posts a single PR comment summarizing both newly quarantined tests, writes results to disk (`.quarantine/results.json`), and the CI build exits with status code 0
 
 ---
 
@@ -76,7 +82,7 @@ and updates their CI workflow to replace `jest --ci --reporters=default --report
 
 **Given** `quarantine.json` contains an entry for `PaymentService > should handle charge timeout`, and a GitHub Issue titled "Flaky test: PaymentService > should handle charge timeout" exists with the `quarantine` label
 **When** a developer closes the GitHub Issue (indicating the flaky test has been fixed)
-**Then** on the next CI run, the CLI detects the issue is closed, removes the `should handle charge timeout` entry from `quarantine.json` via Contents API with compare-and-swap, the test runs normally (no longer suppressed), and if it fails, it fails the build like any other test
+**Then** on the next CI run, the CLI performs a batch issue status check via the GitHub Search API (one call returns all closed quarantine issues), detects the issue is closed, removes the `should handle charge timeout` entry from `quarantine.json` via Contents API with compare-and-swap, and the test is no longer excluded from execution — it runs normally as part of the test suite, and if it fails, it fails the build like any other test
 
 ---
 
@@ -110,7 +116,7 @@ and updates their CI workflow to replace `jest --ci --reporters=default --report
 
 **Given** the CLI is configured in CI and the GitHub API is unreachable (network failure, rate limit exceeded, or API outage)
 **When** CI executes `quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit`
-**Then** the CLI logs a warning: "Unable to reach GitHub API. Running in degraded mode with cached quarantine state.", falls back to a cached copy of `quarantine.json` from the GitHub Actions cache, suppresses quarantined test failures using the last-known quarantine list, logs a warning that the quarantine data may be stale, still retries non-quarantined failures per `--retries 3`, does NOT attempt to update `quarantine.json` or create issues, stores results locally and attempts to upload them as a GitHub Artifact (which may also fail), and exits with a status code based on the test results (quarantined tests ARE suppressed using cached state). If no cache exists (very first run ever with API down), the CLI falls back to running without quarantine state and exits based on raw test results
+**Then** the CLI logs a warning: "Unable to reach GitHub API. Running in degraded mode.", falls back to a cached copy of `quarantine.json` from the GitHub Actions cache if available, runs the test suite without quarantine exclusions if no cache exists, still retries failing tests per `--retries 3`, does NOT attempt to update `quarantine.json` or create issues, writes results to disk (`.quarantine/results.json`), and exits with a status code based on the test results. Any flaky tests detected during the degraded run will be re-detected on the next successful run when GitHub API connectivity is restored
 
 ---
 
@@ -118,7 +124,7 @@ and updates their CI workflow to replace `jest --ci --reporters=default --report
 
 **Given** the CLI is configured in CI, the GitHub API is reachable, but the React Router v7 dashboard is unreachable
 **When** CI executes `quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit` and detects a flaky test
-**Then** the CLI operates normally: updates `quarantine.json`, creates GitHub Issues, posts PR comments, and uploads results as GitHub Artifacts; the dashboard being unreachable has no effect on the CLI's behavior since the dashboard pulls data from GitHub Artifacts independently; the CI build exits with status code 0
+**Then** the CLI operates normally: updates `quarantine.json`, creates GitHub Issues, posts PR comments, and writes results to disk; the dashboard being unreachable has no effect on the CLI's behavior since the dashboard pulls data from GitHub Artifacts independently; the CI build exits with status code 0
 
 ---
 
@@ -130,16 +136,11 @@ and updates their CI workflow to replace `jest --ci --reporters=default --report
 
 ---
 
-### Scenario 14: CI run with no API access and empty cache but preexisting quarantine state on branch [v1]
+### Scenario 14: CI run with no API access and empty cache [v1]
 
 **Given** the CLI is configured in CI, the `quarantine/state` branch exists and contains a `quarantine.json` with 4 previously quarantined tests, the GitHub Actions cache is empty (e.g., cache expired or was manually cleared), and the GitHub API is completely unreachable (network outage, DNS failure, or total GitHub downtime)
 **When** CI executes `quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit`
-**Then** the CLI attempts to fetch `quarantine.json` from the `quarantine/state` branch via the GitHub Contents API and fails, attempts to load a cached copy from the GitHub Actions cache and finds none, logs a warning: "Unable to reach GitHub API and no cached quarantine state available. Running in full degraded mode — all tests will run without quarantine suppression.", runs the full test suite without suppressing any quarantined test failures, retries any failing tests per `--retries 3`, identifies 2 tests as flaky (they fail initially but pass on retry), attempts to write the updated quarantine state to GitHub and fails, attempts to upload results as a GitHub Artifact and fails (GitHub is unreachable), attempts to write detected flaky tests to a local file (`.quarantine/pending.json`) in the workspace, and exits with status code 0 (flaky failures are still forgiven even in degraded mode)
-
-**When** on the next CI run the GitHub API is reachable again
-**Then** the CLI fetches the existing `quarantine.json` from the `quarantine/state` branch (containing the original 4 quarantined tests), checks for a `.quarantine/pending.json` file in the workspace, performs an additive (union) merge of the 2 newly detected flaky tests with the 4 existing quarantined tests, writes the merged `quarantine.json` (now containing 6 tests) back to the `quarantine/state` branch via the Contents API using optimistic concurrency (compare-and-swap with the current SHA), deletes the `.quarantine/pending.json` file after a successful write, creates GitHub Issues for the 2 newly quarantined tests, and no data from the preexisting `quarantine.json` is lost
-
-> **Note on local state persistence:** The `.quarantine/pending.json` fallback only works if the CI workspace persists between runs (e.g., a self-hosted runner with a persistent workspace). On ephemeral runners (the default for GitHub-hosted runners), the workspace is destroyed after each job, so `.quarantine/pending.json` is lost. Writing to the GitHub Actions cache is also not possible when the GitHub API is unreachable. In this case, the flaky test detection from the degraded run is lost entirely — the flaky tests will simply be re-detected on the next run when connectivity is restored. This is an accepted limitation: the system trades durability of a single degraded run's results for simplicity, and no preexisting quarantine data is ever lost.
+**Then** the CLI attempts to fetch `quarantine.json` from the `quarantine/state` branch via the GitHub Contents API and fails, attempts to load a cached copy from the GitHub Actions cache and finds none, logs a warning: "Unable to reach GitHub API and no cached quarantine state available. Running without quarantine exclusions.", runs the full test suite without excluding any quarantined tests, retries any failing tests per `--retries 3`, writes results to disk (`.quarantine/results.json`), logs warnings that quarantine state could not be read or updated, and exits with a status code based on the test results (flaky failures are still forgiven via retry). Any flaky tests detected during this run will be re-detected and quarantined on the next run when GitHub API connectivity is restored
 
 ---
 
@@ -157,7 +158,7 @@ and updates their CI workflow to replace `jest --ci --reporters=default --report
 
 **Given** the user is on the dashboard and selects the repository `acme/payments-service`, which has 3 quarantined tests
 **When** the project detail page loads
-**Then** the dashboard displays a list of all 3 quarantined tests with their names, date first quarantined, last flaky occurrence, consecutive-pass count, links to their corresponding GitHub Issues, and a trend chart showing flaky test count over time (data sourced from ingested GitHub Artifacts)
+**Then** the dashboard displays a list of all 3 quarantined tests with their names, date first quarantined, last flaky occurrence, links to their corresponding GitHub Issues, and a trend chart showing flaky test count over time (data derived from ingested GitHub Artifacts history)
 
 ---
 
@@ -210,15 +211,44 @@ and updates their CI workflow to replace `jest --ci --reporters=default --report
 **Given** a `quarantine.yml` file exists in the repo root with the following content:
 
 ```yaml
+version: 1
 framework: jest
 retries: 3
 issue_tracker: github
 labels:
   - quarantine
+notifications:
+  github_pr_comment: true
 ```
 
 **When** the developer runs `quarantine validate` from the repo root
-**Then** the CLI reads `quarantine.yml`, validates all fields against the expected schema, confirms the framework is supported, confirms the retry count is a positive integer, confirms the issue tracker is valid, and prints "quarantine.yml is valid." with exit code 0; if the file is missing, the CLI prints "Error: quarantine.yml not found in the current directory." and exits with code 1; if a field is invalid (e.g., `retries: -1`), the CLI prints "Error: 'retries' must be a positive integer." and exits with code 1
+**Then** the CLI reads `quarantine.yml`, validates all fields against the expected schema (including `version`, `framework`, `issue_tracker`, `labels`, and `notifications`), confirms the framework is supported in v1 (`jest`, `rspec`, or `vitest`), confirms the retry count is a positive integer, confirms the issue tracker is valid for v1, validates forward-compatible fields (e.g., `issue_tracker: jira` produces "Error: 'issue_tracker: jira' is not supported in v1. Supported values: github."), and prints "quarantine.yml is valid." with exit code 0; if the file is missing, the CLI prints "Error: quarantine.yml not found in the current directory." and exits with code 1; if a field is invalid (e.g., `retries: -1`), the CLI prints "Error: 'retries' must be a positive integer." and exits with code 1
+
+---
+
+### Scenario 22b: Invalid forward-compatible config value [v1]
+
+**Given** a `quarantine.yml` file exists in the repo root with the following content:
+
+```yaml
+version: 1
+framework: jest
+retries: 3
+issue_tracker: jira
+labels:
+  - quarantine
+```
+
+**When** the developer runs `quarantine validate` from the repo root
+**Then** the CLI reads `quarantine.yml`, detects that `issue_tracker: jira` is a known but unsupported value in v1, and prints: "Error: 'issue_tracker: jira' is not supported in v1. Supported values: github." and exits with code 1
+
+---
+
+### Scenario 22c: quarantine init with Jest recommendation [v1]
+
+**Given** a developer has a project with a Jest test suite and runs `quarantine init`, selecting `jest` as the framework
+**When** `quarantine init` completes framework selection
+**Then** the CLI recommends configuring `jest-junit` for clean `test_id` output, printing guidance such as: "Recommended: install jest-junit and add to your Jest config for reliable test identification. See https://github.com/jest-community/jest-junit for setup instructions.", and proceeds with the remaining init steps (retry count, JUnit XML path, config creation, branch setup)
 
 ---
 
@@ -235,6 +265,32 @@ labels:
 **Given** `quarantine.yml` exists with `retries: 5`
 **When** the developer runs `quarantine run -- jest --ci --reporters=default --reporters=jest-junit` without the `--retries` flag
 **Then** the CLI reads the retry count from `quarantine.yml` and retries each failing test up to 5 times; if the developer runs `quarantine run --retries 2 -- jest --ci --reporters=default --reporters=jest-junit`, the CLI flag overrides the config file and retries only 2 times
+
+---
+
+## Edge Cases
+
+### Scenario 33: All tests in the suite are quarantined [v1]
+
+**Given** the CLI is configured in CI, `quarantine.json` on the `quarantine/state` branch contains entries for every test in the suite (e.g., 50 out of 50 tests are quarantined), and the corresponding GitHub Issues are all open
+**When** CI executes `quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit`
+**Then** the CLI reads the quarantine list from `quarantine.json`, constructs exclusion flags that exclude all 50 tests from execution, and the test runner executes 0 tests. Some test frameworks (notably Jest) exit non-zero when no tests match (e.g., Jest exits with code 1 and the message "No tests found"). The CLI detects this condition by examining the JUnit XML output: if the XML contains zero test cases (or no XML is produced) and the test runner exited non-zero, the CLI checks whether the number of quarantined exclusions equals or exceeds the expected test count. If all failures can be attributed to an empty suite caused by quarantine exclusions, the CLI treats this as a successful run and exits with code 0. The CLI posts a PR comment noting: "All 50 tests in this suite are currently quarantined. No tests were executed. Consider reviewing quarantined tests and closing resolved issues." The results artifact contains `summary.total: 0`, `summary.quarantined: 50`, and an empty `tests` array, reflecting that no tests were executed. The CLI logs a warning to stderr: `[quarantine] WARNING: All tests excluded by quarantine. No tests executed.`
+
+---
+
+### Scenario 34: Search API result limit exceeded during unquarantine detection [v1]
+
+**Given** the CLI is configured in CI, `quarantine.json` contains 5 currently quarantined tests, and the repository has a long history of quarantine issues -- over 1,000 closed GitHub Issues with the `quarantine` label accumulated over months of CI activity
+**When** CI executes `quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit` and the CLI performs the batch issue status check via `GET /search/issues?q=repo:{owner}/{repo}+is:issue+is:closed+label:quarantine`, and the GitHub Search API returns `total_count: 1,247` but caps the retrievable results at 1,000 items (the documented Search API maximum)
+**Then** the CLI paginates through all available results (up to 1,000 items at 100 per page = 10 pages), matches closed issue numbers against the `issue_number` fields in `quarantine.json` entries, and unquarantines any tests whose issues appear in the retrieved results. If a quarantined test's closed issue falls outside the 1,000-result window (i.e., it was one of the oldest 247 closed issues not returned by the API), that test remains quarantined for this run. The CLI detects this condition when the Search API response includes `total_count` greater than the number of retrievable items, and logs a warning: `[quarantine] WARNING: GitHub Search API returned 1,000 of 1,247 closed quarantine issues. Some closed issues may not be detected. Consider narrowing the search with a date filter or manually closing stale quarantine issues.` The missed unquarantine is non-critical: the test remains quarantined (excluded from execution) until a subsequent run retrieves the closed issue, or until a developer notices and manually removes the entry. This is consistent with the quarantine-wins principle (ADR-012) -- erring on the side of keeping a test quarantined is safer than accidentally re-enabling a flaky test. Future mitigation: add a `closed_since` date filter to the search query scoped to the test's `quarantined_at` timestamp, which keeps results within the 1,000-item window for most repositories.
+
+---
+
+### Scenario 35: Concurrent unquarantine race with quarantine-wins resolution [v1]
+
+**Given** `quarantine.json` on the `quarantine/state` branch contains entries for `PaymentService > should handle charge timeout` (test X, issue #42) and `SearchService > should fuzzy match` (test Y, issue #55), both with open GitHub Issues. Two CI builds (Build A and Build B) are running in parallel. A developer closes issue #42 for test X between the moment Build A reads `quarantine.json` and the moment Build B reads it.
+**When** Build A reads `quarantine.json` at SHA `abc123` (test X and test Y present), performs the batch issue status check, and does NOT see issue #42 as closed (it was still open at the time of Build A's search query). Build A runs tests, detects a new flaky test `ApiService > should handle timeout` (test Z), and writes `quarantine.json` with test X, test Y, and test Z (SHA `abc123` -> `def456`, write succeeds). Meanwhile, Build B reads `quarantine.json` at SHA `abc123` (stale, before Build A's write), performs the batch issue status check, and DOES see issue #42 as closed (the developer closed it after Build A's check but before Build B's check). Build B removes test X from its local copy and attempts to write `quarantine.json` with only test Y (using stale SHA `abc123`).
+**Then** Build B's write fails with a 409 Conflict because the SHA no longer matches (Build A already wrote `def456`). Build B re-reads `quarantine.json` at SHA `def456` (which now contains test X, test Y, and test Z). Build B merges using the quarantine-wins (union) strategy per ADR-012: test X is present in the remote state (Build A's write) and absent in Build B's local state (removed due to closed issue), so the union merge preserves test X. The resulting `quarantine.json` contains test X, test Y, and test Z. Build B writes this merged state and logs: `[quarantine] WARNING: Test 'PaymentService > should handle charge timeout' was unquarantined (issue closed) but re-quarantined due to concurrent update. It will be unquarantined on the next build.` On the very next CI run (Build C), the CLI reads `quarantine.json`, performs the batch issue status check, finds issue #42 is closed, removes test X, and writes the update. The impact of the race is one extra build cycle where test X remains quarantined -- it is excluded from execution rather than running and potentially failing, which is the safe default.
 
 ---
 
@@ -278,6 +334,7 @@ labels:
 
 ```yaml
 notifications:
+  github_pr_comment: true
   slack:
     webhook_url: https://hooks.slack.com/services/T00/B00/xxxxx
     threshold: 10
@@ -293,7 +350,7 @@ and the organization currently has 9 quarantined tests
 
 **Given** a project uses Jenkins for CI (not GitHub Actions), the Quarantine CLI is installed on the Jenkins agent, and `quarantine.yml` is configured with `ci_provider: jenkins`
 **When** the Jenkins pipeline executes `quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit` and detects a flaky test
-**Then** the CLI updates `quarantine.json` on the `quarantine/state` branch via the GitHub Contents API (same as GitHub Actions), creates a GitHub Issue, but instead of uploading results as GitHub Artifacts (unavailable in Jenkins), the CLI uploads results via the dashboard's HTTP API endpoint or stores them in a configured artifact backend, and the Jenkins build exits with status code 0
+**Then** the CLI updates `quarantine.json` on the `quarantine/state` branch via the GitHub Contents API (same as GitHub Actions), creates a GitHub Issue, but instead of relying on `actions/upload-artifact` (unavailable in Jenkins), the CLI uploads results via the dashboard's HTTP API endpoint or stores them in a configured artifact backend, and the Jenkins build exits with status code 0
 
 ---
 

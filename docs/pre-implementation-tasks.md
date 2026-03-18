@@ -1,6 +1,6 @@
 # Pre-Implementation Tasks
 
-> Last updated: 2026-03-14
+> Last updated: 2026-03-17
 >
 > These tasks should be completed before (or during early) implementation to
 > reduce ambiguity and avoid rework. They are ordered by impact on
@@ -8,20 +8,20 @@
 
 ## Status
 
-| # | Task | Status | Priority |
-|---|------|--------|----------|
-| 1 | CLI interface specification | Not started | P0 |
-| 2 | GitHub API interaction inventory | Not started | P0 |
-| 3 | Implementation milestones | Not started | P0 |
-| 4 | quarantine.yml full schema | Not started | P0 |
-| 5 | Sequence diagrams for key flows | Not started | P1 |
-| 6 | Test strategy for the project itself | Not started | P1 |
-| 7 | Error handling strategy | Not started | P1 |
-| 8 | CLAUDE.md for the repo | Done | P1 |
-| 9 | JSON interface schemas | Not started | P0 |
-| 10 | Golden test fixtures | Not started | P0 |
-| 11 | Repo scaffolding and build infrastructure | Not started | P0 |
-| 12 | Claude Code hooks for scope enforcement | Not started | P1 |
+| # | Task | Status | Priority | Deliverable |
+|---|------|--------|----------|-------------|
+| 1 | CLI interface specification | Done | P0 | `docs/cli-spec.md` |
+| 2 | GitHub API interaction inventory | Done | P0 | `docs/github-api-inventory.md` |
+| 3 | Implementation milestones | Done | P0 | `docs/milestones.md` |
+| 4 | quarantine.yml full schema | Done | P0 | `docs/config-schema.md` |
+| 5 | Sequence diagrams for key flows | Done | P1 | `docs/sequence-diagrams.md` |
+| 6 | Test strategy for the project itself | Done | P1 | `docs/test-strategy.md` |
+| 7 | Error handling strategy | Done | P1 | `docs/error-handling.md` |
+| 8 | CLAUDE.md for the repo | Done | P1 | `CLAUDE.md` |
+| 9 | JSON interface schemas | Done | P0 | `schemas/*.schema.json` |
+| 10 | Golden test fixtures | Done | P0 | `testdata/` (30 files) |
+| 11 | Repo scaffolding and build infrastructure | Done | P0 | `cli/`, `dashboard/`, `Makefile` |
+| 12 | Claude Code hooks for scope enforcement | Done | P1 | `.claude/hooks/`, `.claude/settings.json` |
 
 P0 = complete before coding. P1 = can be done alongside early milestones.
 
@@ -54,18 +54,46 @@ For each command, specify:
 - Stdout/stderr output format (human-readable vs machine-readable)
 - Examples
 
-**Specific open questions to resolve:**
-- `quarantine run`: What flags? At minimum: `--retries`, `--config`,
-  `--junitxml` (glob pattern), `--dry-run`, `--verbose`. What else?
-- `quarantine run` exit codes: 0 = all tests pass (quarantined failures
-  suppressed), 1 = real failures exist, 2 = quarantine itself errored (but
-  still ran tests). Are there others?
-- `quarantine validate`: What does it output? Resolved config including
-  auto-detected values? Errors? Warnings?
-- Should there be a `quarantine init` command to create quarantine.yml and
-  the quarantine/state branch?
-- Output verbosity levels: default, `--verbose`, `--quiet`, `--json`?
-- PR comment format: exact markdown template
+**Resolved decisions:**
+- **`quarantine init` command:** Required before `quarantine run`. Interactive:
+  prompts for framework, retries, JUnit XML path. Creates `quarantine.yml`,
+  validates GitHub token/permissions, creates `quarantine/state` branch.
+  `--yes` flag (accept defaults, non-interactive) deferred to v2.
+- **`quarantine run` without init:** Refuses with error:
+  `"Quarantine is not initialized for this repository. Run 'quarantine init' first."`
+- **Output verbosity:** `--verbose`, `--quiet` in v1. `--json` deferred to v2.
+- **PR comment format:** Designed as part of the CLI spec deliverable.
+  PR comment identification via hidden HTML marker `<!-- quarantine-bot -->`.
+- **Exit codes:**
+  - 0 = success (tests passed; includes degraded mode where tests passed)
+  - 1 = test failure (real, non-flaky failures exist)
+  - 2 = quarantine error (not initialized, bad command, `--strict` infrastructure failure)
+  - `validate` and `init`: 0 = success, 2 = failure
+  - Exit code 1 exclusively means "your tests failed." No ambiguity.
+  - Research pending: CI runner conventions for exit codes 0/1/2.
+- **`--strict` mode:** v1. Infrastructure errors cause exit 2 instead of
+  degraded mode. Useful for debugging and verifying setup.
+- **Quarantined tests don't run.** CLI excludes them via framework-specific
+  flags before test execution. No JUnit XML rewriting. ADR-003 needs updating.
+- **`framework` is required** in `quarantine.yml`. No auto-detection.
+  `quarantine init` sets it interactively.
+
+**Commands (updated):**
+
+```
+quarantine init
+quarantine run [flags] -- <test command>
+quarantine validate [flags]
+quarantine version
+```
+
+**Remaining questions to resolve in cli-spec.md:**
+- Full flag inventory for `quarantine run` (at minimum: `--retries`, `--config`,
+  `--junitxml`, `--dry-run`, `--verbose`, `--quiet`, `--strict`, `--pr`,
+  `--exclude`)
+- `quarantine validate` output format
+- `quarantine init` interactive prompts and validation steps
+- Framework-specific test exclusion mechanisms (Jest, RSpec, Vitest)
 
 ---
 
@@ -113,15 +141,29 @@ Dashboard:
 14. List repositories in org (Repos API GET -- v2, GitHub App)
 15. OAuth flow endpoints (v2)
 
-**Specific open questions to resolve:**
-- Artifact upload: does the CLI use the `actions/upload-artifact` action (only
-  works in GitHub Actions) or the REST API (works anywhere but more complex)?
-  What about non-GitHub-Actions CI (v2)?
-- Can the CLI determine if it's running inside a GitHub Actions workflow
-  (check for `GITHUB_ACTIONS` env var)?
-- For PR comments: how does the CLI determine the PR number? From
-  `GITHUB_REF`, `GITHUB_EVENT_PATH`, or a flag?
-- Rate limit tracking: should the CLI read `X-RateLimit-Remaining` headers
+**Resolved decisions:**
+- **Artifact upload:** CLI writes result JSON to a local file
+  (e.g., `.quarantine/results.json`). The user's GitHub Actions workflow
+  uses `actions/upload-artifact` to upload it. CLI does file I/O only --
+  no Artifacts REST API complexity. REST API upload is a v2 concern for
+  non-GHA CI environments. Artifact naming collisions in matrix jobs are
+  handled via documentation (workflow snippet with matrix-safe naming).
+- **GHA detection:** CLI checks `GITHUB_ACTIONS` env var to determine if
+  running inside GitHub Actions (used for `::warning` annotations, etc.).
+- **PR number detection:** CLI auto-detects from `GITHUB_EVENT_PATH` env
+  var (reads the JSON file, extracts PR number). `--pr` flag overrides
+  for forward compatibility with non-GHA environments.
+- **Unquarantine detection:** Batch via GitHub Search API -- one call
+  returns all closed quarantine issues. Compare against `quarantine.json`.
+  One API call instead of N (avoids 5-25s latency with many quarantined tests).
+- Item 9 (artifact upload) updated: CLI writes to disk, workflow uploads.
+  Items 10-11 (Actions cache) unchanged.
+- **Dashboard artifact ingestion:** v1 uses GitHub Artifacts polling.
+  Research pending on Jenkins/GitLab artifact systems for v2 per-provider
+  dashboard pollers.
+
+**Remaining questions to resolve in github-api-inventory.md:**
+- Rate limit tracking: should CLI read `X-RateLimit-Remaining` headers
   and log warnings when approaching the limit?
 
 ---
@@ -220,10 +262,21 @@ Both Agent A's CLI output and Agent B's dashboard input should be validated
 against the same JSON schema (from task 9). This ensures the two components
 will work together when integrated in Phase 3.
 
-**Open questions:**
-- Is this the right granularity?
-- Should any milestones be split or merged?
-- What's the minimum viable demo for stakeholders at your employer?
+**Resolved decisions:**
+- **Granularity:** Keep milestones as small as possible. Break into more
+  if needed during implementation.
+- **Minimum viable demo:** M4 (GitHub Issues + PR comments). First
+  milestone where the tool is visible to stakeholders without reading CI logs.
+- Milestones may be further split in the milestones.md deliverable.
+- **M5 (Artifacts upload) folded into M4.** CLI writes results to disk as
+  part of normal operation. Artifact upload is a workflow snippet (docs).
+- **Milestones need holistic rework** due to:
+  - `quarantine init` is now required (needs its own milestone or M1 scope)
+  - Quarantined tests are excluded from execution (not XML rewriting)
+  - `framework` is required (no auto-detection in M1)
+  - `pending.json` removed
+  - `storage.backend: actions-cache` removed from config
+  - Dashboard config (`dashboard.yml`) needs to be in M6 scope
 
 ---
 
@@ -241,7 +294,7 @@ rules, and behavior.
 
 version: 1                          # Required. Schema version.
 
-framework: jest                     # Optional. Auto-detected if omitted.
+framework: jest                     # Required. Set by `quarantine init`.
                                     # Valid: rspec, jest, vitest (v1)
                                     #        pytest, go, maven (v2+)
 
@@ -257,25 +310,48 @@ github:
   owner: my-org                     # Optional. Auto-detected from git remote.
   repo: my-project                  # Optional. Auto-detected from git remote.
 
+issue_tracker: github               # Optional. Default: github.
+                                    # v1: only "github" accepted.
+                                    # v2+: jira, etc.
+
+labels:                             # Optional. Default: [quarantine].
+  - quarantine                      # v1: only ["quarantine"] accepted.
+                                    # v2+: custom labels.
+
+notifications:                      # Optional. Default: { github_pr_comment: true }.
+  github_pr_comment: true           # v1: only valid key. true/false.
+                                    # v2+: adds slack, possibly email.
+  # slack:                          # v2+
+  #   webhook_url: https://...
+  #   threshold: 10
+
 storage:
-  backend: branch                   # Optional. Default: branch.
-                                    # Valid: branch, actions-cache
   branch: quarantine/state          # Optional. Default: quarantine/state.
-                                    # Only used when backend: branch.
+
+exclude:                            # Optional. Default: none.
+  - "test/integration/**"           # Patterns for tests quarantine ignores
+  - "TestSlowService"               # entirely (no retry, no quarantine, no issue).
+                                    # Pattern matching target pending test_id research.
 
 rerun_command: ""                   # Optional. Override auto-detected rerun
                                     # command template. Uses {name}, {classname},
                                     # {file} placeholders.
 ```
 
-**Open questions:**
-- Should the config support per-framework overrides (e.g., different retry
-  count for slow integration tests)?
-- Should there be an `exclude` field to ignore specific tests or patterns?
-- Should there be an `issue` section configuring label names, assignees, etc.?
-- Where does the GitHub token come from -- only env var, or also config?
-  (Recommendation: env var only, never in config file, to avoid committing
-  secrets.)
+**Resolved decisions:**
+- **`framework`:** Required field. No auto-detection. Set by `quarantine init`.
+- **`issue_tracker`:** Forward-compatible. v1: only `github`. Error on other values.
+- **`labels`:** Forward-compatible. v1: only `[quarantine]`. Error on other values.
+- **`notifications`:** Nested object. v1: only `github_pr_comment: true/false`.
+  Error on other keys (e.g., `slack`). Defaults to `{ github_pr_comment: true }`.
+- **`storage.backend`:** Removed. v1 only supports branch storage. `actions-cache`
+  is an internal degraded-mode detail, not a user-facing config option.
+- **`exclude` field:** v1. Quarantine ignores matched tests entirely -- no retry,
+  no quarantine, no issue. Behavior is as if quarantine is not installed for those tests.
+  What patterns match against (test_id? classname? name?) pending research.
+- **Per-framework overrides:** Deferred to v2.
+- **GitHub token:** Env vars only (`QUARANTINE_GITHUB_TOKEN`, falls back to
+  `GITHUB_TOKEN`). Never in config file. No exceptions.
 
 ---
 
@@ -290,20 +366,25 @@ diagrams)
 ### Flows to diagram
 
 1. **Happy path: flaky test detected and quarantined**
-   CLI starts -> read quarantine.json -> run tests -> parse XML -> test fails
-   -> retry test -> passes on retry -> flag as flaky -> update quarantine.json
-   (with CAS) -> create GitHub issue (with dedup check) -> post PR comment ->
-   upload artifact -> exit 0
-
-2. **Happy path: quarantined test suppressed**
-   CLI starts -> read quarantine.json -> run tests -> quarantined test fails ->
-   suppress (no retry) -> check if issue closed -> still open -> rewrite XML ->
+   CLI starts -> read quarantine.json -> batch check issue status (Search API)
+   -> remove unquarantined tests -> exclude quarantined tests from command ->
+   run tests -> parse XML -> test fails -> retry test -> passes on retry ->
+   flag as flaky -> update quarantine.json (with CAS) -> create GitHub issue
+   (with dedup check) -> post/update PR comment -> write results to disk ->
    exit 0
 
-3. **Quarantined test's issue is closed**
-   CLI starts -> read quarantine.json -> check issue status -> issue closed ->
-   remove from quarantine.json -> run tests -> test runs normally (not
-   suppressed)
+2. **Happy path: quarantined test excluded from execution**
+   CLI starts -> read quarantine.json -> quarantined tests exist -> batch
+   check issue status -> all issues still open -> construct test command with
+   framework-specific exclusion flags -> run tests (quarantined tests don't
+   execute) -> parse XML -> all ran tests pass -> write results to disk ->
+   exit 0
+
+3. **Quarantined test's issue is closed (unquarantine)**
+   CLI starts -> read quarantine.json -> batch check issue status (Search API)
+   -> issue closed -> remove test from quarantine.json (CAS write) -> test is
+   no longer excluded -> run tests -> test runs normally -> if it fails, it
+   fails the build like any other test
 
 4. **Concurrent builds: CAS conflict on quarantine.json**
    Build A reads (SHA1) -> Build B reads (SHA1) -> Build A writes (ok, SHA2)
@@ -312,22 +393,28 @@ diagrams)
 
 5. **Degraded mode: GitHub API unreachable**
    CLI starts -> try read quarantine.json -> timeout -> try Actions cache ->
-   cache hit -> use cached data -> run tests -> try write quarantine.json ->
-   timeout -> try upload artifact -> timeout -> log warnings -> exit based on
-   test results only
+   cache hit -> use cached data -> exclude quarantined tests -> run tests ->
+   try write quarantine.json -> timeout -> log warnings + emit ::warning
+   annotation -> write results to disk -> exit 0 (based on test results only)
 
-6. **Degraded mode: no cache, no API (first run + outage)**
+6. **Degraded mode: no cache, no API**
    CLI starts -> try read -> fail -> try cache -> miss -> log warning -> run
-   tests without quarantine -> detect flaky tests -> write to
-   .quarantine/pending.json -> exit based on all test results (no suppression)
+   all tests (no quarantine state available, no exclusions) -> detect flaky
+   tests via retry -> write results to disk -> log warnings -> exit based on
+   test results (flaky failures still forgiven via retry)
 
 7. **Dashboard: artifact ingestion**
    Poll timer fires -> list artifacts since last poll -> for each new artifact
    -> download -> parse JSON -> upsert into SQLite -> update last-poll
    timestamp
 
-### Open questions
-- Should diagrams use Mermaid (renderable in GitHub) or ASCII?
+8. **quarantine init (new)**
+   User runs `quarantine init` -> interactive prompts (framework, retries,
+   JUnit XML path) -> write quarantine.yml -> validate GitHub token ->
+   test repo access -> create quarantine/state branch with empty
+   quarantine.json -> print summary and next steps
+
+**Resolved:** Use Mermaid (renderable in GitHub).
 
 ---
 
@@ -343,10 +430,11 @@ confidence in correctness without over-engineering the test suite.
 **CLI unit tests (Go):**
 - JUnit XML parsing (various framework outputs, malformed XML, multiple files)
 - quarantine.json read/write/merge logic
-- Framework auto-detection from XML
+- Framework-specific test exclusion flag construction (Jest, RSpec, Vitest)
 - Rerun command construction per framework
-- Config file parsing and validation
+- Config file parsing and validation (including forward-compatible field validation)
 - Exit code determination logic
+- test_id construction from JUnit XML attributes
 
 **CLI integration tests:**
 - Against a real GitHub repo (or GitHub API mock?)
@@ -371,14 +459,16 @@ confidence in correctness without over-engineering the test suite.
 - These ensure CLI and dashboard agree on data formats even when developed by independent agents
 - Run as part of `make schemas-validate` and in CI
 
-### Open questions
-- Real GitHub API or mocked? Real gives more confidence but is slower, flakier
-  (ironic), and needs a test repo. Mocked is faster but may diverge from
-  reality. Recommendation: mocked for CI, real for a periodic integration
-  test suite.
-- Should the project use its own tool (Quarantine) to manage its own flaky
-  tests? (Dogfooding.)
-- What coverage threshold, if any?
+**Resolved decisions:**
+- **GitHub API: mocked for CI, real for periodic integration tests.** A
+  dedicated test repo with purposefully flaky tests (failing a predetermined
+  % of the time) will be used for integration testing. Quarantine runs
+  regularly against this repo for maximum confidence.
+- **Dogfooding:** Only if it adds significant value. The test repo approach
+  provides more controlled confidence.
+- **Test assertion libraries:** Go: `github.com/mycargus/riteway-golang`.
+  TypeScript: `github.com/paralleldrive/riteway`.
+- Coverage threshold: not specified. Revisit during implementation.
 
 ---
 
@@ -398,7 +488,7 @@ failure."
 |-------|-------|----------|
 | 401 Unauthorized | Bad token | Log error, run in degraded mode |
 | 403 Forbidden | Insufficient permissions | Log error, run in degraded mode |
-| 404 Not Found | Branch/repo doesn't exist | First run: create branch. Otherwise: log error, degraded mode |
+| 404 Not Found | Branch/repo doesn't exist | `init`: create branch. `run`: not initialized error (exit 2). Otherwise: log error, degraded mode |
 | 409 Conflict | CAS conflict on quarantine.json | Re-read, merge, retry (max 3) |
 | 422 Validation | Malformed request | Log error, degraded mode |
 | 429 Rate Limited | Too many requests | Backoff per Retry-After header, retry |
@@ -433,11 +523,16 @@ failure."
 3. The dashboard failing has zero impact on CI.
 4. Prefer degraded mode over failure in every case.
 
-### Open questions
-- Should degraded mode be surfaced to the user beyond log output? E.g., a
-  GitHub commit status check "Quarantine: degraded (GitHub API unreachable)"?
-- Should the CLI have a `--strict` mode that DOES fail on infrastructure
-  errors (for debugging)?
+**Resolved decisions:**
+- **Degraded mode communication:** Two mechanisms, both in v1:
+  1. Stderr warning line: `[quarantine] WARNING: running in degraded mode
+     (reason)` -- always emitted, works everywhere.
+  2. GitHub Actions `::warning` annotation: shows as yellow warning banner
+     on workflow run summary. Emitted when `GITHUB_ACTIONS` env var is set.
+  Forward-compatible: stderr works in any CI; GHA annotation is v1-specific
+  but harmless elsewhere.
+- **`--strict` mode:** Yes, v1. When set, infrastructure errors cause exit 2
+  instead of degraded mode. Useful for debugging and verifying setup.
 
 ---
 
@@ -496,10 +591,15 @@ dashboard, enabling parallel development by independent agents.
 - Both Go (CLI) and TypeScript (dashboard) can validate against JSON Schema
   at build/test time
 
-### Open questions
-
-- Should schemas use JSON Schema draft 2020-12 or an earlier draft for
-  broader tooling support?
+**Resolved decisions:**
+- JSON Schema draft 2020-12. Go library: `santhosh-tekuri/jsonschema`.
+  TypeScript library: `ajv` (with `ajv/dist/2020`).
+- **`test_id` format:** Human-readable composite `file_path::classname::name`.
+  `::` delimiter does not appear in any framework's JUnit XML output.
+  Raw components (`file_path`, `classname`, `name`) stored alongside `test_id`
+  in both `quarantine.json` and test result artifacts.
+- Dashboard stores a SHA-256 hash of `test_id` internally for efficient
+  indexing. The hash is not part of the cross-system contract.
 
 ---
 
@@ -521,7 +621,8 @@ testdata/
     jest/
       single-pass.xml          # all tests pass
       single-failure.xml       # one real failure
-      flaky-on-retry.xml       # test that fails then passes
+      flaky-run-1.xml          # test fails (first execution)
+      flaky-run-2.xml          # same test passes (retry execution)
       multiple-suites.xml      # parallel runner output (multiple files)
       malformed.xml            # truncated/invalid XML
     rspec/
@@ -558,12 +659,12 @@ testdata/
 - Fixtures also serve as documentation of framework-specific XML variations
 - Malformed fixtures enable testing error handling paths
 
-### Open questions
-
-- Should fixtures include parameterized test output? (e.g., Jest `test.each`,
-  RSpec shared examples)
-- Should we include output from parallel runners (jest with --shard, rspec
-  with parallel_tests)?
+**Resolved decisions:**
+- **Parameterized test output:** Yes, at end of v1. (Jest `test.each`,
+  RSpec shared examples, Vitest parameterized.)
+- **Parallel runner output:** Yes, as early as possible in v1. (Jest `--shard`,
+  RSpec `parallel_tests`, Vitest threads.) Include early to avoid concurrency
+  bugs that could be difficult to address later.
 
 ---
 
@@ -621,9 +722,9 @@ quarantine/
 cli-build       # go build -o bin/quarantine ./cmd/quarantine
 cli-test        # go test ./...
 cli-lint        # golangci-lint run
-dash-build      # cd dashboard && npm run build
-dash-test       # cd dashboard && npm test
-dash-lint       # cd dashboard && npm run lint
+dash-build      # cd dashboard && pnpm run build
+dash-test       # cd dashboard && pnpm test
+dash-lint       # cd dashboard && pnpm run lint
 schemas-validate # validate fixtures against JSON schemas
 test-all        # cli-test + dash-test + schemas-validate
 ```
@@ -645,13 +746,13 @@ test-all        # cli-test + dash-test + schemas-validate
   Go knowledge)
 - Makefile provides standard verification commands
 
-### Open questions
-
-- Go module path: `github.com/{org}/quarantine`? What org/user name?
-- Dashboard: React Router v7 with Vite as bundler? (This is the default)
-- Linting: golangci-lint for Go, ESLint + Prettier for TypeScript?
-- Should there be a root-level `go.work` file if CLI and dashboard are in the
-  same repo?
+**Resolved decisions:**
+- **Go module path:** `github.com/mycargus/quarantine`
+- **Dashboard bundler:** React Router v7 with Vite (default).
+- **Go linting:** `golangci-lint` (de facto standard meta-linter for Go).
+- **TypeScript linting/formatting:** Biome. Package manager: pnpm.
+- **`go.work`:** Not needed. Single Go module (`cli/`) and separate
+  TypeScript project (`dashboard/`). Independent build systems.
 
 ---
 
@@ -685,19 +786,62 @@ General guardrails:
 
 ---
 
+## M6 Pre-Implementation Tasks
+
+These tasks should be completed before dashboard implementation begins.
+
+### Artifact naming and dashboard discovery convention
+
+**Priority:** P0 for M6
+**Status:** Open
+
+Define the integration contract between the CLI's local output and the dashboard's artifact polling:
+
+- **Artifact name convention:** What should users name the artifact in `actions/upload-artifact`? Consider matrix builds (each job needs a unique name).
+- **Dashboard search pattern:** How does the dashboard discover quarantine result artifacts among all artifacts in a repo?
+- **Name prefix vs metadata:** Should the dashboard search by artifact name prefix (e.g., `quarantine-results*`) or by inspecting artifact contents?
+- **Documentation:** The `quarantine init` command should output a workflow snippet with the correct artifact name for the user to paste.
+
+The CLI output path is already defined: `.quarantine/results.json` (configurable via `--output`).
+
+---
+
 ## Dependencies Between Tasks
 
 ```
-Task 4 (config schema) ──┐
-Task 1 (CLI spec)  ──────┤
-Task 2 (API inventory) ──┼──> Task 3 (milestones) ──> Task 8 (CLAUDE.md) [done]
-Task 7 (error handling) ─┘
+Task 4 (config schema) ──┬──> Task 1 (CLI spec) ──┐
+                         │                         │
+                         ├─────────────────────────┤
+Task 2 (API inventory) ──┤                         ├──> Task 3 (milestones)
+Task 7 (error handling) ─┘                         │         ──> Task 8 (CLAUDE.md) [done]
+                                                   │
+Research: test_id, exit codes, CI artifacts ────────┘
+
 Task 5 (sequence diagrams) -- can be done anytime, helps validate 1+2
 Task 6 (test strategy) -- can be done alongside M1/M2
 Task 9 (JSON schemas) ──> Task 10 (fixtures) ──> Task 11 (scaffolding)
 Task 4 (config schema) ──> Task 9 (JSON schemas)
 Task 12 (hooks) -- can be done alongside M1, benefits from Task 3 (milestones)
 ```
+
+**Research completed (2026-03-17):**
+
+1. **Exit codes (see `docs/ci-exit-code-research.md`):** 0/1/2 is safe and
+   conventional. All major CI runners treat non-zero as failure with no
+   special meaning for specific codes. GitLab CI and Buildkite support
+   exit-code-specific `allow_failure`/`soft_fail`. Must override cobra's
+   default exit-2 for usage errors via `cmd.SetFlagErrorFunc()`.
+
+2. **JUnit XML / test_id (see `docs/junit-xml-research.md`):** No official
+   schema. `test_id` = human-readable composite `file_path::classname::name`.
+   `::` delimiter absent from all framework output. Jest needs recommended
+   `jest-junit` config (suggested during `quarantine init`). Dashboard uses
+   hash internally for indexing.
+
+3. **CI artifact APIs (see `docs/ci-artifact-api-research.md`):** Per-provider
+   dashboard pollers viable for v2. GitLab CI has best API (P1), Jenkins
+   viable with caveats (P2), Buildkite clean (P3), CircleCI verbose (P4).
+   All support an `ArtifactPoller` interface pattern.
 
 Tasks 1, 2, 4, and 7 inform the milestones. The CLAUDE.md is best written
 once milestones and conventions are defined. Sequence diagrams help validate
