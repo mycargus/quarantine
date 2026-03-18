@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mycargus/quarantine/schemas/quarantine-state.schema.json",
+  "title": "Quarantine State",
+  "description": "Schema for quarantine.json stored on the quarantine/state branch. Contains only active quarantine entries (tests currently quarantined). Entries are removed when the associated GitHub Issue is closed.",
+  "type": "object",
+  "required": ["version", "updated_at", "tests"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version. Must be 1."
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the last update to this file."
+    },
+    "tests": {
+      "type": "object",
+      "description": "Map of quarantined tests, keyed by test_id (file_path::classname::name).",
+      "additionalProperties": {
+        "$ref": "#/$defs/quarantined_test"
+      },
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The test_id in file_path::classname::name format."
+      }
+    }
+  },
+  "$defs": {
+    "quarantined_test": {
+      "type": "object",
+      "description": "A single quarantined test entry.",
+      "required": [
+        "test_id",
+        "file_path",
+        "classname",
+        "name",
+        "suite",
+        "first_flaky_at",
+        "last_flaky_at",
+        "flaky_count",
+        "issue_number",
+        "issue_url",
+        "quarantined_at",
+        "quarantined_by"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "test_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable composite identifier: file_path::classname::name."
+        },
+        "file_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "File path component extracted from JUnit XML (framework-specific)."
+        },
+        "classname": {
+          "type": "string",
+          "description": "Class name from the JUnit XML classname attribute."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Test name from the JUnit XML name attribute."
+        },
+        "suite": {
+          "type": "string",
+          "description": "Test suite name (typically the classname or describe block)."
+        },
+        "first_flaky_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of the first time this test was detected as flaky."
+        },
+        "last_flaky_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of the most recent flaky detection for this test."
+        },
+        "flaky_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of times this test has been detected as flaky."
+        },
+        "issue_number": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "GitHub Issue number tracking this flaky test."
+        },
+        "issue_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Full URL to the GitHub Issue tracking this flaky test."
+        },
+        "quarantined_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of when this test was quarantined."
+        },
+        "quarantined_by": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Who or what quarantined this test (e.g., 'cli-auto')."
+        }
+      }
+    }
+  }
+}

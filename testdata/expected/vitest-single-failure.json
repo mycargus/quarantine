@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "run_id": "fixture-vitest-single-failure",
+  "repo": "mycargus/my-app",
+  "branch": "feature/api-error-handling",
+  "commit_sha": "fff1234567890def1234567890abcdef12345678",
+  "pr_number": 63,
+  "timestamp": "2026-03-15T14:22:12Z",
+  "cli_version": "0.1.0",
+  "framework": "vitest",
+  "config": {
+    "retry_count": 3
+  },
+  "summary": {
+    "total": 3,
+    "passed": 2,
+    "failed": 1,
+    "skipped": 0,
+    "quarantined": 0,
+    "flaky_detected": 0
+  },
+  "tests": [
+    {
+      "test_id": "src/services/__tests__/api-client.test.ts::src/services/__tests__/api-client.test.ts::ApiClient > GET > should fetch data successfully",
+      "file_path": "src/services/__tests__/api-client.test.ts",
+      "classname": "src/services/__tests__/api-client.test.ts",
+      "name": "ApiClient > GET > should fetch data successfully",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 145,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "src/services/__tests__/api-client.test.ts::src/services/__tests__/api-client.test.ts::ApiClient > GET > should handle 404 responses",
+      "file_path": "src/services/__tests__/api-client.test.ts",
+      "classname": "src/services/__tests__/api-client.test.ts",
+      "name": "ApiClient > GET > should handle 404 responses",
+      "status": "failed",
+      "original_status": null,
+      "duration_ms": 234,
+      "retries": [
+        {
+          "attempt": 1,
+          "status": "failed",
+          "duration_ms": 230
+        },
+        {
+          "attempt": 2,
+          "status": "failed",
+          "duration_ms": 228
+        },
+        {
+          "attempt": 3,
+          "status": "failed",
+          "duration_ms": 231
+        }
+      ],
+      "failure_message": "AssertionError: expected 'NetworkError' to be 'NotFoundError'",
+      "issue_number": null
+    },
+    {
+      "test_id": "src/services/__tests__/api-client.test.ts::src/services/__tests__/api-client.test.ts::ApiClient > POST > should send JSON body",
+      "file_path": "src/services/__tests__/api-client.test.ts",
+      "classname": "src/services/__tests__/api-client.test.ts",
+      "name": "ApiClient > POST > should send JSON body",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 98,
+      "failure_message": null,
+      "issue_number": null
+    }
+  ]
+}

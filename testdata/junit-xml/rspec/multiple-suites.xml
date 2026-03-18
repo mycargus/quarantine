@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="rspec" tests="3" skipped="1" failures="0" errors="0"
+             time="0.345" timestamp="2026-03-15T14:22:10+00:00"
+             hostname="ci-runner-1">
+    <properties>
+      <property name="seed" value="12001"/>
+    </properties>
+    <testcase classname="spec.models.order_spec"
+              name="Order#total calculates line item subtotals"
+              file="./spec/models/order_spec.rb"
+              time="0.067">
+    </testcase>
+    <testcase classname="spec.models.order_spec"
+              name="Order#total applies discount codes"
+              file="./spec/models/order_spec.rb"
+              time="0.089">
+    </testcase>
+    <testcase classname="spec.models.order_spec"
+              name="Order#total handles tax-exempt orders"
+              file="./spec/models/order_spec.rb"
+              time="0.000">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="rspec2" tests="2" skipped="0" failures="0" errors="0"
+             time="0.234" timestamp="2026-03-15T14:22:10+00:00"
+             hostname="ci-runner-2">
+    <properties>
+      <property name="seed" value="12001"/>
+    </properties>
+    <testcase classname="spec.models.inventory_spec"
+              name="Inventory#reserve decrements available quantity"
+              file="./spec/models/inventory_spec.rb"
+              time="0.112">
+    </testcase>
+    <testcase classname="spec.models.inventory_spec"
+              name="Inventory#reserve raises error when insufficient stock"
+              file="./spec/models/inventory_spec.rb"
+              time="0.078">
+    </testcase>
+  </testsuite>
+</testsuites>

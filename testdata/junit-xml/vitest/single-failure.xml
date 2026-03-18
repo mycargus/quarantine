@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="3" failures="1" errors="0" time="1.234">
+  <testsuite name="src/services/__tests__/api-client.test.ts"
+             timestamp="2026-03-15T14:22:10.000Z"
+             hostname="ci-runner-1"
+             tests="3" failures="1" errors="0" skipped="0"
+             time="1.234">
+    <testcase classname="src/services/__tests__/api-client.test.ts"
+              name="ApiClient > GET > should fetch data successfully"
+              time="0.145">
+    </testcase>
+    <testcase classname="src/services/__tests__/api-client.test.ts"
+              name="ApiClient > GET > should handle 404 responses"
+              time="0.234">
+      <failure message="AssertionError: expected 'NetworkError' to be 'NotFoundError'" type="AssertionError">
+AssertionError: expected 'NetworkError' to be 'NotFoundError'
+ ❯ src/services/__tests__/api-client.test.ts:38:21
+     36|     const client = new ApiClient({ baseUrl: 'https://api.example.com' });
+     37|     const error = await client.get('/missing').catch(e => e);
+     38|     expect(error.name).toBe('NotFoundError');
+       |                       ^
+     39|   });
+     40| });
+      </failure>
+    </testcase>
+    <testcase classname="src/services/__tests__/api-client.test.ts"
+              name="ApiClient > POST > should send JSON body"
+              time="0.098">
+    </testcase>
+  </testsuite>
+</testsuites>

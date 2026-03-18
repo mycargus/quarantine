@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "updated_at": "2026-03-16T09:15:30Z",
+  "tests": {
+    "__tests__/services/user.test.js::UserService fetchProfile::should return cached profile": {
+      "test_id": "__tests__/services/user.test.js::UserService fetchProfile::should return cached profile",
+      "file_path": "__tests__/services/user.test.js",
+      "classname": "UserService fetchProfile",
+      "name": "should return cached profile",
+      "suite": "UserService fetchProfile",
+      "first_flaky_at": "2026-03-10T11:30:00Z",
+      "last_flaky_at": "2026-03-15T14:22:15Z",
+      "flaky_count": 4,
+      "issue_number": 43,
+      "issue_url": "https://github.com/mycargus/my-app/issues/43",
+      "quarantined_at": "2026-03-10T11:30:00Z",
+      "quarantined_by": "cli-auto"
+    },
+    "./spec/services/notification_service_spec.rb::spec.services.notification_service_spec::NotificationService#send_email retries on SMTP timeout": {
+      "test_id": "./spec/services/notification_service_spec.rb::spec.services.notification_service_spec::NotificationService#send_email retries on SMTP timeout",
+      "file_path": "./spec/services/notification_service_spec.rb",
+      "classname": "spec.services.notification_service_spec",
+      "name": "NotificationService#send_email retries on SMTP timeout",
+      "suite": "NotificationService#send_email",
+      "first_flaky_at": "2026-03-12T08:45:00Z",
+      "last_flaky_at": "2026-03-16T09:15:30Z",
+      "flaky_count": 7,
+      "issue_number": 51,
+      "issue_url": "https://github.com/mycargus/my-app/issues/51",
+      "quarantined_at": "2026-03-12T08:45:00Z",
+      "quarantined_by": "cli-auto"
+    },
+    "src/services/__tests__/cache.test.ts::src/services/__tests__/cache.test.ts::CacheService > get > should return undefined for expired entries": {
+      "test_id": "src/services/__tests__/cache.test.ts::src/services/__tests__/cache.test.ts::CacheService > get > should return undefined for expired entries",
+      "file_path": "src/services/__tests__/cache.test.ts",
+      "classname": "src/services/__tests__/cache.test.ts",
+      "name": "CacheService > get > should return undefined for expired entries",
+      "suite": "CacheService > get",
+      "first_flaky_at": "2026-03-14T16:20:00Z",
+      "last_flaky_at": "2026-03-15T14:22:15Z",
+      "flaky_count": 2,
+      "issue_number": 67,
+      "issue_url": "https://github.com/mycargus/my-app/issues/67",
+      "quarantined_at": "2026-03-14T16:20:00Z",
+      "quarantined_by": "cli-auto"
+    }
+  }
+}

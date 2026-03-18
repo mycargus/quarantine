@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "run_id": "fixture-jest-single-failure",
+  "repo": "mycargus/my-app",
+  "branch": "feature/payment-refactor",
+  "commit_sha": "def4567890abcdef1234567890abcdef12345678",
+  "pr_number": 42,
+  "timestamp": "2026-03-15T14:22:12Z",
+  "cli_version": "0.1.0",
+  "framework": "jest",
+  "config": {
+    "retry_count": 3
+  },
+  "summary": {
+    "total": 3,
+    "passed": 2,
+    "failed": 1,
+    "skipped": 0,
+    "quarantined": 0,
+    "flaky_detected": 0
+  },
+  "tests": [
+    {
+      "test_id": "__tests__/services/payment.test.js::PaymentService processPayment::should charge the correct amount",
+      "file_path": "__tests__/services/payment.test.js",
+      "classname": "PaymentService processPayment",
+      "name": "should charge the correct amount",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 112,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "__tests__/services/payment.test.js::PaymentService processPayment::should handle declined cards",
+      "file_path": "__tests__/services/payment.test.js",
+      "classname": "PaymentService processPayment",
+      "name": "should handle declined cards",
+      "status": "failed",
+      "original_status": null,
+      "duration_ms": 89,
+      "retries": [
+        {
+          "attempt": 1,
+          "status": "failed",
+          "duration_ms": 91
+        },
+        {
+          "attempt": 2,
+          "status": "failed",
+          "duration_ms": 88
+        },
+        {
+          "attempt": 3,
+          "status": "failed",
+          "duration_ms": 90
+        }
+      ],
+      "failure_message": "expected 'declined' but received 'error'",
+      "issue_number": null
+    },
+    {
+      "test_id": "__tests__/services/payment.test.js::PaymentService refund::should process full refund",
+      "file_path": "__tests__/services/payment.test.js",
+      "classname": "PaymentService refund",
+      "name": "should process full refund",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 67,
+      "failure_message": null,
+      "issue_number": null
+    }
+  ]
+}

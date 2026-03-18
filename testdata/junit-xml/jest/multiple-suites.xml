@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="6" failures="0" errors="0" time="4.567">
+  <testsuite name="__tests__/components/Button.test.jsx" tests="2" errors="0" failures="0" skipped="0"
+             timestamp="2026-03-15T14:22:10" time="1.234">
+    <testcase classname="Button renders" name="should render with default props"
+              file="__tests__/components/Button.test.jsx" time="0.234">
+    </testcase>
+    <testcase classname="Button handles events" name="should call onClick handler"
+              file="__tests__/components/Button.test.jsx" time="0.189">
+    </testcase>
+  </testsuite>
+  <testsuite name="__tests__/components/Modal.test.jsx" tests="2" errors="0" failures="0" skipped="1"
+             timestamp="2026-03-15T14:22:10" time="1.567">
+    <testcase classname="Modal visibility" name="should show when isOpen is true"
+              file="__tests__/components/Modal.test.jsx" time="0.312">
+    </testcase>
+    <testcase classname="Modal accessibility" name="should trap focus when open"
+              file="__tests__/components/Modal.test.jsx" time="0.000">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="__tests__/utils/format.test.js" tests="2" errors="0" failures="0" skipped="0"
+             timestamp="2026-03-15T14:22:10" time="0.456">
+    <testcase classname="formatCurrency" name="should format USD amounts"
+              file="__tests__/utils/format.test.js" time="0.012">
+    </testcase>
+    <testcase classname="formatCurrency" name="should handle zero"
+              file="__tests__/utils/format.test.js" time="0.008">
+    </testcase>
+  </testsuite>
+</testsuites>

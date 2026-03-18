@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="rspec" tests="4" skipped="0" failures="1" errors="0"
+           time="1.876" timestamp="2026-03-15T14:22:10+00:00"
+           hostname="ci-runner-1">
+  <properties>
+    <property name="seed" value="55012"/>
+  </properties>
+  <testcase classname="spec.services.notification_service_spec"
+            name="NotificationService#send_email delivers to the correct recipient"
+            file="./spec/services/notification_service_spec.rb"
+            time="0.234">
+  </testcase>
+  <testcase classname="spec.services.notification_service_spec"
+            name="NotificationService#send_email retries on SMTP timeout"
+            file="./spec/services/notification_service_spec.rb"
+            time="1.205">
+    <failure message="expected: &quot;delivered&quot;&#10;     got: &quot;timeout&quot;&#10;&#10;(compared using ==)" type="RSpec::Expectations::ExpectationNotMetError">
+Failure/Error: expect(result.status).to eq("delivered")
+
+  expected: "delivered"
+       got: "timeout"
+
+  (compared using ==)
+
+./spec/services/notification_service_spec.rb:52:in `block (3 levels) in &lt;top (required)&gt;'
+    </failure>
+  </testcase>
+  <testcase classname="spec.services.notification_service_spec"
+            name="NotificationService#send_sms sends via Twilio adapter"
+            file="./spec/services/notification_service_spec.rb"
+            time="0.189">
+  </testcase>
+  <testcase classname="spec.services.notification_service_spec"
+            name="NotificationService#send_sms validates phone number format"
+            file="./spec/services/notification_service_spec.rb"
+            time="0.045">
+  </testcase>
+</testsuite>

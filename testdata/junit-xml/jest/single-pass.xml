@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="3" failures="0" errors="0" time="1.234">
+  <testsuite name="__tests__/auth/login.test.js" tests="3" errors="0" failures="0" skipped="0"
+             timestamp="2026-03-15T14:22:10" time="1.234">
+    <testcase classname="LoginForm validates input" name="should reject empty email"
+              file="__tests__/auth/login.test.js" time="0.045">
+    </testcase>
+    <testcase classname="LoginForm validates input" name="should reject invalid email format"
+              file="__tests__/auth/login.test.js" time="0.032">
+    </testcase>
+    <testcase classname="LoginForm submits" name="should call onSubmit with credentials"
+              file="__tests__/auth/login.test.js" time="0.078">
+    </testcase>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="6" failures="0" errors="0" time="3.456">
+  <testsuite name="src/components/__tests__/Header.test.tsx"
+             timestamp="2026-03-15T14:22:10.000Z"
+             hostname="ci-runner-1"
+             tests="2" failures="0" errors="0" skipped="0"
+             time="1.234">
+    <testcase classname="src/components/__tests__/Header.test.tsx"
+              name="Header > renders > should display the logo"
+              time="0.234">
+    </testcase>
+    <testcase classname="src/components/__tests__/Header.test.tsx"
+              name="Header > navigation > should highlight active link"
+              time="0.189">
+    </testcase>
+  </testsuite>
+  <testsuite name="src/components/__tests__/Footer.test.tsx"
+             timestamp="2026-03-15T14:22:10.000Z"
+             hostname="ci-runner-1"
+             tests="2" failures="0" errors="0" skipped="1"
+             time="0.890">
+    <testcase classname="src/components/__tests__/Footer.test.tsx"
+              name="Footer > renders > should display copyright year"
+              time="0.156">
+    </testcase>
+    <testcase classname="src/components/__tests__/Footer.test.tsx"
+              name="Footer > links > should render social media links"
+              time="0.000">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="src/hooks/__tests__/useAuth.test.ts"
+             timestamp="2026-03-15T14:22:10.000Z"
+             hostname="ci-runner-1"
+             tests="2" failures="0" errors="0" skipped="0"
+             time="0.567">
+    <testcase classname="src/hooks/__tests__/useAuth.test.ts"
+              name="useAuth > login > should set authenticated state"
+              time="0.234">
+    </testcase>
+    <testcase classname="src/hooks/__tests__/useAuth.test.ts"
+              name="useAuth > logout > should clear session token"
+              time="0.123">
+    </testcase>
+  </testsuite>
+</testsuites>

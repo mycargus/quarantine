@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "run_id": "fixture-rspec-flaky",
+  "repo": "mycargus/my-app",
+  "branch": "main",
+  "commit_sha": "ddd1234567890def1234567890abcdef12345678",
+  "pr_number": 77,
+  "timestamp": "2026-03-15T14:22:15Z",
+  "cli_version": "0.1.0",
+  "framework": "rspec",
+  "config": {
+    "retry_count": 3
+  },
+  "summary": {
+    "total": 4,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0,
+    "quarantined": 0,
+    "flaky_detected": 1
+  },
+  "tests": [
+    {
+      "test_id": "./spec/services/notification_service_spec.rb::spec.services.notification_service_spec::NotificationService#send_email delivers to the correct recipient",
+      "file_path": "./spec/services/notification_service_spec.rb",
+      "classname": "spec.services.notification_service_spec",
+      "name": "NotificationService#send_email delivers to the correct recipient",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 234,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "./spec/services/notification_service_spec.rb::spec.services.notification_service_spec::NotificationService#send_email retries on SMTP timeout",
+      "file_path": "./spec/services/notification_service_spec.rb",
+      "classname": "spec.services.notification_service_spec",
+      "name": "NotificationService#send_email retries on SMTP timeout",
+      "status": "flaky",
+      "original_status": "failed",
+      "duration_ms": 1205,
+      "retries": [
+        {
+          "attempt": 1,
+          "status": "passed",
+          "duration_ms": 312
+        }
+      ],
+      "failure_message": "expected: \"delivered\"\n     got: \"timeout\"\n\n(compared using ==)",
+      "issue_number": 51
+    },
+    {
+      "test_id": "./spec/services/notification_service_spec.rb::spec.services.notification_service_spec::NotificationService#send_sms sends via Twilio adapter",
+      "file_path": "./spec/services/notification_service_spec.rb",
+      "classname": "spec.services.notification_service_spec",
+      "name": "NotificationService#send_sms sends via Twilio adapter",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 189,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "./spec/services/notification_service_spec.rb::spec.services.notification_service_spec::NotificationService#send_sms validates phone number format",
+      "file_path": "./spec/services/notification_service_spec.rb",
+      "classname": "spec.services.notification_service_spec",
+      "name": "NotificationService#send_sms validates phone number format",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 45,
+      "failure_message": null,
+      "issue_number": null
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "run_id": "fixture-rspec-single-failure",
+  "repo": "mycargus/my-app",
+  "branch": "feature/gateway-handling",
+  "commit_sha": "ccc1234567890def1234567890abcdef12345678",
+  "pr_number": 55,
+  "timestamp": "2026-03-15T14:22:12Z",
+  "cli_version": "0.1.0",
+  "framework": "rspec",
+  "config": {
+    "retry_count": 3
+  },
+  "summary": {
+    "total": 3,
+    "passed": 2,
+    "failed": 1,
+    "skipped": 0,
+    "quarantined": 0,
+    "flaky_detected": 0
+  },
+  "tests": [
+    {
+      "test_id": "./spec/services/payment_service_spec.rb::spec.services.payment_service_spec::PaymentService#charge charges the correct amount",
+      "file_path": "./spec/services/payment_service_spec.rb",
+      "classname": "spec.services.payment_service_spec",
+      "name": "PaymentService#charge charges the correct amount",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 156,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "./spec/services/payment_service_spec.rb::spec.services.payment_service_spec::PaymentService#charge handles gateway timeout",
+      "file_path": "./spec/services/payment_service_spec.rb",
+      "classname": "spec.services.payment_service_spec",
+      "name": "PaymentService#charge handles gateway timeout",
+      "status": "failed",
+      "original_status": null,
+      "duration_ms": 234,
+      "retries": [
+        {
+          "attempt": 1,
+          "status": "failed",
+          "duration_ms": 230
+        },
+        {
+          "attempt": 2,
+          "status": "failed",
+          "duration_ms": 228
+        },
+        {
+          "attempt": 3,
+          "status": "failed",
+          "duration_ms": 231
+        }
+      ],
+      "failure_message": "expected: 503\n     got: 500\n\n(compared using ==)",
+      "issue_number": null
+    },
+    {
+      "test_id": "./spec/services/payment_service_spec.rb::spec.services.payment_service_spec::PaymentService#refund processes full refund",
+      "file_path": "./spec/services/payment_service_spec.rb",
+      "classname": "spec.services.payment_service_spec",
+      "name": "PaymentService#refund processes full refund",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 89,
+      "failure_message": null,
+      "issue_number": null
+    }
+  ]
+}

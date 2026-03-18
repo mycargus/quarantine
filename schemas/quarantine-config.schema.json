@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mycargus/quarantine/schemas/quarantine-config.schema.json",
+  "title": "Quarantine Configuration",
+  "description": "Schema for quarantine.yml configuration file. Lives in the repository root and is created by 'quarantine init'. Tokens are never stored in this file -- authentication is handled exclusively through environment variables.",
+  "type": "object",
+  "required": ["version", "framework"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Config schema version. Must be the integer 1. Allows the CLI to detect incompatible config files from future versions."
+    },
+    "framework": {
+      "type": "string",
+      "enum": ["jest", "rspec", "vitest"],
+      "description": "Test framework in use. Determines default junitxml glob, rerun command, and test exclusion flags. Case-sensitive. No auto-detection; must be set explicitly."
+    },
+    "retries": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "default": 3,
+      "description": "Number of times to re-run a failing test before declaring it a genuine failure. A test that passes on any retry is classified as flaky."
+    },
+    "junitxml": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Glob pattern for locating JUnit XML output files. Supports multiple files for parallel test runners. Framework-specific defaults: jest='junit.xml', rspec='rspec.xml', vitest='junit-report.xml'."
+    },
+    "github": {
+      "type": "object",
+      "description": "GitHub repository identification. Both fields are auto-detected from the git remote if omitted.",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9-]+$",
+          "description": "GitHub organization or user that owns the repository. Auto-detected from the origin remote URL if omitted."
+        },
+        "repo": {
+          "type": "string",
+          "minLength": 1,
+          "description": "GitHub repository name (without the owner prefix). Auto-detected from the origin remote URL if omitted."
+        }
+      }
+    },
+    "issue_tracker": {
+      "type": "string",
+      "enum": ["github"],
+      "default": "github",
+      "description": "Issue tracking system for flaky test tickets. v1 supports only 'github'. Forward-compatible field for v2+ (jira, etc.)."
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "maxItems": 1,
+      "default": ["quarantine"],
+      "description": "Labels applied to GitHub Issues for flaky tests. v1 accepts only the exact list ['quarantine']. Used for deterministic issue deduplication. Forward-compatible field for v2+ custom labels.",
+      "prefixItems": [
+        {
+          "const": "quarantine"
+        }
+      ]
+    },
+    "notifications": {
+      "type": "object",
+      "description": "Notification channels. v1 supports only github_pr_comment. Forward-compatible field for v2+ (slack, email).",
+      "default": {
+        "github_pr_comment": true
+      },
+      "additionalProperties": false,
+      "properties": {
+        "github_pr_comment": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true, the CLI posts or updates a PR comment summarizing flaky test findings. Comments are identified by a hidden HTML marker to avoid duplicates."
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "description": "Configuration for quarantine state storage. No 'backend' field -- v1 only supports branch-based storage. Actions cache is used internally as a degraded-mode fallback.",
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": "string",
+          "minLength": 1,
+          "default": "quarantine/state",
+          "description": "Git branch name where quarantine.json is stored. Created by 'quarantine init' and never merged. The CLI uses the GitHub Contents API with SHA-based CAS for optimistic concurrency."
+        }
+      }
+    },
+    "exclude": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": [],
+      "description": "Glob patterns for tests that Quarantine ignores entirely. Matched tests are not retried, not quarantined, and do not trigger issue creation. Patterns match against the test_id (file_path::classname::name). Supports *, **, and ? glob syntax."
+    },
+    "rerun_command": {
+      "type": "string",
+      "default": "",
+      "description": "Override the auto-detected rerun command template for re-running individual failing tests. Supports {name}, {classname}, and {file} placeholders. When empty, the framework-specific default is used."
+    }
+  }
+}

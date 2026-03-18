@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="3" failures="1" errors="0" time="2.456">
+  <testsuite name="__tests__/services/payment.test.js" tests="3" errors="0" failures="1" skipped="0"
+             timestamp="2026-03-15T14:22:10" time="2.456">
+    <testcase classname="PaymentService processPayment" name="should charge the correct amount"
+              file="__tests__/services/payment.test.js" time="0.112">
+    </testcase>
+    <testcase classname="PaymentService processPayment" name="should handle declined cards"
+              file="__tests__/services/payment.test.js" time="0.089">
+      <failure message="expected 'declined' but received 'error'" type="AssertionError">
+Error: expected 'declined' but received 'error'
+    at Object.&lt;anonymous&gt; (__tests__/services/payment.test.js:45:12)
+    at Object.asyncJestTest (node_modules/jest-jasmine2/build/jasmineAsyncInstall.js:100:37)
+    at resolve (node_modules/jest-jasmine2/build/queueRunner.js:43:12)
+      </failure>
+    </testcase>
+    <testcase classname="PaymentService refund" name="should process full refund"
+              file="__tests__/services/payment.test.js" time="0.067">
+    </testcase>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "run_id": "fixture-vitest-single-pass",
+  "repo": "mycargus/my-app",
+  "branch": "main",
+  "commit_sha": "eee1234567890def1234567890abcdef12345678",
+  "pr_number": null,
+  "timestamp": "2026-03-15T14:22:11Z",
+  "cli_version": "0.1.0",
+  "framework": "vitest",
+  "config": {
+    "retry_count": 3
+  },
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0,
+    "quarantined": 0,
+    "flaky_detected": 0
+  },
+  "tests": [
+    {
+      "test_id": "src/utils/__tests__/math.test.ts::src/utils/__tests__/math.test.ts::math > add > should add positive numbers",
+      "file_path": "src/utils/__tests__/math.test.ts",
+      "classname": "src/utils/__tests__/math.test.ts",
+      "name": "math > add > should add positive numbers",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 12,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "src/utils/__tests__/math.test.ts::src/utils/__tests__/math.test.ts::math > add > should handle negative numbers",
+      "file_path": "src/utils/__tests__/math.test.ts",
+      "classname": "src/utils/__tests__/math.test.ts",
+      "name": "math > add > should handle negative numbers",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 8,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "src/utils/__tests__/math.test.ts::src/utils/__tests__/math.test.ts::math > multiply > should multiply two numbers",
+      "file_path": "src/utils/__tests__/math.test.ts",
+      "classname": "src/utils/__tests__/math.test.ts",
+      "name": "math > multiply > should multiply two numbers",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 6,
+      "failure_message": null,
+      "issue_number": null
+    }
+  ]
+}
