@@ -1,288 +1,103 @@
 # Test Strategy
 
-> Last updated: 2026-03-17
+> Last updated: 2026-03-18
 >
-> How we test the Quarantine CLI and dashboard. The goal is confidence in
-> correctness without over-engineering. This document covers what to test,
-> how to test it, and the tools involved.
+> Guiding principles for how we test. The goal is confidence in correctness
+> without over-engineering. Specific test cases live in scenario files
+> (`docs/scenarios/`) and in the tests themselves — this document covers
+> *why* and *how*, not *what*.
 
-## Assertion Libraries
+## Assertion Style
+
+All tests use the RITEway assertion pattern: `Given / Should / Actual / Expected`.
 
 - **Go (CLI):** [`github.com/mycargus/riteway-golang`](https://github.com/mycargus/riteway-golang)
 - **TypeScript (Dashboard):** [`github.com/paralleldrive/riteway`](https://github.com/paralleldrive/riteway)
 
-Both libraries enforce a consistent assertion style: `Given / Should / Actual / Expected`. This makes test intent immediately clear and failure messages self-documenting.
+This makes test intent immediately clear and failure messages self-documenting. Every assertion answers: "Given [context], should [expectation]."
 
-## Coverage Threshold
+## Guiding Principles
 
-Not specified. Revisit during implementation once there is enough code to establish a meaningful baseline.
+### 1. Functional Core, Imperative Shell
 
----
+Separate pure logic from I/O. Pure functions (parsing, merging, decision-making) are unit tested exhaustively. I/O boundaries (API calls, file system, process execution) are thin and tested at the integration level.
 
-## CLI Unit Tests (Go)
+**Validation:** After implementing scenarios, use `/mikey:testify` to audit code design and verify adherence to this principle. The testify agent identifies mixed logic/I/O, excessive mocking, and missing error-path tests.
 
-Unit tests cover the CLI's core logic in isolation. No network calls, no filesystem side effects beyond temp files.
+### 2. Test the Interface, Not the Implementation
 
-### JUnit XML Parsing
+Tests assert on inputs and outputs of public interfaces. Internal data structures, private methods, and implementation details are not tested directly. Refactoring internals should not break tests.
 
-- Parse valid output from each v1 framework (Jest, RSpec, Vitest)
-- Handle malformed XML (truncated, invalid encoding, missing attributes)
-- Merge results from multiple XML files (parallel runner output like Jest `--shard`, RSpec `parallel_tests`)
-- Handle empty XML (zero test cases)
-- Handle XML with only skipped tests
+### 3. No Mocks in Unit Tests
 
-Test fixtures live in `testdata/junit-xml/{jest,rspec,vitest}/`. Tests compare parsed output against expected JSON in `testdata/expected/`.
+Unit tests operate on pure functions that don't need mocks. If a unit test requires a mock, that's a design smell — the code under test is mixing logic with I/O. Extract the logic into a pure function.
 
-### `test_id` Construction
+### 4. Real Dependencies at Integration Boundaries
 
-- Construct `file_path::classname::name` from JUnit XML attributes for each framework
-- Handle missing `file_path` attribute (Jest without `addFileAttribute`)
-- Handle special characters in test names (parentheses, quotes, colons)
-- Verify `::` delimiter is never ambiguous with actual test content
+Integration tests use real instances of internal dependencies (real SQLite, real file system) and mock only external services (GitHub API). This catches the integration bugs that mocks hide.
 
-### `quarantine.json` Read/Write/Merge
+### 5. Contract Tests Bridge Components
 
-- Deserialize and serialize `quarantine.json` correctly
-- Union merge: concurrent builds that each detect different flaky tests produce a combined result
-- Quarantine wins on conflict: if one build quarantines a test and another does not, the test stays quarantined (ADR-012)
-- Remove unquarantined tests (issue closed) from state
-- Handle empty state (first run, no quarantined tests)
+When two independently developed components exchange data (e.g., CLI produces JSON that the dashboard consumes), a shared JSON Schema is the contract. Both sides validate against the schema in their own test suites. This is the primary mechanism ensuring components integrate correctly without end-to-end coupling.
 
-### Framework-Specific Exclusion Flag Construction
+### 6. Scenarios Drive Coverage
 
-- **Jest:** `--testPathIgnorePatterns` for whole-file exclusion, `--testNamePattern` with negative lookahead for individual tests, combined when both apply
-- **RSpec:** File-level exclusion by omitting spec files from the file list
-- **Vitest:** `--exclude` for file-level, `-t` with negative lookahead for individual tests
-- Regex special characters in test names are escaped correctly
-- No exclusion flags when quarantine list is empty
+Given/When/Then scenario files (`docs/scenarios/`) are the source of truth for what behaviors exist. Tests implement these scenarios. If a behavior isn't in a scenario, it probably doesn't need a test. If it's in a scenario, it must have a test.
 
-### Framework-Specific Rerun Command Construction
+**Workflow:** Use `/mikey:tdd <scenario-file>` to implement scenarios interactively. The TDD agent guides you through each scenario, generating test code and implementation following Functional Core / Imperative Shell design automatically.
 
-- **Jest:** `jest --testNamePattern "{name}"`
-- **RSpec:** `rspec -e "{name}"`
-- **Vitest:** `vitest run --reporter=junit {file} -t "{name}"`
-- Custom `rerun_command` template with `{name}`, `{classname}`, `{file}` placeholders
-- Placeholder values are properly escaped for shell execution
+### 7. Fail Fast, Fail Clearly
 
-### Config File Parsing and Validation
+Tests should fail immediately on the first broken assertion with a message that tells you what went wrong without reading the test code. The RITEway pattern enforces this — every failure includes the given context and expected vs actual values.
 
-- Parse valid `quarantine.yml` with all fields
-- Parse minimal `quarantine.yml` (only `version` and `framework`)
-- Apply defaults for optional fields (`retries: 3`, framework-specific `junitxml`)
-- Reject unknown `framework` values
-- Reject `retries` outside 1-10 range
-- Forward-compatible field validation: reject unsupported `issue_tracker` values (only `github` in v1), reject unsupported `labels` (only `[quarantine]` in v1), reject unsupported `notifications` keys (only `github_pr_comment` in v1)
-- Warn on unknown fields (do not reject)
-- Reject config files with tokens or secrets
+### 8. No Flaky Tests (Practice What We Preach)
 
-### Exit Code Determination
+Our own test suite must have zero flaky tests. Any test that fails intermittently is either fixed immediately or deleted. Non-determinism in tests comes from shared state, time, randomness, or network — eliminate or control all four.
 
-- Exit 0: all tests passed
-- Exit 0: only flaky failures (detected and quarantined)
-- Exit 0: degraded mode but tests passed
-- Exit 1: at least one genuine failure after retries
-- Exit 2: not initialized, invalid config, bad flags
-- Exit 2: infrastructure failure with `--strict`
-- Exit 2: `--verbose` and `--quiet` both set
+## Test Layers
 
-### Exclude Pattern Matching
+| Layer | Scope | External I/O | Runs on |
+|-------|-------|-------------|---------|
+| **Unit** | Pure functions in isolation | None | Every commit |
+| **Integration (mocked external)** | Full component flows against mock external APIs | Mock HTTP server | Every commit |
+| **Integration (real external)** | Full flows against real external APIs | Real API calls | Scheduled / manual |
+| **Contract** | Schema validation of shared data formats | None | Every commit |
 
-- Glob patterns match against `test_id` (`file_path::classname::name`)
-- `**` matches across path separators in the `file_path` portion
-- `*` matches within a single segment
-- Patterns from config and `--exclude` flags are merged
-- Excluded tests are completely ignored (no retry, no quarantine, no issue)
+### Unit Tests
 
----
+Cover all pure logic: parsing, validation, merging, decision-making, command construction. No network, no disk I/O beyond temp files. These are fast, deterministic, and form the bulk of the test suite.
 
-## CLI Integration Tests
+### Integration Tests (Mocked External APIs)
 
-### Against Mocked GitHub API (CI)
+Exercise full component flows end-to-end within the component boundary. A mock HTTP server stands in for external APIs, returning canned responses. These validate that the I/O shell correctly orchestrates the functional core.
 
-These run on every CI build. A mock HTTP server stands in for the GitHub API, returning canned responses for Contents API, Issues API, Search API, etc.
+### Integration Tests (Real External APIs)
 
-- Full `quarantine run` flow: read state, execute tests, parse XML, retry failures, update state, create issues, post PR comment
-- `quarantine init` flow: interactive prompts produce config, branch creation via API
-- `quarantine run` without prior `init`: refuses with exit 2
-- `quarantine doctor`: reports errors and warnings correctly
-- Degraded mode: mock returns 503 for Contents API, CLI falls back to cache then runs without state
-- `--strict` mode: mock returns errors, CLI exits 2 instead of degrading
-- `--dry-run`: no API writes occur
+Run periodically (not on every push) against dedicated test infrastructure. These catch issues that mocks cannot: API behavior changes, response format drift, rate limiting, and real-world edge cases.
 
-### Against Real GitHub API (Periodic)
+### Contract Tests
 
-These run on a schedule (not on every push) against a dedicated test repository. They validate that the CLI works with the real GitHub API, catching issues that mocks cannot (API changes, edge cases in response formats, rate limiting behavior).
+Validate that shared data formats (JSON schemas) are respected by both producers and consumers. Golden fixture files are validated against schemas as a build step — if a schema changes, tests break immediately on both sides.
 
-- Full end-to-end: `quarantine run` against the test repo with real flaky tests
-- CAS conflict simulation: two processes run concurrently, both updating `quarantine.json`. One gets a 409, retries, and the union merge produces correct state.
-- Issue creation and dedup: verify issues are created with deterministic labels and duplicates are avoided
-- PR comment post and update: verify the hidden HTML marker `<!-- quarantine-bot -->` is used to find and update existing comments
-- Branch creation: `quarantine init` creates the `quarantine/state` branch on a fresh repo
+## Test Organization Conventions
 
-### End-to-End with Real Test Suites
+- **Go:** Build tags separate test layers. `go test ./...` runs units only. `-tags=integration` and `-tags=e2e` add progressively heavier tests.
+- **TypeScript:** Standard test runner. Integration tests in a separate `test/integration/` directory.
+- **Test data:** Fixtures live in `testdata/` directories adjacent to the code they test.
+- **Coverage threshold:** Not specified. Revisit once there is enough code to establish a meaningful baseline.
 
-- Run a real Jest test suite (with a known flaky test) through `quarantine run`, verify the flaky test is detected, quarantined, and the exit code is 0
-- Same for RSpec and Vitest
-- These use small test projects in the test repo (see "Test Repo for Integration" below)
+## What We Deliberately Skip
+
+- **Browser-level E2E tests:** Integration tests cover loader-to-render. Full browser tests add cost without proportional confidence at current scale.
+- **Performance benchmarks:** Not needed at v1 scale. Revisit when data volumes warrant it.
+- **Exhaustive negative testing of external APIs:** We trust external API contracts and test our error handling, not their failure modes.
+
+## Development Tools
+
+**`/mikey:tdd`** — Test-driven development agent. Takes a scenario file and implements it interactively, generating tests and code that follow Functional Core / Imperative Shell principles. Use when implementing a new milestone scenario.
+
+**`/mikey:testify`** — Test quality auditor. Reviews code for design issues (mixed I/O and logic), excessive mocking, implementation detail testing, and missing error-path coverage. Use after implementing scenarios to validate alignment with this strategy.
 
 ---
 
-## Dashboard Unit Tests (TypeScript)
-
-### Artifact JSON Parsing
-
-- Parse valid test result JSON matching `test-result.schema.json`
-- Handle missing optional fields
-- Reject malformed JSON (log warning, skip artifact)
-
-### SQLite Query Correctness
-
-- Upsert test runs and test results correctly
-- Query flaky test trends (count over time, per-project)
-- Query quarantine duration (time between quarantine and unquarantine events)
-- Cross-repo rollup queries return correct aggregations
-- Handle empty database (first run, no data)
-
-### Polling Logic
-
-- Debounce: on-demand pull does not fire more than once per repo per 5 minutes
-- ETag handling: conditional requests skip download when content has not changed
-- Error resilience: a failed poll cycle does not block subsequent cycles
-
----
-
-## Dashboard Integration Tests
-
-### Artifact Ingestion from Mock GitHub API
-
-- Mock the Artifacts API to return a list of artifacts, then serve artifact content on download
-- Verify artifacts are downloaded, parsed, and inserted into SQLite
-- Verify `last_synced` and `last_etag` are updated on the project record
-- Verify malformed artifacts are skipped with a warning (not a crash)
-
-### Web UI Rendering
-
-- Loader data (from SQLite queries) renders into the expected page structure
-- Project listing page shows projects with test run counts
-- Quarantined test list shows test names, issue links, quarantine dates
-- Empty states render correctly (no projects, no test runs, no quarantined tests)
-
----
-
-## Contract Tests
-
-Contract tests validate that the CLI and dashboard agree on data formats. They run as part of `make schemas-validate` and in CI.
-
-| Schema | Validates |
-|--------|-----------|
-| `schemas/test-result.schema.json` | CLI output in `.quarantine/results.json` and dashboard's artifact ingestion input |
-| `schemas/quarantine-state.schema.json` | CLI read/write of `quarantine.json` on the `quarantine/state` branch |
-| `schemas/quarantine-config.schema.json` | CLI parsing and validation of `quarantine.yml` |
-
-### How they work
-
-- **CLI side (Go):** After each unit/integration test that produces a `results.json` or `quarantine.json`, validate the output against the corresponding JSON Schema using `santhosh-tekuri/jsonschema`.
-- **Dashboard side (TypeScript):** Artifact parsing tests validate input against `test-result.schema.json` using `ajv`.
-- **Golden fixtures:** Files in `testdata/expected/` are validated against schemas as a build step. If a schema changes, fixture tests break immediately.
-
-Contract tests are the primary mechanism ensuring the two independently developed components (CLI and dashboard) will integrate correctly.
-
----
-
-## Test Repo for Integration
-
-A dedicated GitHub repository (e.g., `mycargus/quarantine-test-suite`) provides a controlled environment for integration and end-to-end testing.
-
-### Contents
-
-The repo contains three small test projects, one per v1 framework:
-
-- **Jest project:** A few passing tests plus tests that fail ~30% of the time (`Math.random() < 0.3`)
-- **RSpec project:** Same pattern -- deterministic failures at a predetermined rate
-- **Vitest project:** Same pattern
-
-### Purpose
-
-- Validates the full end-to-end flow: `quarantine init`, `quarantine run`, flaky detection, state update, issue creation, PR comment
-- Tests real GitHub API interactions (Contents API, Issues API, Search API)
-- CAS conflict simulation with concurrent CI jobs
-- Verifies framework-specific JUnit XML parsing against real (not hand-crafted) output
-
-### Usage
-
-- **Periodic CI job:** Runs on a schedule (e.g., daily or weekly), not on every push to the Quarantine repo
-- **Manual trigger:** Can be run on-demand for debugging or verifying a release
-- The test repo is separate from the Quarantine source repo to avoid circular dependencies
-
----
-
-## Test Organization
-
-### CLI (`cli/`)
-
-```
-cli/
-  internal/
-    parser/
-      parser_test.go          # JUnit XML parsing, test_id construction
-    config/
-      config_test.go          # quarantine.yml parsing and validation
-    quarantine/
-      state_test.go           # quarantine.json read/write/merge
-    runner/
-      runner_test.go          # Rerun command construction, exclusion flags
-      exitcode_test.go        # Exit code determination
-    github/
-      client_test.go          # GitHub API client (against mock server)
-  test/
-    integration_test.go       # Full CLI flow against mock GitHub API
-    e2e_test.go               # End-to-end against real test repo (build tag: e2e)
-```
-
-Integration and e2e tests use Go build tags so they can be excluded from `go test ./...`:
-
-- `go test ./...` -- runs unit tests only
-- `go test -tags=integration ./...` -- adds integration tests (mock GitHub API)
-- `go test -tags=e2e ./...` -- adds end-to-end tests (real GitHub API, requires token)
-
-### Dashboard (`dashboard/`)
-
-```
-dashboard/
-  app/
-    lib/
-      ingest.server.test.ts    # Artifact parsing, SQLite ingestion
-      db.server.test.ts        # SQLite query correctness
-      github.server.test.ts    # Polling logic
-    routes/
-      _index.test.tsx          # Page rendering
-  test/
-    integration/
-      ingestion.test.ts        # Full ingestion pipeline against mock API
-```
-
-### Makefile Targets
-
-```makefile
-cli-test              # go test ./...
-cli-test-integration  # go test -tags=integration ./...
-cli-test-e2e          # go test -tags=e2e ./... (requires QUARANTINE_GITHUB_TOKEN)
-dash-test             # cd dashboard && pnpm test
-schemas-validate      # validate golden fixtures against JSON schemas
-test-all              # cli-test + dash-test + schemas-validate
-```
-
----
-
-## What We Deliberately Do Not Test
-
-- **Frameworks beyond v1 scope:** No pytest, Go, Maven test fixtures or parsing tests.
-- **GitHub App auth flow:** v2+ concern.
-- **Dashboard write-back to GitHub:** The dashboard is read-only in v1.
-- **Performance benchmarks:** Not needed at v1 scale. Revisit if quarantine.json approaches thousands of entries.
-- **Browser-level E2E tests (Playwright, Cypress):** Dashboard integration tests cover loader-to-render. Full browser tests are v2+ if warranted.
-
----
-
-*References: [cli-spec.md](cli-spec.md), [architecture.md](../planning/architecture.md),
-[ADR-012](../adr/012-concurrency-strategy.md), [ADR-016](../adr/016-v1-framework-scope.md).*
+*References: [architecture.md](../planning/architecture.md), scenario files in `docs/scenarios/`, Claude Code skills: [`/mikey:tdd`, `/mikey:testify`](https://github.com/mycargus/mikey-claude-plugins).*
