@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="1" failures="0" errors="0" time="0.187">
+  <testsuite name="__tests__/services/user.test.js" tests="1" errors="0" failures="0" skipped="0"
+             timestamp="2026-03-15T14:22:15" time="0.187">
+    <testcase classname="UserService fetchProfile" name="should return cached profile"
+              file="__tests__/services/user.test.js" time="0.187">
+    </testcase>
+  </testsuite>
+</testsuites>

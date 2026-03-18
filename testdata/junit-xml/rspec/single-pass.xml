@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="rspec" tests="3" skipped="0" failures="0" errors="0"
+           time="0.284" timestamp="2026-03-15T14:22:10+00:00"
+           hostname="ci-runner-1">
+  <properties>
+    <property name="seed" value="48291"/>
+  </properties>
+  <testcase classname="spec.models.user_spec"
+            name="User#valid? returns true for valid attributes"
+            file="./spec/models/user_spec.rb"
+            time="0.098">
+  </testcase>
+  <testcase classname="spec.models.user_spec"
+            name="User#valid? requires an email address"
+            file="./spec/models/user_spec.rb"
+            time="0.045">
+  </testcase>
+  <testcase classname="spec.models.user_spec"
+            name="User#full_name concatenates first and last name"
+            file="./spec/models/user_spec.rb"
+            time="0.031">
+  </testcase>
+</testsuite>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="3" failures="0" errors="0" time="0.567">
+  <testsuite name="src/utils/__tests__/math.test.ts"
+             timestamp="2026-03-15T14:22:10.000Z"
+             hostname="ci-runner-1"
+             tests="3" failures="0" errors="0" skipped="0"
+             time="0.234">
+    <testcase classname="src/utils/__tests__/math.test.ts"
+              name="math > add > should add positive numbers"
+              time="0.012">
+    </testcase>
+    <testcase classname="src/utils/__tests__/math.test.ts"
+              name="math > add > should handle negative numbers"
+              time="0.008">
+    </testcase>
+    <testcase classname="src/utils/__tests__/math.test.ts"
+              name="math > multiply > should multiply two numbers"
+              time="0.006">
+    </testcase>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="rspec" tests="3" skipped="0" failures="1" errors="0"
+           time="0.512" timestamp="2026-03-15T14:22:10+00:00"
+           hostname="ci-runner-1">
+  <properties>
+    <property name="seed" value="73104"/>
+  </properties>
+  <testcase classname="spec.services.payment_service_spec"
+            name="PaymentService#charge charges the correct amount"
+            file="./spec/services/payment_service_spec.rb"
+            time="0.156">
+  </testcase>
+  <testcase classname="spec.services.payment_service_spec"
+            name="PaymentService#charge handles gateway timeout"
+            file="./spec/services/payment_service_spec.rb"
+            time="0.234">
+    <failure message="expected: 503&#10;     got: 500&#10;&#10;(compared using ==)" type="RSpec::Expectations::ExpectationNotMetError">
+Failure/Error: expect(response.status).to eq(503)
+
+  expected: 503
+       got: 500
+
+  (compared using ==)
+
+  Diff:
+  @@ -1 +1 @@
+  -503
+  +500
+
+./spec/services/payment_service_spec.rb:34:in `block (3 levels) in &lt;top (required)&gt;'
+    </failure>
+  </testcase>
+  <testcase classname="spec.services.payment_service_spec"
+            name="PaymentService#refund processes full refund"
+            file="./spec/services/payment_service_spec.rb"
+            time="0.089">
+  </testcase>
+</testsuite>

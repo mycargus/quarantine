@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "run_id": "fixture-rspec-single-pass",
+  "repo": "mycargus/my-app",
+  "branch": "main",
+  "commit_sha": "bbb1234567890def1234567890abcdef12345678",
+  "pr_number": null,
+  "timestamp": "2026-03-15T14:22:11Z",
+  "cli_version": "0.1.0",
+  "framework": "rspec",
+  "config": {
+    "retry_count": 3
+  },
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0,
+    "quarantined": 0,
+    "flaky_detected": 0
+  },
+  "tests": [
+    {
+      "test_id": "./spec/models/user_spec.rb::spec.models.user_spec::User#valid? returns true for valid attributes",
+      "file_path": "./spec/models/user_spec.rb",
+      "classname": "spec.models.user_spec",
+      "name": "User#valid? returns true for valid attributes",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 98,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "./spec/models/user_spec.rb::spec.models.user_spec::User#valid? requires an email address",
+      "file_path": "./spec/models/user_spec.rb",
+      "classname": "spec.models.user_spec",
+      "name": "User#valid? requires an email address",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 45,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "./spec/models/user_spec.rb::spec.models.user_spec::User#full_name concatenates first and last name",
+      "file_path": "./spec/models/user_spec.rb",
+      "classname": "spec.models.user_spec",
+      "name": "User#full_name concatenates first and last name",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 31,
+      "failure_message": null,
+      "issue_number": null
+    }
+  ]
+}

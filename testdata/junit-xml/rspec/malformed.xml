@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="rspec" tests="2" skipped="0" failures="0" errors="0"
+           time="0.123" timestamp="2026-03-15T14:22:10+00:00"
+           hostname="ci-runner-1">
+  <properties>
+    <property name="seed" value="99999"/>
+  </properties>
+  <testcase classname="spec.models.broken_spec"
+            name="BrokenSpec works correctly"
+            file="./spec/models/broken_spec.rb"
+            time="0.045">
+  </testcase>
+  <testcase classname="spec.models.broken_spec"
+            name="BrokenSpec handles edge cases"
+            file="./spec/models/broken_spec.rb"

@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "run_id": "fixture-jest-single-pass",
+  "repo": "mycargus/my-app",
+  "branch": "main",
+  "commit_sha": "abc1234567890def1234567890abcdef12345678",
+  "pr_number": null,
+  "timestamp": "2026-03-15T14:22:11Z",
+  "cli_version": "0.1.0",
+  "framework": "jest",
+  "config": {
+    "retry_count": 3
+  },
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0,
+    "quarantined": 0,
+    "flaky_detected": 0
+  },
+  "tests": [
+    {
+      "test_id": "__tests__/auth/login.test.js::LoginForm validates input::should reject empty email",
+      "file_path": "__tests__/auth/login.test.js",
+      "classname": "LoginForm validates input",
+      "name": "should reject empty email",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 45,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "__tests__/auth/login.test.js::LoginForm validates input::should reject invalid email format",
+      "file_path": "__tests__/auth/login.test.js",
+      "classname": "LoginForm validates input",
+      "name": "should reject invalid email format",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 32,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "__tests__/auth/login.test.js::LoginForm submits::should call onSubmit with credentials",
+      "file_path": "__tests__/auth/login.test.js",
+      "classname": "LoginForm submits",
+      "name": "should call onSubmit with credentials",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 78,
+      "failure_message": null,
+      "issue_number": null
+    }
+  ]
+}

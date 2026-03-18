@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "updated_at": "2026-03-15T14:22:15Z",
+  "tests": {
+    "__tests__/services/user.test.js::UserService fetchProfile::should return cached profile": {
+      "test_id": "__tests__/services/user.test.js::UserService fetchProfile::should return cached profile",
+      "file_path": "__tests__/services/user.test.js",
+      "classname": "UserService fetchProfile",
+      "name": "should return cached profile",
+      "suite": "UserService fetchProfile",
+      "first_flaky_at": "2026-03-15T14:22:15Z",
+      "last_flaky_at": "2026-03-15T14:22:15Z",
+      "flaky_count": 1,
+      "issue_number": 43,
+      "issue_url": "https://github.com/mycargus/my-app/issues/43",
+      "quarantined_at": "2026-03-15T14:22:15Z",
+      "quarantined_by": "cli-auto"
+    }
+  }
+}

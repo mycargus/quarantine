@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "run_id": "fixture-jest-flaky",
+  "repo": "mycargus/my-app",
+  "branch": "main",
+  "commit_sha": "aaa1234567890def1234567890abcdef12345678",
+  "pr_number": 99,
+  "timestamp": "2026-03-15T14:22:15Z",
+  "cli_version": "0.1.0",
+  "framework": "jest",
+  "config": {
+    "retry_count": 3
+  },
+  "summary": {
+    "total": 4,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0,
+    "quarantined": 0,
+    "flaky_detected": 1
+  },
+  "tests": [
+    {
+      "test_id": "__tests__/services/user.test.js::UserService createUser::should create user with valid data",
+      "file_path": "__tests__/services/user.test.js",
+      "classname": "UserService createUser",
+      "name": "should create user with valid data",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 156,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "__tests__/services/user.test.js::UserService createUser::should hash the password",
+      "file_path": "__tests__/services/user.test.js",
+      "classname": "UserService createUser",
+      "name": "should hash the password",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 98,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "__tests__/services/user.test.js::UserService fetchProfile::should return cached profile",
+      "file_path": "__tests__/services/user.test.js",
+      "classname": "UserService fetchProfile",
+      "name": "should return cached profile",
+      "status": "flaky",
+      "original_status": "failed",
+      "duration_ms": 2501,
+      "retries": [
+        {
+          "attempt": 1,
+          "status": "passed",
+          "duration_ms": 187
+        }
+      ],
+      "failure_message": "Timeout - Async callback was not invoked within the 2000 ms timeout specified by jest.setTimeout.",
+      "issue_number": 43
+    },
+    {
+      "test_id": "__tests__/services/user.test.js::UserService deleteUser::should soft-delete the user",
+      "file_path": "__tests__/services/user.test.js",
+      "classname": "UserService deleteUser",
+      "name": "should soft-delete the user",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 74,
+      "failure_message": null,
+      "issue_number": null
+    }
+  ]
+}

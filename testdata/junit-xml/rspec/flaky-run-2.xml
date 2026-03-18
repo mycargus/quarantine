@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="rspec" tests="1" skipped="0" failures="0" errors="0"
+           time="0.312" timestamp="2026-03-15T14:22:15+00:00"
+           hostname="ci-runner-1">
+  <properties>
+    <property name="seed" value="55012"/>
+  </properties>
+  <testcase classname="spec.services.notification_service_spec"
+            name="NotificationService#send_email retries on SMTP timeout"
+            file="./spec/services/notification_service_spec.rb"
+            time="0.312">
+  </testcase>
+</testsuite>

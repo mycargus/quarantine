@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "run_id": "fixture-vitest-flaky",
+  "repo": "mycargus/my-app",
+  "branch": "main",
+  "commit_sha": "111abcdef1234567890abcdef1234567890abcde",
+  "pr_number": 81,
+  "timestamp": "2026-03-15T14:22:15Z",
+  "cli_version": "0.1.0",
+  "framework": "vitest",
+  "config": {
+    "retry_count": 3
+  },
+  "summary": {
+    "total": 4,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0,
+    "quarantined": 0,
+    "flaky_detected": 1
+  },
+  "tests": [
+    {
+      "test_id": "src/services/__tests__/cache.test.ts::src/services/__tests__/cache.test.ts::CacheService > get > should return cached value",
+      "file_path": "src/services/__tests__/cache.test.ts",
+      "classname": "src/services/__tests__/cache.test.ts",
+      "name": "CacheService > get > should return cached value",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 23,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "src/services/__tests__/cache.test.ts::src/services/__tests__/cache.test.ts::CacheService > get > should return undefined for expired entries",
+      "file_path": "src/services/__tests__/cache.test.ts",
+      "classname": "src/services/__tests__/cache.test.ts",
+      "name": "CacheService > get > should return undefined for expired entries",
+      "status": "flaky",
+      "original_status": "failed",
+      "duration_ms": 1567,
+      "retries": [
+        {
+          "attempt": 1,
+          "status": "passed",
+          "duration_ms": 89
+        }
+      ],
+      "failure_message": "AssertionError: expected undefined to be 'cached-value'",
+      "issue_number": 67
+    },
+    {
+      "test_id": "src/services/__tests__/cache.test.ts::src/services/__tests__/cache.test.ts::CacheService > set > should store value with TTL",
+      "file_path": "src/services/__tests__/cache.test.ts",
+      "classname": "src/services/__tests__/cache.test.ts",
+      "name": "CacheService > set > should store value with TTL",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 15,
+      "failure_message": null,
+      "issue_number": null
+    },
+    {
+      "test_id": "src/services/__tests__/cache.test.ts::src/services/__tests__/cache.test.ts::CacheService > delete > should remove cached entry",
+      "file_path": "src/services/__tests__/cache.test.ts",
+      "classname": "src/services/__tests__/cache.test.ts",
+      "name": "CacheService > delete > should remove cached entry",
+      "status": "passed",
+      "original_status": null,
+      "duration_ms": 11,
+      "failure_message": null,
+      "issue_number": null
+    }
+  ]
+}
