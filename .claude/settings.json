@@ -6,13 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/reject-v2-frameworks.sh \"$TOOL_INPUT\"",
-            "description": "Reject v2+ framework references (pytest, go test, maven)"
+            "command": ".claude/hooks/reject-v2-frameworks.sh \"$TOOL_INPUT\""
           },
           {
             "type": "command",
-            "command": ".claude/hooks/reject-secrets-in-files.sh \"$TOOL_INPUT\"",
-            "description": "Reject GitHub token patterns in file content"
+            "command": ".claude/hooks/reject-secrets-in-files.sh \"$TOOL_INPUT\""
           }
         ]
       },
@@ -21,11 +19,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/warn-destructive-git.sh \"$TOOL_INPUT\"",
-            "description": "Warn before destructive git commands"
+            "command": ".claude/hooks/warn-destructive-git.sh \"$TOOL_INPUT\""
           }
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "mikey@mikey-claude-plugins": true
   }
 }
