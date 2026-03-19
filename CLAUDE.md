@@ -1,96 +1,67 @@
 # Quarantine
 
-Quarantine automatically detects, quarantines, and tracks flaky tests in CI pipelines. A Go CLI wraps test commands, detects flakiness via retry, and manages quarantine state on GitHub. A React Router v7 dashboard provides analytics by pulling data from GitHub Artifacts.
+Flaky test detection and quarantine for CI pipelines. Go CLI + React dashboard.
+
+## Commands
+
+```bash
+make test-all          # Run all tests (CLI + dashboard)
+make cli-build         # Build CLI binary to bin/quarantine
+make cli-test          # Go tests
+make cli-lint          # golangci-lint
+make dash-build        # Dashboard production build
+make dash-test         # Dashboard tests
+make dash-lint         # Biome lint
+```
 
 ## Architecture
 
-See `docs/planning/architecture.md` for the full system design. Key points:
+See `docs/planning/architecture.md` for full design. See `cli/CLAUDE.md` and `dashboard/CLAUDE.md` for component-specific context.
 
-- **Model C (ADR-011):** GitHub-native CLI + standalone dashboard. The CI-critical path depends only on GitHub. The dashboard is non-critical.
-- **CLI (Go):** Wraps test commands, parses JUnit XML, retries failures, suppresses quarantined tests, updates state on a dedicated GitHub branch (`quarantine/state`), creates GitHub Issues, posts PR comments, uploads results as GitHub Artifacts.
-- **Dashboard (React Router v7 + SQLite):** Pulls results from GitHub Artifacts via hybrid polling. Provides trends, cross-repo visibility, and flaky test analytics.
-- **No SaaS dependency in the CI path.** The CLI never talks to the dashboard. The dashboard discovers data autonomously.
-
-## v1 Scope
-
-Strict boundaries -- do not expand without discussion:
-
-- **Frameworks:** RSpec, Jest, Vitest only (ADR-016). Python/Go/Java are v2+.
-- **CI:** GitHub Actions only for full features (artifacts, cache). CLI binary runs anywhere.
-- **Tickets:** GitHub Issues only. Jira is v2+.
-- **Notifications:** PR comments only. Slack/email are v2+.
-- **Auth:** PAT via `QUARANTINE_GITHUB_TOKEN` env var (falls back to `GITHUB_TOKEN`). GitHub App + OAuth is v2+.
-- **No auto-healing (ADR-017).** The tool does not fix or re-test quarantined tests. Unquarantine happens only when a human closes the GitHub Issue.
-
-## Tech Stack
-
-- **CLI:** Go. Single binary, no runtime deps. `cobra` for CLI framework. `encoding/xml` for JUnit XML.
-- **Dashboard:** React Router v7 (framework mode), TypeScript, SQLite (WAL mode), Tailwind CSS.
-- **Config:** `quarantine.yml` in repo root (ADR-010).
+- **Model C (ADR-011):** GitHub-native CLI + standalone dashboard. CI path depends only on GitHub.
+- **CLI (Go):** Wraps test commands, parses JUnit XML, retries failures, manages quarantine state on `quarantine/state` branch, creates Issues, posts PR comments, uploads Artifacts.
+- **Dashboard (React Router v7 + SQLite):** Pulls from GitHub Artifacts. Read-only analytics.
+- **No SaaS in the CI path.** CLI never talks to the dashboard.
 
 ## Key Design Principles
 
-1. **Never break the build due to Quarantine's own failure.** All infrastructure errors are warnings, never fatal. Degraded mode uses cached `quarantine.json` from GitHub Actions cache.
-2. **Zero friction adoption.** `quarantine run -- <test command>` is the entire integration. One env var for auth.
-3. **GitHub IS the backend.** State on a branch, results in artifacts, tickets as issues. No external database in the CI path.
-4. **Quarantine wins on conflict.** Concurrent builds use optimistic concurrency (SHA-based CAS). When quarantine and unquarantine race, quarantine wins (ADR-012).
-
-## Documentation
-
-Docs are organized by purpose:
-
-- `docs/specs/` -- Implementation references (cli-spec, config-schema, github-api-inventory, error-handling, sequence-diagrams, test-strategy)
-- `docs/planning/` -- Architecture, milestones, functional and non-functional requirements
-- `docs/research/` -- Decision inputs (junit-xml-research, ci-artifact-api-research, competitive-landscape)
-- `docs/scenarios/` -- 66 given-when-then scenarios (v1) + 9 v2+ scenarios, organized by topic
-- `docs/milestones/` -- Milestone manifests: the entry point for agents implementing a milestone
-- `docs/adr/` -- 21 Architecture Decision Records
-
-## Agents and Skills
-
-Custom agents and skills are in `.claude/agents/` and `.claude/commands/`.
-
-- **`cli-dev` agent:** Scoped to CLI (Go) work. Use for M1-M5.
-- **`dashboard-dev` agent:** Scoped to dashboard (TypeScript) work. Use for M6-M7.
-- **`/milestone N`:** Sets current milestone context in CLAUDE.md.
-- **`/review-adr "description"`:** Checks a proposed change against all ADRs for conflicts.
-- **`/sync-docs [scope]`:** Audits code vs documentation for inconsistencies.
-
-Agent path scoping is trust-based (system prompt instructions), not structurally enforced. If structural enforcement is needed, use `PreToolUse` hooks to validate file paths.
+1. **Never break the build.** Quarantine errors are warnings, never fatal. Degraded mode uses cached `quarantine.json`.
+2. **Zero friction.** `quarantine run -- <test command>` is the entire integration. One env var for auth.
+3. **GitHub IS the backend.** State on a branch, results in artifacts, tickets as issues.
+4. **Quarantine wins on conflict.** SHA-based CAS with retry on 409. When quarantine and unquarantine race, quarantine wins (ADR-012).
 
 ## Implementation Notes
 
-- **Milestones** are in `docs/planning/milestones.md` (M1-M8). Milestone manifests in `docs/milestones/` are the entry point for agents.
-- **Rate limits:** `GITHUB_TOKEN` = 1,000 req/hr. PAT = 5,000/hr. GitHub App = 5,000-12,500/hr. Design for the lowest.
-- **Concurrency:** quarantine.json uses SHA-based compare-and-swap via GitHub Contents API. Retry on 409, max 3. Issue creation uses check-before-create with deterministic labels.
-- **JUnit XML caveats:** No official schema exists. Jest needs `jest-junit`, RSpec needs `rspec_junit_formatter`, Vitest has built-in support. Rerun commands require framework-specific classname-to-invocation mapping.
+- **Milestones** are in `docs/planning/milestones.md`. Manifests in `docs/milestones/` are the entry point for implementation.
+- **Rate limits:** Design for `GITHUB_TOKEN` (1,000 req/hr), not PAT (5,000/hr).
+- **Concurrency:** `quarantine.json` uses compare-and-swap via GitHub Contents API. Issue creation uses check-before-create with deterministic labels.
+- **JUnit XML:** No official schema. Jest needs `jest-junit`, RSpec needs `rspec_junit_formatter`, Vitest has built-in support.
+- **Test fixtures:** `testdata/` at repo root (shared across packages).
 
-## What NOT to Do
+## Documentation
 
-- Do not add frameworks beyond v1 scope without discussion
-- Do not add SaaS infrastructure dependencies to the CLI critical path
-- Do not add features beyond the current milestone
-- Do not attempt auto-healing or auto-unquarantine of flaky tests
-- Do not assume Docker is required -- it is a deployment convenience
-- Do not store secrets in `quarantine.yml` -- tokens come from env vars only
+- `docs/specs/` -- Implementation references (cli-spec, config-schema, error-handling, test-strategy, etc.)
+- `docs/planning/` -- Architecture, milestones, requirements
+- `docs/research/` -- Decision inputs (junit-xml, ci-artifacts, competitive landscape)
+- `docs/scenarios/` -- Given/when/then user scenarios
+- `docs/milestones/` -- Milestone manifests (agent entry points)
+- `docs/prompts/` -- Reusable prompts
+- `docs/adr/` -- Architecture Decision Records
 
-## Development Workflow
+## Boundaries
 
-When implementing a milestone:
+Do not expand without discussion:
 
-1. **Read the manifest.** Load `docs/milestones/m{N}.md` — the single entry point for scope, constraints, and spec references. Do NOT read all spec docs upfront.
-2. **Implement via TDD.** Use `/mikey:tdd <scenario-file>` against the scenarios listed in the manifest. Work through one scenario at a time.
-3. **Validate code.** Use `/mikey:testify` to review code design and test quality alignment after each scenario.
-4. **Verify.** Use `/verify-milestone {N}` after all scenarios are implemented. Fix any failures before reporting completion.
+- **v1 frameworks:** RSpec, Jest, Vitest only (ADR-016)
+- **v1 CI:** GitHub Actions only for full features
+- **v1 tickets:** GitHub Issues only (no Jira)
+- **v1 auth:** PAT via `QUARANTINE_GITHUB_TOKEN` (falls back to `GITHUB_TOKEN`)
+- **No auto-healing (ADR-017).** Unquarantine only when a human closes the Issue.
+- **No features beyond the current milestone.**
+- **No secrets in `quarantine.yml`** -- tokens come from env vars only.
 
-**Constraints:**
-- Keep scope small per change. Avoid drift from intention. One concern per change.
-- NEVER modify existing scenarios in `docs/scenarios/` without user confirmation. Adding new scenarios is OK.
+## Rules
 
-## Instructions
-
-- NEVER make assumptions
-- NEVER use APIs, fields, config options, or features without first verifying they exist in official documentation
-- ALWAYS admit when you're not sure
-- ALWAYS consult official resources (code, documentation, etc) before making a recommendation or decision
-- ALWAYS ask clarification questions as needed
+- Do not make assumptions -- verify APIs, fields, and features exist in official docs first.
+- Admit when you're not sure. Ask clarification questions.
+- Consult `docs/` before making design decisions.

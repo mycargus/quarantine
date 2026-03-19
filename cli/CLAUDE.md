@@ -1,36 +1,29 @@
 # CLI (Go)
 
-## Build & Test Commands
+## Commands
 
-- Build: `go build -o bin/quarantine ./cmd/quarantine`
-- Test: `go test ./...`
-- Lint: `golangci-lint run`
-- Test assertions: `github.com/mycargus/riteway-golang` (Given/Should/Actual/Expected pattern)
-- Module: `github.com/mycargus/quarantine`
+```bash
+make cli-build   # Or: go build -o bin/quarantine ./cmd/quarantine
+make cli-test    # Or: go test ./...
+make cli-lint    # Or: golangci-lint run
+```
 
-## Package Responsibilities
+## Packages
 
 | Package | Purpose |
 |---------|---------|
 | `cmd/quarantine` | Entry point, cobra command setup |
-| `internal/parser` | JUnit XML parsing, test_id construction |
 | `internal/config` | `quarantine.yml` parsing and validation |
-| `internal/runner` | Test command execution, rerun command construction |
+| `internal/git` | Git remote URL parsing |
 | `internal/github` | GitHub API client (Contents, Issues, Search, Comments) |
+| `internal/parser` | JUnit XML parsing, test_id construction |
 | `internal/quarantine` | `quarantine.json` read/write/merge, quarantine state logic |
+| `internal/runner` | Test command execution, rerun command construction |
 
 ## Conventions
 
-- All exported functions have doc comments.
-- Tests use riteway-golang for assertions: `riteway.Assert(t, riteway.Case[T]{...})`.
+- Test assertions: `riteway.Assert(t, riteway.Case[T]{...})` from `github.com/mycargus/riteway-golang`.
 - Golden test fixtures live in `testdata/` at the repo root.
 - Integration tests use build tag `integration`. E2E tests use build tag `e2e`.
-- Error handling follows `docs/specs/error-handling.md`: never break the build due to quarantine's own failure.
+- Error handling: never break the build. See `docs/specs/error-handling.md`.
 - Exit codes: 0 = success, 1 = test failures, 2 = quarantine error.
-
-## Scope
-
-- Do NOT modify dashboard code (`dashboard/` directory).
-- Do NOT add frameworks beyond v1 scope (rspec, jest, vitest only).
-- Do NOT add SaaS dependencies to the CLI critical path.
-- Do NOT store secrets in configuration files.
