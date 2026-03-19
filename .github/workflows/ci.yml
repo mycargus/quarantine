@@ -43,6 +43,7 @@ jobs:
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
+    environment: CI
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
 
     steps:
@@ -79,7 +80,7 @@ jobs:
           QUARANTINE_GITHUB_TOKEN: ${{ secrets.QUARANTINE_GITHUB_TOKEN }}
           QUARANTINE_TEST_OWNER: ${{ vars.QUARANTINE_TEST_OWNER }}
           QUARANTINE_TEST_REPO: ${{ vars.QUARANTINE_TEST_REPO }}
-          QUARANTINE_BIN: ${{ github.workspace }}/cli/bin/quarantine
+          QUARANTINE_BIN: ${{ github.workspace }}/bin/quarantine
 
   dashboard:
     name: Dashboard (TypeScript)
