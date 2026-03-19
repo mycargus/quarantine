@@ -59,21 +59,23 @@ Our own test suite must have zero flaky tests. Any test that fails intermittentl
 | Layer | Scope | External I/O | Runs on |
 |-------|-------|-------------|---------|
 | **Unit** | Pure functions in isolation | None | Every commit |
-| **Integration (mocked external)** | Full component flows against mock external APIs | Mock HTTP server | Every commit |
-| **Integration (real external)** | Full flows against real external APIs | Real API calls | Scheduled / manual |
+| **Integration** | Full component flows against mock external APIs | Mock HTTP server | Every commit |
+| **E2E** | Full system flows against real external dependencies | Real GitHub API, real binary | Main branch / manual |
 | **Contract** | Schema validation of shared data formats | None | Every commit |
 
 ### Unit Tests
 
 Cover all pure logic: parsing, validation, merging, decision-making, command construction. No network, no disk I/O beyond temp files. These are fast, deterministic, and form the bulk of the test suite.
 
-### Integration Tests (Mocked External APIs)
+### Integration Tests
 
 Exercise full component flows end-to-end within the component boundary. A mock HTTP server stands in for external APIs, returning canned responses. These validate that the I/O shell correctly orchestrates the functional core.
 
-### Integration Tests (Real External APIs)
+### E2E Tests
 
-Run periodically (not on every push) against dedicated test infrastructure. These catch issues that mocks cannot: API behavior changes, response format drift, rate limiting, and real-world edge cases.
+Exercise the full system — compiled binary + real GitHub API — against a dedicated test repository. Written in JavaScript (Vitest + [`riteway`](https://github.com/paralleldrive/riteway) assertions) and located in `e2e/` at the repository root. These catch issues that mocks cannot: API behavior changes, response format drift, auth edge cases, and real-world integration bugs.
+
+Run on the main branch and on PRs from within the repository (not forks, which cannot access secrets). See `e2e/README.md` for setup instructions.
 
 ### Contract Tests
 
@@ -81,8 +83,9 @@ Validate that shared data formats (JSON schemas) are respected by both producers
 
 ## Test Organization Conventions
 
-- **Go:** Build tags separate test layers. `go test ./...` runs units only. `-tags=integration` and `-tags=e2e` add progressively heavier tests.
-- **TypeScript:** Standard test runner. Integration tests in a separate `test/integration/` directory.
+- **Go:** Build tags separate test layers. `go test ./...` runs units only. `-tags=integration` adds integration tests.
+- **TypeScript (Dashboard):** Standard test runner. Integration tests in a separate `test/integration/` directory.
+- **JavaScript (E2E):** Vitest in `e2e/`. Uses RITEway-style `assert` helper. Run with `cd e2e && pnpm test`.
 - **Test data:** Fixtures live in `testdata/` directories adjacent to the code they test.
 - **Coverage threshold:** Not specified. Revisit once there is enough code to establish a meaningful baseline.
 

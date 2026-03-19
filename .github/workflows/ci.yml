@@ -30,6 +30,53 @@ jobs:
       - name: Test
         run: go test ./...
 
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: cli
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
+      - name: Build CLI binary
+        run: go build -o bin/quarantine ./cmd/quarantine
+        working-directory: cli
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: e2e/package.json
+
+      - name: Install E2E dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: e2e
+
+      - name: Lint E2E
+        run: pnpm lint
+        working-directory: e2e
+
+      - name: E2E Tests
+        run: pnpm test
+        working-directory: e2e
+        env:
+          QUARANTINE_GITHUB_TOKEN: ${{ secrets.QUARANTINE_GITHUB_TOKEN }}
+          QUARANTINE_TEST_OWNER: ${{ vars.QUARANTINE_TEST_OWNER }}
+          QUARANTINE_TEST_REPO: ${{ vars.QUARANTINE_TEST_REPO }}
+          QUARANTINE_BIN: ${{ github.workspace }}/cli/bin/quarantine
+
   dashboard:
     name: Dashboard (TypeScript)
     runs-on: ubuntu-latest
