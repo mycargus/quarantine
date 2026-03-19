@@ -71,14 +71,14 @@ The CLI then:
          env:
            QUARANTINE_GITHUB_TOKEN: ${{ secrets.QUARANTINE_GITHUB_TOKEN }}
 
-    2. Upload results as an artifact:
-
        - name: Upload quarantine results
          if: always()
          uses: actions/upload-artifact@v4
          with:
            name: quarantine-results-${{ github.run_id }}
            path: .quarantine/results.json
+
+    2. Run `quarantine doctor` to verify your configuration.
   ```
 - Exits with code 0.
 
@@ -260,14 +260,15 @@ diagnostics.
 
 ---
 
-### Scenario 12: quarantine run without prior init [M1]
+### Scenario 12: quarantine run without prior init [M2]
 
 **Given** a developer has the CLI installed but has not run `quarantine init`
 (no `quarantine.yml` in the repo root, no `quarantine/state` branch)
 
 **When** the developer runs `quarantine run -- jest --ci`
 
-**Then** the CLI checks for `quarantine.yml` and finds it missing. Prints:
+**Then** the CLI checks for `quarantine.yml` and the `quarantine/state` branch.
+Finding both absent, it prints:
 ```
 Quarantine is not initialized for this repository. Run 'quarantine init' first.
 ```
