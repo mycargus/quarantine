@@ -1,6 +1,6 @@
 # Test Strategy
 
-> Last updated: 2026-03-18
+> Last updated: 2026-03-19
 >
 > Guiding principles for how we test. The goal is confidence in correctness
 > without over-engineering. Specific test cases live in scenario files
@@ -88,6 +88,59 @@ Validate that shared data formats (JSON schemas) are respected by both producers
 - **JavaScript (E2E):** Vitest in `e2e/`. Uses RITEway-style `assert` helper. Run with `cd e2e && pnpm test`.
 - **Test data:** Fixtures live in `testdata/` directories adjacent to the code they test.
 - **Coverage threshold:** Not specified. Revisit once there is enough code to establish a meaningful baseline.
+
+## Mutation Testing
+
+Coverage tells you which lines are executed; mutation testing tells you whether those lines are actually verified. A test that executes a branch without asserting on its effect will pass even when the branch is deleted or inverted — that's the gap mutation testing closes.
+
+### Tools
+
+| Component | Tool | Config |
+|-----------|------|--------|
+| CLI (Go) | [gremlins](https://github.com/go-gremlins/gremlins) | `cli/.gremlins.yaml` |
+| Dashboard (TypeScript) | [Stryker](https://github.com/stryker-mutator/stryker-js) | `dashboard/stryker.config.mjs` |
+
+### Running locally
+
+```bash
+make cli-mutate    # run gremlins on all CLI packages
+make dash-mutate   # run stryker on the dashboard (requires test files)
+make mutate-all    # both
+```
+
+gremlins must be run per package (it does not support `./...`). `make cli-mutate` loops over all packages automatically.
+
+### CI
+
+Mutation tests run nightly at 03:00 UTC via `.github/workflows/mutation.yml`. They can also be triggered manually via `workflow_dispatch`. They do not run on every PR — mutation testing is a quality signal, not a gate. Survivors appear in the job log under the per-package step that produced them.
+
+### Reading results
+
+| Status | Meaning |
+|--------|---------|
+| `KILLED` | The mutation was caught by a test — good. |
+| `LIVED` | No test detected the change — a coverage gap. |
+| `NOT COVERED` | The mutated line has no test coverage at all. |
+| `TIMED OUT` | Test run exceeded the timeout (often indicates an infinite loop caused by the mutation). |
+
+A `LIVED` result means: "I changed the logic and all tests still passed." That's the signal to write a test that would fail if that change were made.
+
+### Responding to survivors
+
+For each `LIVED` mutant:
+
+1. Read the mutation (e.g., `CONDITIONALS_NEGATION at config.go:181:16` — the `== ""` check was inverted to `!= ""`).
+2. Write a test that would fail under the mutated condition but pass under the original.
+3. Re-run the package to confirm the mutant is now `KILLED`.
+
+If a mutant cannot be killed by any realistic test input, it is a false positive. Document it with a comment in the test file or here, and move on. Known false positives in this codebase:
+
+- `config.go:140:18`, `config.go:167:18` — YAML mapping loop bound (`i+1 < len` → `i+1 <= len`). Only differs for odd-length node arrays, which valid YAML cannot produce.
+- `state.go:122:46`, `state.go:126:43` — Timestamp `<` → `<=` in `Merge`. When timestamps are equal, `earliest = existing.FirstFlakyAt` is a no-op regardless of which branch is taken.
+
+### What mutation testing does not replace
+
+Mutation testing validates that existing tests are meaningful. It does not replace the scenario-driven process for deciding *which* behaviors need tests in the first place. Use `/mikey:tdd` to add new behaviors, then use mutation results to verify the tests you wrote actually catch regressions.
 
 ## What We Deliberately Skip
 

@@ -1,0 +1,5 @@
+# Gremlins mutation testing configuration.
+# Run with: make cli-mutate
+# Docs: https://github.com/go-gremlins/gremlins
+
+timeout-coefficient: 20  # tests are fast; multiply base timeout to avoid false TIMED_OUT
