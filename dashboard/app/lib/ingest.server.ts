@@ -9,36 +9,36 @@
 // TODO: M6 — Implement JSON parsing, schema validation (ajv), SQLite upsert.
 
 export interface TestResult {
-  version: number;
-  run_id: string;
-  repo: string;
-  branch: string;
-  commit_sha: string;
-  pr_number: number | null;
-  timestamp: string;
-  cli_version: string;
-  framework: string;
+  version: number
+  run_id: string
+  repo: string
+  branch: string
+  commit_sha: string
+  pr_number: number | null
+  timestamp: string
+  cli_version: string
+  framework: string
   summary: {
-    total: number;
-    passed: number;
-    failed: number;
-    skipped: number;
-    quarantined: number;
-    flaky_detected: number;
-  };
-  tests: TestEntry[];
+    total: number
+    passed: number
+    failed: number
+    skipped: number
+    quarantined: number
+    flaky_detected: number
+  }
+  tests: TestEntry[]
 }
 
 export interface TestEntry {
-  test_id: string;
-  file_path: string;
-  classname: string;
-  name: string;
-  status: string;
-  original_status: string | null;
-  duration_ms: number;
-  failure_message: string | null;
-  issue_number: number | null;
+  test_id: string
+  file_path: string
+  classname: string
+  name: string
+  status: string
+  original_status: string | null
+  duration_ms: number
+  failure_message: string | null
+  issue_number: number | null
 }
 
 /**

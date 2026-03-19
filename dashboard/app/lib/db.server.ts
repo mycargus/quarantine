@@ -8,25 +8,25 @@
 // TODO: M6 — Initialize better-sqlite3, create schema, implement queries.
 
 export interface Project {
-  id: number;
-  owner: string;
-  repo: string;
-  lastSynced: string | null;
-  testRunCount: number;
+  id: number
+  owner: string
+  repo: string
+  lastSynced: string | null
+  testRunCount: number
 }
 
 export interface TestRun {
-  id: number;
-  projectId: number;
-  runId: string;
-  branch: string;
-  commitSha: string;
-  prNumber: number | null;
-  timestamp: string;
-  totalTests: number;
-  passedTests: number;
-  failedTests: number;
-  flakyTests: number;
+  id: number
+  projectId: number
+  runId: string
+  branch: string
+  commitSha: string
+  prNumber: number | null
+  timestamp: string
+  totalTests: number
+  passedTests: number
+  failedTests: number
+  flakyTests: number
 }
 
 /**
@@ -34,7 +34,7 @@ export interface TestRun {
  */
 export function getProjects(): Project[] {
   // TODO: M6 — Query SQLite for projects with aggregated test run counts.
-  return [];
+  return []
 }
 
 /**
@@ -42,5 +42,5 @@ export function getProjects(): Project[] {
  */
 export function getTestRuns(_projectId: number): TestRun[] {
   // TODO: M6 — Query SQLite for test runs ordered by timestamp desc.
-  return [];
+  return []
 }
