@@ -12,23 +12,23 @@
 // TODO: M6 — Implement artifact polling, ETag handling, circuit breaker.
 
 export interface ArtifactListResponse {
-  total_count: number;
-  artifacts: Artifact[];
+  total_count: number
+  artifacts: Artifact[]
 }
 
 export interface Artifact {
-  id: number;
-  name: string;
-  size_in_bytes: number;
-  archive_download_url: string;
-  created_at: string;
-  expires_at: string;
+  id: number
+  name: string
+  size_in_bytes: number
+  archive_download_url: string
+  created_at: string
+  expires_at: string
 }
 
 export interface PollState {
-  lastEtag: string | null;
-  consecutiveFailures: number;
-  pausedUntil: string | null;
+  lastEtag: string | null
+  consecutiveFailures: number
+  pausedUntil: string | null
 }
 
 /**
@@ -41,5 +41,5 @@ export async function pollArtifacts(
   _state: PollState,
 ): Promise<Artifact[]> {
   // TODO: M6 — List artifacts with ETag, filter by name prefix, download new ones.
-  return [];
+  return []
 }

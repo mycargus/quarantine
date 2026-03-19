@@ -30,7 +30,7 @@
   },
   "overrides": [
     {
-      "includes": ["tests/**/*", "**/*.test.*", "**/*.spec.*"],
+      "include": ["tests/**/*", "**/*.test.*", "**/*.spec.*"],
       "linter": {
         "rules": {
           // Explicit null checks like `error !== null && error.message.includes(...)`
@@ -45,12 +45,7 @@
       }
     }
   ],
-  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "files": {
-    "ignore": [
-      "node_modules",
-      "build",
-      ".react-router"
-    ]
+    "ignore": ["node_modules", "build", ".react-router"]
   }
 }

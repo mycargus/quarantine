@@ -14,12 +14,11 @@ export default function Index() {
       <section>
         <h2>Projects</h2>
         <p style={{ color: "#666" }}>
-          No projects configured yet. Add repositories to{" "}
-          <code>dashboard.yml</code> to get started.
+          No projects configured yet. Add repositories to <code>dashboard.yml</code> to get started.
         </p>
         {/* TODO: M6 — Load projects from SQLite via loader, render table with
             repo name, test run count, last sync timestamp. */}
       </section>
     </main>
-  );
+  )
 }
