@@ -52,11 +52,7 @@ func newInitCmd() *cobra.Command {
 		Short: "Initialize quarantine for a repository",
 		Long: `Initialize quarantine for a repository. Creates quarantine.yml,
 validates GitHub token/permissions, and creates the quarantine/state branch.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// TODO: Implement in M1.
-			fmt.Println("[quarantine] init is not yet implemented.")
-			return nil
-		},
+		RunE: runInit,
 	}
 }
 
@@ -99,11 +95,7 @@ func newDoctorCmd() *cobra.Command {
 		Long: `Validate quarantine.yml configuration. Reads and validates all fields
 against the schema, prints the resolved configuration, and reports errors
 and warnings.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// TODO: Implement in M1.
-			fmt.Println("[quarantine] doctor is not yet implemented.")
-			return nil
-		},
+		RunE: runDoctor,
 	}
 
 	cmd.Flags().String("config", "quarantine.yml", "Path to configuration file")
