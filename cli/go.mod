@@ -1,6 +1,6 @@
 module github.com/mycargus/quarantine
 
-go 1.22.0
+go 1.23.0
 
 require (
 	github.com/mycargus/riteway-golang v0.1.0
