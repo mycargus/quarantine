@@ -8,9 +8,9 @@
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
     "test": "node --test --import tsx 'app/**/*.test.{ts,tsx}'",
-    "lint": "biome check .",
-    "lint:fix": "biome check --write .",
-    "format": "biome format --write .",
+    "lint": "biome ci --error-on-warnings",
+    "lint:fix": "biome check --write",
+    "lint:fix:unsafe": "pnpm run format --unsafe",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

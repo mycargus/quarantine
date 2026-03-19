@@ -25,9 +25,27 @@
   "javascript": {
     "formatter": {
       "quoteStyle": "double",
-      "semicolons": "always"
+      "semicolons": "asNeeded"
     }
   },
+  "overrides": [
+    {
+      "includes": ["tests/**/*", "**/*.test.*", "**/*.spec.*"],
+      "linter": {
+        "rules": {
+          // Explicit null checks like `error !== null && error.message.includes(...)`
+          // produce clearer test failure output (false) than optional chaining (undefined).
+          "complexity": {
+            "useOptionalChain": "off"
+          },
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    }
+  ],
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "files": {
     "ignore": [
       "node_modules",
