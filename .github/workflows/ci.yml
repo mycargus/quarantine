@@ -12,9 +12,6 @@ jobs:
   cli:
     name: CLI (Go)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: cli
 
     steps:
       - uses: actions/checkout@v4
@@ -25,10 +22,10 @@ jobs:
           cache-dependency-path: cli/go.sum
 
       - name: Build
-        run: go build ./...
+        run: make cli-build
 
       - name: Test
-        run: go test ./...
+        run: make cli-test
 
       - name: Lint
         uses: golangci/golangci-lint-action@v6
@@ -49,8 +46,7 @@ jobs:
           cache-dependency-path: cli/go.sum
 
       - name: Build CLI binary
-        run: go build -o bin/quarantine ./cmd/quarantine
-        working-directory: cli
+        run: make cli-build
 
       - uses: actions/setup-node@v4
         with:
@@ -80,9 +76,6 @@ jobs:
   dashboard:
     name: Dashboard (TypeScript)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: dashboard
 
     steps:
       - uses: actions/checkout@v4
@@ -97,15 +90,17 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        working-directory: dashboard
 
       - name: Lint
-        run: pnpm run lint
+        run: make dash-lint
 
       - name: Typecheck
         run: pnpm run typecheck
+        working-directory: dashboard
 
       - name: Test
-        run: pnpm test
+        run: make dash-test
 
       - name: Build
-        run: pnpm run build
+        run: make dash-build
