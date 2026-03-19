@@ -1,6 +1,6 @@
 # Quarantine
 
-Copyright (C) 2026 Michael Hargiss. Licensed under the [GNU Affero General Public License v3.0](LICENSE).
+> *Still under construction!*
 
 Quarantine automatically detects, quarantines, and tracks flaky (non-deterministic) tests in CI pipelines.
 
@@ -105,6 +105,44 @@ Quarantine follows a GitHub-native architecture. The CLI handles the CI-critical
 
 See [`docs/planning/architecture.md`](docs/planning/architecture.md) for the full system design.
 
+## Roadmap
+
+Quarantine is under active development. Here's where things stand and where they're headed.
+
+### v1 — GitHub-Native Core *(in progress)*
+
+The focus of v1 is zero-friction adoption for teams already on GitHub Actions. Everything runs through your existing `GITHUB_TOKEN` — no new accounts, no SaaS dependencies in the CI path.
+
+| Feature | Status |
+|---------|--------|
+| `quarantine init` + `quarantine doctor` | Done |
+| Test execution + JUnit XML parsing (Jest, Vitest, RSpec) | In progress |
+| Flaky detection via configurable retry | Planned |
+| Quarantine state on `quarantine/state` branch (SHA-based CAS) | Planned |
+| Pre-execution exclusion of quarantined tests | Planned |
+| GitHub Issue per flaky test (deduplicated) | Planned |
+| PR comment summaries | Planned |
+| Result artifacts for dashboard ingestion | Planned |
+| Web dashboard (React Router v7 + SQLite) with trend analytics | Planned |
+| CLI + dashboard Docker images, cross-compiled binaries (6 targets) | Planned |
+
+### v2 — Expanded Integrations
+
+- **GitHub App** — fine-grained permissions and short-lived tokens (no PAT required)
+- **Monorepo support** — namespace test IDs per project within a single repo
+- **More CI providers** — Jenkins, GitLab, Bitbucket
+- **More frameworks** — pytest, and others
+- **Real-time unquarantine** — GitHub webhooks instead of polling on each run
+- **Notification channels** — Slack, email
+- **Code sync adapter** — automated PRs to add skip markers directly in source
+
+### v3+ — Scale
+
+- Hosted SaaS dashboard option
+- Multi-org support
+- Jira ticket integration
+- AI-assisted flaky test remediation suggestions
+
 ## Development
 
 Reusable prompts for common development tasks are in [`docs/prompts/`](docs/prompts/):
@@ -120,3 +158,7 @@ Reusable prompts for common development tasks are in [`docs/prompts/`](docs/prom
 Inspired by the [quarantine gem] by Flexport.
 
 [quarantine gem]: https://github.com/flexport/quarantine
+
+## License
+
+Copyright (C) 2026 Michael Hargiss. Licensed under the [GNU Affero General Public License v3.0](LICENSE).
