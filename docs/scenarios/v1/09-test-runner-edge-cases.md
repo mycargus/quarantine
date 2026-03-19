@@ -2,6 +2,8 @@
 
 ### Scenario 52: quarantine run without -- separator [M2]
 
+**Risk:** The CLI misinterprets test command arguments as its own flags, causing unpredictable behavior or silently swallowing test runner options.
+
 **Given** the CLI is configured in CI
 
 **When** the developer runs `quarantine run jest --ci` (missing `--` separator)
@@ -18,6 +20,8 @@ Exits with code 2. The test command is NOT executed.
 
 ### Scenario 53: Test command not found [M2]
 
+**Risk:** A typo in the test command produces exit code 1 (suggesting test failure) instead of exit code 2 with a diagnostic, misleading users about the cause.
+
 **Given** the CLI is configured in CI and `quarantine.yml` is valid
 
 **When** the developer runs `quarantine run -- jset --ci` (typo: `jset` instead
@@ -33,6 +37,8 @@ failure.
 ---
 
 ### Scenario 54: No JUnit XML produced [M2]
+
+**Risk:** The CLI exits 0 when the test runner crashes before producing XML, falsely indicating all tests passed.
 
 **Given** the CLI is configured in CI with `junitxml: junit.xml` and the test
 runner crashes before producing XML output (e.g., segfault, OOM, or the test
@@ -51,6 +57,8 @@ the failure was a test failure or infrastructure issue).
 
 ### Scenario 55: Malformed JUnit XML [M2]
 
+**Risk:** Malformed XML causes the CLI to crash or exit 2, breaking the build due to quarantine infrastructure rather than test results (FR-1.6.3).
+
 **Given** a single JUnit XML file exists but is truncated or contains invalid
 XML
 
@@ -64,6 +72,8 @@ Treats this as "no XML produced" and exits with the test runner's exit code.
 ---
 
 ### Scenario 56: Multiple XML files, some malformed (parallel runners) [M2]
+
+**Risk:** One corrupt XML file from a crashed shard causes all test results to be discarded, losing valid results from other shards.
 
 **Given** the project uses Jest with `--shard` and produces 4 JUnit XML files.
 3 are valid and 1 is truncated.
@@ -83,6 +93,8 @@ Treats this as "no XML produced" and exits with the test runner's exit code.
 ---
 
 ### Scenario 57: All tests in the suite are quarantined — Jest/Vitest [M4]
+
+**Risk:** Excluding all tests causes the test runner to report "no tests found" (exit non-zero), which the CLI misinterprets as a test failure and exits 1.
 
 **Given** `quarantine.json` contains entries for every test in the suite (e.g.,
 50 out of 50 tests are quarantined), and all corresponding GitHub Issues are
@@ -106,6 +118,8 @@ Exits with code 0.
 ---
 
 ### Scenario 58: All tests in the suite are quarantined — RSpec [M4]
+
+**Risk:** All quarantined RSpec tests run and fail, and the CLI does not suppress all failures, incorrectly exiting 1 and breaking the build.
 
 **Given** `quarantine.json` contains entries for every test in the suite (e.g.,
 50 out of 50 tests), all issues open. The project uses RSpec.

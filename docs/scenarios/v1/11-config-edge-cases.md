@@ -2,6 +2,8 @@
 
 ### Scenario 64: Config resolution order [M2]
 
+**Risk:** Ambiguous config resolution causes unpredictable behavior when CLI flags and config file values conflict, preventing users from reliably overriding settings.
+
 **Given** `quarantine.yml` has `retries: 5` and `junitxml: "custom/*.xml"`.
 The `origin` git remote points to `github.com/my-org/my-project`.
 
@@ -19,6 +21,8 @@ Result: retries=2, junitxml="override.xml", github.owner="my-org".
 ---
 
 ### Scenario 65: Minimal valid config [M1]
+
+**Risk:** A minimal two-field config crashes or misbehaves because the CLI doesn't properly apply defaults for omitted optional fields.
 
 **Given** `quarantine.yml` contains only:
 ```yaml
@@ -42,6 +46,8 @@ Prints the resolved configuration. Exits with code 0.
 ---
 
 ### Scenario 66: Unsupported config version [M1]
+
+**Risk:** A config file from a newer CLI version is parsed without error, producing silent misbehavior due to unrecognized schema changes.
 
 **Given** `quarantine.yml` contains `version: 2`
 

@@ -2,6 +2,8 @@
 
 ### Scenario 36: User views org-wide flaky test overview [M7]
 
+**Risk:** Users cannot see the aggregate flaky test problem across their organization, missing systemic quality issues that span multiple repositories.
+
 **Given** the user is viewing the dashboard and the `dashboard.yml`
 configuration includes 4 repositories with Quarantine configured, containing a
 combined 12 quarantined tests
@@ -15,6 +17,8 @@ quarantined tests, and links to drill into each project's details.
 ---
 
 ### Scenario 37: User views single project's flaky test details and trends [M7]
+
+**Risk:** Users cannot determine whether the flaky test situation in a project is improving or worsening, making it impossible to measure the impact of quality initiatives.
 
 **Given** the user selects the repository `acme/payments-service`, which has
 3 quarantined tests
@@ -30,6 +34,8 @@ time (data derived from ingested GitHub Artifacts history).
 
 ### Scenario 38: User filters and searches quarantined tests on dashboard [M7]
 
+**Risk:** Users with many quarantined tests cannot find specific ones, making the dashboard unusable for targeted investigation.
+
 **Given** the user is viewing a repository with 15 quarantined tests
 
 **When** the user types `timeout` into the search bar and selects the filter
@@ -42,6 +48,8 @@ updating the displayed count accordingly.
 ---
 
 ### Scenario 39: Dashboard polls artifacts and ingests new results [M6]
+
+**Risk:** The dashboard shows stale data because artifact polling fails to discover new results, undermining trust in the analytics.
 
 **Given** the dashboard is running with `dashboard.yml` configured as:
 ```yaml
@@ -69,6 +77,8 @@ and its last successful poll was 5 minutes ago
 ---
 
 ### Scenario 40: Dashboard circuit breaker pauses polling after failures [M6]
+
+**Risk:** Persistent polling failures exhaust the GitHub API rate limit budget, starving other repositories of polling capacity (ADR-015).
 
 **Given** the dashboard is polling a repository and 3 consecutive GitHub API
 calls have failed (e.g., 500 Internal Server Error)

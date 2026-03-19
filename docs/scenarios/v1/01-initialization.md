@@ -2,6 +2,8 @@
 
 ### Scenario 1: First-time setup with Jest [M1]
 
+**Risk:** Init fails to produce a working configuration and state branch for Jest, causing `quarantine run` to fail in CI where errors are harder to diagnose (ADR-019).
+
 **Given** a developer has a project with a Jest test suite and a GitHub Actions
 CI pipeline, and Quarantine CLI is installed but not yet initialized
 
@@ -86,6 +88,8 @@ The CLI then:
 
 ### Scenario 2: quarantine init with RSpec [M1]
 
+**Risk:** RSpec-specific defaults (JUnit XML path, workflow snippet) are incorrect, leading users to set up CI with a configuration that silently produces no XML output.
+
 **Given** a developer has a project with an RSpec test suite
 
 **When** the developer runs `quarantine init` and selects `rspec` as the
@@ -103,6 +107,8 @@ Exits with code 0.
 ---
 
 ### Scenario 3: quarantine init with Vitest [M1]
+
+**Risk:** Vitest-specific defaults (JUnit XML path, workflow snippet) are incorrect, leading users to set up CI with a configuration that silently produces no XML output.
 
 **Given** a developer has a project with a Vitest test suite
 
@@ -122,6 +128,8 @@ Exits with code 0.
 
 ### Scenario 4: quarantine init when quarantine.yml already exists [M1]
 
+**Risk:** Re-running init silently overwrites an existing `quarantine.yml`, destroying the user's customized configuration.
+
 **Given** a developer has already run `quarantine init` and a `quarantine.yml`
 file exists in the repo root
 
@@ -140,6 +148,8 @@ If the developer enters `n` or presses enter (default): the CLI prints
 
 ### Scenario 5: quarantine init when quarantine/state branch already exists [M1]
 
+**Risk:** Re-running init overwrites an existing `quarantine.json`, destroying all previously tracked quarantine state.
+
 **Given** a developer has already run `quarantine init` and the
 `quarantine/state` branch exists in the GitHub repository with a
 `quarantine.json` file
@@ -157,6 +167,8 @@ Exits with code 0.
 ---
 
 ### Scenario 6: quarantine init with no GitHub token [M1]
+
+**Risk:** Missing token is not detected until CI, where the error is buried in logs and harder to act on (ADR-019).
 
 **Given** a developer has Quarantine CLI installed, but neither
 `QUARANTINE_GITHUB_TOKEN` nor `GITHUB_TOKEN` is set in the environment
@@ -179,6 +191,8 @@ init — config created, GitHub setup not completed).
 
 ### Scenario 7: quarantine init with insufficient token permissions [M1]
 
+**Risk:** A token with insufficient scope passes init without error, causing cryptic 403 failures during CI runs.
+
 **Given** a developer has `GITHUB_TOKEN` set but the token lacks the `repo`
 scope (e.g., it has only `read:org` scope)
 
@@ -197,6 +211,8 @@ degraded mode (per milestones.md).
 
 ### Scenario 8: quarantine init when not a git repository [M1]
 
+**Risk:** The CLI attempts GitHub operations without owner/repo, producing a confusing error instead of a clear diagnostic.
+
 **Given** a developer runs `quarantine init` in a directory that is not a git
 repository (no `.git` directory)
 
@@ -212,6 +228,8 @@ Exits with code 2.
 ---
 
 ### Scenario 9: quarantine init with non-GitHub remote [M1]
+
+**Risk:** A non-GitHub remote URL is misinterpreted as GitHub, causing the CLI to target the wrong repository or fail with a misleading error.
 
 **Given** a developer's git repository has its `origin` remote set to a
 non-GitHub URL (e.g., `https://gitlab.com/my-org/my-project.git`)
@@ -231,6 +249,8 @@ Exits with code 2.
 
 ### Scenario 10: quarantine init with invalid framework input [M1]
 
+**Risk:** An unsupported framework value is written to `quarantine.yml`, causing `quarantine run` to fail with an unclear error.
+
 **Given** a developer runs `quarantine init`
 
 **When** the CLI prompts `Which test framework? [rspec/jest/vitest]` and the
@@ -243,6 +263,8 @@ repeats until a valid value is entered.
 ---
 
 ### Scenario 11: quarantine init with GitHub API unreachable [M1]
+
+**Risk:** A transient network failure during init produces no actionable diagnostic, leaving the user unable to distinguish between a configuration error and a temporary outage.
 
 **Given** a developer has a valid GitHub token but the GitHub API is unreachable
 (network failure, DNS resolution failure, or GitHub outage)
@@ -261,6 +283,8 @@ diagnostics.
 ---
 
 ### Scenario 12: quarantine run without prior init [M2]
+
+**Risk:** Running without initialization causes cryptic GitHub API errors instead of a clear message directing the user to run `quarantine init` (ADR-019).
 
 **Given** a developer has the CLI installed but has not run `quarantine init`
 (no `quarantine.yml` in the repo root, no `quarantine/state` branch)

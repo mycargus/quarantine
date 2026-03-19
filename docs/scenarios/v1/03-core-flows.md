@@ -2,6 +2,8 @@
 
 ### Scenario 19: Normal CI run with no flaky tests [M2]
 
+**Risk:** The CLI introduces false positives, unnecessary retries, or non-zero exit codes when all tests pass, breaking builds that have no flaky tests.
+
 **Given** the CLI is configured in CI, `quarantine.json` on the
 `quarantine/state` branch contains zero quarantined tests, and all tests in the
 suite are deterministic
@@ -22,6 +24,8 @@ suite are deterministic
 ---
 
 ### Scenario 20: CI run detects a new flaky test [M3]
+
+**Risk:** A flaky test is not detected, continues breaking builds intermittently, and no issue is created to track it.
 
 **Given** the CLI is configured in CI, `quarantine.json` has no entry for the
 test `PaymentService > should handle charge timeout`, and this test is
@@ -54,6 +58,8 @@ and `should handle charge timeout` fails on the first run but passes on retry
 
 ### Scenario 21: CI run with a previously quarantined test — Jest or Vitest (pre-execution exclusion) [M4]
 
+**Risk:** A quarantined test is not excluded from execution, runs, fails, and breaks the build despite being quarantined (ADR-003).
+
 **Given** `quarantine.json` on the `quarantine/state` branch contains an entry
 for `PaymentService > should handle charge timeout` with status `quarantined`,
 and the corresponding GitHub Issue is still open. The project uses Jest (or
@@ -83,6 +89,8 @@ Vitest).
 ---
 
 ### Scenario 22: CI run with a previously quarantined test — RSpec (post-execution filtering) [M4]
+
+**Risk:** A quarantined RSpec test's failure is not suppressed from the exit code, breaking the build despite the test being quarantined (ADR-003).
 
 **Given** `quarantine.json` on the `quarantine/state` branch contains an entry
 for `User#valid? returns true for valid attributes` with status `quarantined`,
@@ -122,6 +130,8 @@ automatically.)
 
 ### Scenario 23: CI run with a real failure [M3]
 
+**Risk:** A genuinely broken test is misclassified as flaky and quarantined, hiding a real bug from the build signal.
+
 **Given** the CLI is configured in CI, `quarantine.json` has no entry for
 `CheckoutService > should apply discount`, and this test has a genuine bug
 
@@ -142,6 +152,8 @@ and `should apply discount` fails on all 3 retries
 ---
 
 ### Scenario 24: Multiple flaky tests detected in a single run [M3]
+
+**Risk:** When multiple flaky tests are detected in one run, some are missed or duplicate issues are created due to non-atomic state updates.
 
 **Given** the CLI is configured in CI with `--retries 3`, and `quarantine.json`
 has no entries for `SearchService > should fuzzy match` or
@@ -164,6 +176,8 @@ rate limit` (fails run 1, fails run 2, passes run 3) are detected as flaky
 ---
 
 ### Scenario 25: Quarantined test's GitHub issue is closed (unquarantine) [M4]
+
+**Risk:** Closing a GitHub Issue does not actually unquarantine the test, leaving it permanently excluded from builds even after being fixed (ADR-017).
 
 **Given** `quarantine.json` contains an entry for
 `PaymentService > should handle charge timeout` with `issue_number: 42`, and
@@ -189,6 +203,8 @@ issue)
 ---
 
 ### Scenario 26: CI run with mixed results — flaky, quarantined, real failures, and passes [M4]
+
+**Risk:** The interaction of multiple test states (quarantined, unquarantined, flaky, failing, passing) produces an incorrect exit code or corrupted quarantine state.
 
 **Given** the CLI is configured in CI with `--retries 3`. `quarantine.json`
 contains entries for tests A (quarantined, issue open) and test B (quarantined,

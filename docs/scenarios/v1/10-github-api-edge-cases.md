@@ -2,6 +2,8 @@
 
 ### Scenario 59: Search API result limit exceeded during unquarantine detection [M4]
 
+**Risk:** The CLI fails or behaves unpredictably when the repository has more than 1,000 closed quarantine issues, instead of gracefully degrading per the quarantine-wins principle (ADR-012).
+
 **Given** `quarantine.json` contains 5 currently quarantined tests, and the
 repository has over 1,000 closed GitHub Issues with the `quarantine` label
 accumulated over months of CI activity
@@ -30,6 +32,8 @@ quarantined until a subsequent run retrieves the closed issue.
 
 ### Scenario 60: Rate limit warning [M4]
 
+**Risk:** Users exhaust their GitHub API rate limit without warning, causing unexpected degraded mode entries across all subsequent CI builds until the limit resets (ADR-015).
+
 **Given** the CLI is running in CI and the GitHub API responds with rate limit
 headers showing `X-RateLimit-Remaining: 47` out of `X-RateLimit-Limit: 1000`
 (below 10% remaining)
@@ -45,6 +49,8 @@ The CLI continues operating normally — this is informational only.
 ---
 
 ### Scenario 61: Issues disabled on repository [M5]
+
+**Risk:** The CLI crashes or exits 2 when GitHub Issues are disabled on the repository, breaking builds even though issue creation is non-critical.
 
 **Given** the CLI detects a flaky test and attempts to create a GitHub Issue,
 but GitHub Issues are disabled on the repository
@@ -63,6 +69,8 @@ comments and results are still written. Exits normally.
 
 ### Scenario 62: quarantine.json exceeds size limit [M4]
 
+**Risk:** The CLI crashes or exits 2 when `quarantine.json` exceeds the 1 MB Contents API limit, breaking builds instead of gracefully skipping the write.
+
 **Given** `quarantine.json` has grown large (approaching the 1 MB Contents API
 limit) due to many quarantined tests
 
@@ -79,6 +87,8 @@ of the flow (issue creation, PR comment, results). Exits based on test results.
 ---
 
 ### Scenario 63: CAS conflict exhaustion (all 3 retries fail) [M4]
+
+**Risk:** Exhausting CAS retries causes the CLI to exit 2, breaking builds during periods of high concurrent CI activity (ADR-012).
 
 **Given** the CLI detects a flaky test and attempts to update `quarantine.json`,
 but 3 other concurrent builds are also writing, and every CAS retry encounters

@@ -2,6 +2,8 @@
 
 ### Scenario 41: CLI updates quarantine.json on unprotected branch [M4]
 
+**Risk:** The standard write path for quarantine state fails on unprotected branches, blocking the most common deployment configuration.
+
 **Given** the `quarantine/state` branch is not protected, and the CLI has
 detected a new flaky test
 
@@ -14,6 +16,8 @@ optimistic concurrency, and `quarantine.json` is updated.
 ---
 
 ### Scenario 42: CLI updates quarantine.json when branch is protected [M4]
+
+**Risk:** Branch protection rules block quarantine state updates with no fallback, causing flaky test detections to be silently lost.
 
 **Given** the `quarantine/state` branch has branch protection rules enabled
 (e.g., required reviews, status checks), and the CLI has detected a new flaky
