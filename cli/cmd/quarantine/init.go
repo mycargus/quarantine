@@ -95,17 +95,7 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 
 	owner, repo, err := git.ParseRemote(cwd)
 	if err != nil {
-		errMsg := err.Error()
-		if strings.Contains(errMsg, "not a git repository") {
-			cmd.Printf("Error: Not a git repository. Run 'quarantine init' from the root of a git repository.\n")
-		} else if strings.Contains(errMsg, "not a GitHub URL") {
-			// Extract the URL from the error for the detailed message.
-			// The git package returns "remote 'origin' is not a GitHub URL: <url>"
-			cmd.Printf("Error: Remote 'origin' is not a GitHub URL: %s\nQuarantine v1 supports GitHub repositories only. Set github.owner and github.repo\nin quarantine.yml manually if using a non-standard remote.\n",
-				extractURLFromError(errMsg))
-		} else {
-			cmd.Printf("Error: %v\n", err)
-		}
+		cmd.Printf("%s\n", classifyGitRemoteError(err))
 		return fmt.Errorf("git remote: %w", err)
 	}
 
@@ -123,7 +113,7 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 	repoInfo, err := client.GetRepo(ctx)
 	if err != nil {
 		cmd.Printf("FAILED\n")
-		printGitHubError(cmd, err, owner, repo)
+		cmd.Printf("%s\n", classifyGitHubError(err, owner, repo))
 		return fmt.Errorf("get repo: %w", err)
 	}
 	cmd.Printf("OK\n")
@@ -174,54 +164,11 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 	}
 
 	// Jest-specific recommendation.
-	if framework == "jest" {
-		cmd.Printf(`
-Recommended jest-junit configuration (in jest.config.js or package.json):
-
-  "jest-junit": {
-    "classNameTemplate": "{classname}",
-    "titleTemplate": "{title}",
-    "ancestorSeparator": " > ",
-    "addFileAttribute": "true"
-  }
-
-This produces well-structured JUnit XML for quarantine's test identification.
-`)
+	if rec := jestRecommendation(framework); rec != "" {
+		cmd.Printf("%s", rec)
 	}
 
-	// Print summary.
-	branchStatus := "created"
-	if branchExists {
-		branchStatus = "already exists"
-	}
-	workflowSnippet := frameworkWorkflowSnippet(framework, junitxml)
-
-	cmd.Printf(`
-Quarantine initialized successfully.
-
-  Config:     quarantine.yml (created)
-  Framework:  %s
-  Retries:    %d
-  JUnit XML:  %s
-  Branch:     quarantine/state (%s)
-
-Next steps:
-  1. Add quarantine to your CI workflow:
-
-     - name: Run tests
-       run: %s
-       env:
-         QUARANTINE_GITHUB_TOKEN: ${{ secrets.QUARANTINE_GITHUB_TOKEN }}
-
-     - name: Upload quarantine results
-       if: always()
-       uses: actions/upload-artifact@v4
-       with:
-         name: quarantine-results-${{ github.run_id }}
-         path: .quarantine/results.json
-
-  2. Run `+"`quarantine doctor`"+` to verify your configuration.
-`, framework, retries, junitxml, branchStatus, workflowSnippet)
+	cmd.Printf("%s", formatInitSummary(framework, retries, junitxml, branchExists))
 
 	return nil
 }
@@ -252,18 +199,48 @@ func writeConfig(path, framework string, retries int, junitxml, defaultJUnit str
 	return os.WriteFile(path, data, 0644)
 }
 
-// printGitHubError prints a user-friendly error message for GitHub API errors.
-func printGitHubError(cmd *cobra.Command, err error, owner, repo string) {
+// classifyGitHubError returns a user-facing error message for a GitHub API failure.
+func classifyGitHubError(err error, owner, repo string) string {
 	errStr := err.Error()
 	if strings.Contains(errStr, "403") || strings.Contains(errStr, "lacks permission") {
-		cmd.Printf("Error: GitHub token lacks permission to access repository '%s/%s'.\nRequired scope: repo. Check your token permissions at https://github.com/settings/tokens\n", owner, repo)
+		return fmt.Sprintf("Error: GitHub token lacks permission to access repository '%s/%s'.\nRequired scope: repo. Check your token permissions at https://github.com/settings/tokens", owner, repo)
 	} else if strings.Contains(errStr, "401") {
-		cmd.Printf("Error: GitHub token is invalid or expired. Check QUARANTINE_GITHUB_TOKEN or GITHUB_TOKEN.\n")
+		return "Error: GitHub token is invalid or expired. Check QUARANTINE_GITHUB_TOKEN or GITHUB_TOKEN."
 	} else if strings.Contains(errStr, "connection") || strings.Contains(errStr, "timeout") || strings.Contains(errStr, "failed") {
-		cmd.Printf("Error: Unable to reach GitHub API: %v.\nCheck your network connection and try again.\n", err)
-	} else {
-		cmd.Printf("Error: GitHub API error: %v\n", err)
+		return fmt.Sprintf("Error: Unable to reach GitHub API: %v.\nCheck your network connection and try again.", err)
 	}
+	return fmt.Sprintf("Error: GitHub API error: %v", err)
+}
+
+// jestRecommendation returns the jest-junit configuration recommendation if framework is "jest",
+// or an empty string otherwise.
+func jestRecommendation(framework string) string {
+	if framework != "jest" {
+		return ""
+	}
+	return `
+Recommended jest-junit configuration (in jest.config.js or package.json):
+
+  "jest-junit": {
+    "classNameTemplate": "{classname}",
+    "titleTemplate": "{title}",
+    "ancestorSeparator": " > ",
+    "addFileAttribute": "true"
+  }
+
+This produces well-structured JUnit XML for quarantine's test identification.
+`
+}
+
+// classifyGitRemoteError returns a user-facing error message for a git remote parsing failure.
+func classifyGitRemoteError(err error) string {
+	errMsg := err.Error()
+	if strings.Contains(errMsg, "not a git repository") {
+		return "Error: Not a git repository. Run 'quarantine init' from the root of a git repository."
+	} else if strings.Contains(errMsg, "not a GitHub URL") {
+		return fmt.Sprintf("Error: Remote 'origin' is not a GitHub URL: %s\nQuarantine v1 supports GitHub repositories only. Set github.owner and github.repo\nin quarantine.yml manually if using a non-standard remote.", extractURLFromError(errMsg))
+	}
+	return fmt.Sprintf("Error: %v", err)
 }
 
 // extractURLFromError extracts the URL from a "not a GitHub URL: <url>" error message.
@@ -274,6 +251,41 @@ func extractURLFromError(errMsg string) string {
 		return errMsg
 	}
 	return errMsg[idx+len(prefix):]
+}
+
+// formatInitSummary returns the formatted success summary for quarantine init.
+func formatInitSummary(framework string, retries int, junitxml string, branchExists bool) string {
+	branchStatus := "created"
+	if branchExists {
+		branchStatus = "already exists"
+	}
+	workflowSnippet := frameworkWorkflowSnippet(framework, junitxml)
+	return fmt.Sprintf(`
+Quarantine initialized successfully.
+
+  Config:     quarantine.yml (created)
+  Framework:  %s
+  Retries:    %d
+  JUnit XML:  %s
+  Branch:     quarantine/state (%s)
+
+Next steps:
+  1. Add quarantine to your CI workflow:
+
+     - name: Run tests
+       run: %s
+       env:
+         QUARANTINE_GITHUB_TOKEN: ${{ secrets.QUARANTINE_GITHUB_TOKEN }}
+
+     - name: Upload quarantine results
+       if: always()
+       uses: actions/upload-artifact@v4
+       with:
+         name: quarantine-results-${{ github.run_id }}
+         path: .quarantine/results.json
+
+  2. Run `+"`quarantine doctor`"+` to verify your configuration.
+`, framework, retries, junitxml, branchStatus, workflowSnippet)
 }
 
 // frameworkWorkflowSnippet returns the recommended CI workflow run snippet for a framework.

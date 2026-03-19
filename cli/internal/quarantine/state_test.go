@@ -349,6 +349,55 @@ func TestMergeConflictKeepsHigherFlakyCount(t *testing.T) {
 	})
 }
 
+func TestMergeConflictEqualFlakyCountKeepsRemote(t *testing.T) {
+	// When flaky_count is equal, remote entry wins (local only overwrites when strictly greater).
+	local := quarantine.NewEmptyState()
+	local.AddTest(quarantine.Entry{
+		TestID:        "a::b::c",
+		FilePath:      "a",
+		Classname:     "b",
+		Name:          "c",
+		Suite:         "b",
+		FirstFlakyAt:  "2026-03-01T00:00:00Z",
+		LastFlakyAt:   "2026-03-10T00:00:00Z",
+		FlakyCount:    5,
+		QuarantinedAt: "2026-03-01T00:00:00Z",
+		QuarantinedBy: "cli-auto",
+	})
+
+	remote := quarantine.NewEmptyState()
+	remote.AddTest(quarantine.Entry{
+		TestID:        "a::b::c",
+		FilePath:      "a",
+		Classname:     "b",
+		Name:          "c",
+		Suite:         "b",
+		FirstFlakyAt:  "2026-03-01T00:00:00Z",
+		LastFlakyAt:   "2026-03-14T00:00:00Z",
+		FlakyCount:    5,
+		QuarantinedAt: "2026-03-01T00:00:00Z",
+		QuarantinedBy: "cli-auto",
+	})
+
+	merged := quarantine.Merge(local, remote)
+
+	entry := merged.Tests["a::b::c"]
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a conflict where local and remote both have flaky_count 5",
+		Should:   "keep remote's entry (local does not override on equal count)",
+		Actual:   entry.FlakyCount,
+		Expected: 5,
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a conflict where local and remote both have flaky_count 5",
+		Should:   "keep remote's last_flaky_at",
+		Actual:   entry.LastFlakyAt,
+		Expected: "2026-03-14T00:00:00Z",
+	})
+}
+
 func TestParseStateMalformedJSON(t *testing.T) {
 	_, err := quarantine.ParseState(strings.NewReader(`{bad json`))
 
