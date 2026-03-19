@@ -26,15 +26,23 @@ type Client struct {
 
 // NewClient creates a new GitHub API client. The token is resolved from
 // QUARANTINE_GITHUB_TOKEN, falling back to GITHUB_TOKEN.
+//
+// The base URL defaults to https://api.github.com but can be overridden
+// via QUARANTINE_GITHUB_API_BASE_URL (used in tests).
 func NewClient(owner, repo string) (*Client, error) {
 	token := resolveToken()
 	if token == "" {
 		return nil, fmt.Errorf("no GitHub token found. Set QUARANTINE_GITHUB_TOKEN or GITHUB_TOKEN")
 	}
 
+	baseURL := defaultBaseURL
+	if override := os.Getenv("QUARANTINE_GITHUB_API_BASE_URL"); override != "" {
+		baseURL = override
+	}
+
 	return &Client{
 		httpClient: &http.Client{Timeout: defaultTimeout},
-		baseURL:    defaultBaseURL,
+		baseURL:    baseURL,
 		token:      token,
 		owner:      owner,
 		repo:       repo,
@@ -47,22 +55,6 @@ func resolveToken() string {
 		return token
 	}
 	return os.Getenv("GITHUB_TOKEN")
-}
-
-// newRequest creates an authenticated HTTP request with the required headers.
-func (c *Client) newRequest(method, path string) (*http.Request, error) {
-	url := c.baseURL + path
-	req, err := http.NewRequest(method, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", userAgent)
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-
-	return req, nil
 }
 
 // repoPath returns the API path prefix for the configured repository.
