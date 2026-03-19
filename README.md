@@ -105,6 +105,16 @@ Quarantine follows a GitHub-native architecture. The CLI handles the CI-critical
 
 See [`docs/planning/architecture.md`](docs/planning/architecture.md) for the full system design.
 
+## Development
+
+Reusable prompts for common development tasks are in [`docs/prompts/`](docs/prompts/):
+
+| Prompt | Use when |
+|--------|----------|
+| [`milestone-dev.md`](docs/prompts/milestone-dev.md) | Implementing a milestone |
+| [`scenario-authoring.md`](docs/prompts/scenario-authoring.md) | Writing new Given/When/Then scenarios |
+| [`adr-proposal.md`](docs/prompts/adr-proposal.md) | Proposing a new Architecture Decision Record |
+
 ## Credit
 
 Inspired by the [quarantine gem] by Flexport.
