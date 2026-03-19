@@ -1,4 +1,4 @@
-import { Outlet } from "react-router";
+import { Outlet } from "react-router"
 
 /**
  * Root layout component.
@@ -17,5 +17,5 @@ export default function Root() {
         <Outlet />
       </body>
     </html>
-  );
+  )
 }
