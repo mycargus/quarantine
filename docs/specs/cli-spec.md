@@ -445,7 +445,7 @@ behavior of exit 2 for usage errors is preserved via `cmd.SetFlagErrorFunc()`.
 - **Human-readable by default.** No `--json` flag in v1 (deferred to v2).
 - **Warnings to stderr,** prefixed with `[quarantine] WARNING:`.
 - **Errors to stderr,** prefixed with `[quarantine] ERROR:`.
-- **Informational output to stdout.**
+- **Informational output to stderr** for `run` (stdout is reserved for the test runner). Interactive commands (`init`, `doctor`) write to **stdout** since they do not wrap a test runner.
 - **GitHub Actions annotations** when `GITHUB_ACTIONS` env var is set:
   `::warning::` annotations appear as yellow warning banners on the workflow
   run summary page. Emitted in addition to stderr warnings, not instead of.
