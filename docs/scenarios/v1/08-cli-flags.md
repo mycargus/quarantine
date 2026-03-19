@@ -2,6 +2,8 @@
 
 ### Scenario 43: User overrides framework in quarantine.yml [M2]
 
+**Risk:** The CLI uses the wrong framework, producing incorrect JUnit XML parsing and rerun commands that silently fail to detect flaky tests.
+
 **Given** the project contains both `jest.config.js` and `vitest.config.ts`
 files, and `quarantine.yml` has `framework: vitest`
 
@@ -16,6 +18,8 @@ auto-detection (ADR-010, amended).
 ---
 
 ### Scenario 44: User customizes retry count [M3]
+
+**Risk:** CLI flags fail to override config file values, preventing users from adjusting retry count per-run or per-environment.
 
 **Given** `quarantine.yml` has `retries: 5`
 
@@ -33,6 +37,8 @@ defaults (per docs/cli-spec.md).
 ---
 
 ### Scenario 45: --dry-run flag [M4]
+
+**Risk:** Users cannot safely evaluate quarantine behavior in their CI pipeline without it creating issues, modifying state, or posting PR comments.
 
 **Given** the CLI is configured in CI and would normally detect a flaky test,
 update `quarantine.json`, and create an issue
@@ -59,6 +65,8 @@ Exits with code 0.
 
 ### Scenario 46: --exclude patterns [M4]
 
+**Risk:** Tests that should be managed outside quarantine (e.g., integration tests) are automatically quarantined, creating unwanted issues and state changes.
+
 **Given** `quarantine.yml` has:
 ```yaml
 exclude:
@@ -78,6 +86,8 @@ The test's failure still affects the exit code normally (exit 1 if it fails).
 ---
 
 ### Scenario 47: --pr flag override and auto-detection [M5]
+
+**Risk:** PR comments are posted to the wrong PR or not posted at all because auto-detection fails in non-standard CI configurations.
 
 **Given** the CLI is running in GitHub Actions on a PR build
 
@@ -104,6 +114,8 @@ best-effort.
 
 ### Scenario 48: PR comment suppressed via config [M5]
 
+**Risk:** Teams that find PR comments noisy or disruptive cannot disable them, degrading the developer experience.
+
 **Given** `quarantine.yml` has:
 ```yaml
 notifications:
@@ -119,6 +131,8 @@ results file) proceeds normally.
 ---
 
 ### Scenario 49: PR comment updated on second run [M5]
+
+**Risk:** Each CI run adds a new PR comment instead of updating the existing one, flooding PRs with duplicate quarantine summaries (ADR-009).
 
 **Given** the CLI previously posted a PR comment on PR #42 containing the
 `<!-- quarantine-bot -->` HTML marker
@@ -138,6 +152,8 @@ results file) proceeds normally.
 
 ### Scenario 50: Custom rerun_command template [M3]
 
+**Risk:** Projects with non-standard test configurations (custom jest configs, test wrappers) cannot use quarantine because the built-in rerun commands don't work (FR-1.1.7).
+
 **Given** `quarantine.yml` has:
 ```yaml
 framework: jest
@@ -156,6 +172,8 @@ that need them.
 ---
 
 ### Scenario 51: --verbose and --quiet flags [M2]
+
+**Risk:** Users cannot debug quarantine issues in CI (no verbose mode) or reduce noise in log parsers (no quiet mode), and mutually exclusive flags silently conflict.
 
 **Given** the CLI is configured in CI
 

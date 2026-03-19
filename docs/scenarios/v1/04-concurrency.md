@@ -2,6 +2,8 @@
 
 ### Scenario 27: Concurrent CI builds detect the same flaky test simultaneously [M5]
 
+**Risk:** Concurrent builds each create a separate GitHub Issue for the same flaky test, flooding the repository with duplicates (ADR-009, ADR-012).
+
 **Given** the CLI is configured in CI, `quarantine.json` has no entry for
 `CacheService > should handle eviction`, and two CI builds (Build A and Build B)
 are running in parallel on different PRs
@@ -24,6 +26,8 @@ next build finds the first issue.
 ---
 
 ### Scenario 28: Concurrent CI builds update quarantine.json simultaneously (CAS conflict) [M4]
+
+**Risk:** A concurrent write overwrites another build's quarantine state changes, silently losing flaky test detections (ADR-006, ADR-012).
 
 **Given** two CI builds (Build A and Build B) are running in parallel. Both have
 fetched `quarantine.json` at SHA `abc123` from the `quarantine/state` branch.
@@ -48,6 +52,8 @@ because re-detection is cheap.
 ---
 
 ### Scenario 29: Concurrent quarantine and unquarantine race [M4]
+
+**Risk:** A race condition between quarantine and unquarantine permanently re-enables a flaky test that concurrent builds detected as still flaky (ADR-012).
 
 **Given** `quarantine.json` contains an entry for
 `CacheService > should handle eviction` with an open GitHub Issue. Two CI builds

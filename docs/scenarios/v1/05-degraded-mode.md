@@ -2,6 +2,8 @@
 
 ### Scenario 30: CI run when GitHub API is unreachable [M4]
 
+**Risk:** A GitHub API outage causes all CI builds to fail with exit code 2, even though the tests themselves pass (FR-1.6.3).
+
 **Given** the CLI is configured in CI and the GitHub API is unreachable (network
 failure, rate limit exceeded, or API outage)
 
@@ -34,6 +36,8 @@ quarantined on the next successful run when GitHub API connectivity is restored.
 
 ### Scenario 31: CI run when dashboard is unreachable [M4]
 
+**Risk:** A hidden coupling between the CLI and dashboard causes CI builds to fail when the dashboard is down (ADR-011).
+
 **Given** the CLI is configured in CI, the GitHub API is reachable, but the
 dashboard is unreachable
 
@@ -48,6 +52,8 @@ dashboard (per ADR-011). Exits with code 0.
 ---
 
 ### Scenario 32: Dashboard reconnects and syncs missed results from artifacts [M6]
+
+**Risk:** Results from CI runs during dashboard downtime are permanently lost, creating gaps in trend data and analytics.
 
 **Given** the dashboard was unreachable for 2 hours, during which 5 CI runs
 completed and uploaded results as GitHub Artifacts
@@ -65,6 +71,8 @@ without manual intervention.
 ---
 
 ### Scenario 33: CI run with no API access and empty cache [M4]
+
+**Risk:** The CLI refuses to run tests when both the GitHub API and cache are unavailable, blocking CI entirely instead of running without quarantine exclusions.
 
 **Given** the CLI is configured in CI, the `quarantine/state` branch exists and
 contains a `quarantine.json` with 4 previously quarantined tests, the GitHub
@@ -93,6 +101,8 @@ when connectivity is restored.
 
 ### Scenario 34: Degraded mode with --strict [M4]
 
+**Risk:** Infrastructure errors are silently swallowed in degraded mode with no way for users to verify their setup works end-to-end.
+
 **Given** the CLI is configured in CI with `--strict` and the GitHub API is
 unreachable
 
@@ -111,6 +121,8 @@ docs/error-handling.md). Useful for verifying setup after `quarantine init`.
 ---
 
 ### Scenario 35: CI run with no GitHub token set [M4]
+
+**Risk:** A missing token in CI causes the build to fail instead of gracefully degrading, breaking all builds when the token secret is misconfigured.
 
 **Given** the CLI is configured in CI but neither `QUARANTINE_GITHUB_TOKEN` nor
 `GITHUB_TOKEN` is set in the environment. A valid `quarantine.yml` exists.

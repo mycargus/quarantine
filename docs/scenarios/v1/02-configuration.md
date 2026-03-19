@@ -2,6 +2,8 @@
 
 ### Scenario 13: quarantine doctor — valid configuration [M1]
 
+**Risk:** The doctor command reports a configuration as valid when it contains errors, giving the user false confidence that CI will work correctly.
+
 **Given** a `quarantine.yml` file exists in the repo root with the following
 content:
 ```yaml
@@ -47,6 +49,8 @@ Exits with code 0.
 
 ### Scenario 14: quarantine doctor — missing config file [M1]
 
+**Risk:** A missing config file produces an opaque error instead of directing the user to run `quarantine init`.
+
 **Given** no `quarantine.yml` file exists in the current directory
 
 **When** the developer runs `quarantine doctor`
@@ -62,6 +66,8 @@ Exits with code 2.
 
 ### Scenario 15: quarantine doctor — invalid field values [M1]
 
+**Risk:** Invalid configuration values (e.g., negative retries) are not caught until `quarantine run` fails in CI.
+
 **Given** a `quarantine.yml` file exists with `retries: -1`
 
 **When** the developer runs `quarantine doctor`
@@ -76,6 +82,8 @@ are reported (not short-circuited on first error).
 ---
 
 ### Scenario 16: quarantine doctor — forward-compatible config value [M1]
+
+**Risk:** Users set `issue_tracker: jira` believing it works, but no tickets are created -- the feature silently does nothing (ADR-021).
 
 **Given** a `quarantine.yml` file exists with:
 ```yaml
@@ -99,6 +107,8 @@ schema changes (ADR-021).
 ---
 
 ### Scenario 17: quarantine doctor — unknown fields [M1]
+
+**Risk:** A typo in a field name goes unnoticed, or a user configures `notifications.slack: true` expecting Slack alerts that never fire.
 
 **Given** a `quarantine.yml` file exists with:
 ```yaml
@@ -125,6 +135,8 @@ Exits with code 2 (errors present). Warnings alone would exit 0.
 ---
 
 ### Scenario 18: quarantine doctor — custom config path [M1]
+
+**Risk:** The `--config` flag is ignored, forcing all projects into the default `quarantine.yml` path and breaking non-standard project layouts.
 
 **Given** a valid configuration file exists at `config/quarantine.yml` (not the
 default location)
