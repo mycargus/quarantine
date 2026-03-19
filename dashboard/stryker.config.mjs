@@ -16,4 +16,4 @@ export default {
   ],
   reporters: ["clear-text", "progress"],
   coverageAnalysis: "off", // command runner doesn't support coverage analysis
-};
+}
