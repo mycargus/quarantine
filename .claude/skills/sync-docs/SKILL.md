@@ -66,4 +66,4 @@ Scope: $1 (default: all) — valid values: 'all', 'architecture', 'requirements'
 - X undocumented items
 ```
 
-5. Ask the user if they want to fix any of the issues found. Do NOT auto-fix — inconsistencies may be intentional (e.g., work in progress).
+5. Ask the user if they want to fix any of the issues found. You MUST NOT auto-fix — inconsistencies may be intentional (e.g., work in progress).
