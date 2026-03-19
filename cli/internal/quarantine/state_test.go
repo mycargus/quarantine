@@ -9,8 +9,6 @@ import (
 	"github.com/mycargus/quarantine/internal/quarantine"
 )
 
-// ptr is a helper to take the address of an int literal in tests.
-func ptr(n int) *int { return &n }
 
 func TestNewEmptyState(t *testing.T) {
 	s := quarantine.NewEmptyState()
@@ -348,6 +346,51 @@ func TestMergeConflictKeepsHigherFlakyCount(t *testing.T) {
 		Should:   "keep the higher flaky_count (10)",
 		Actual:   entry.FlakyCount,
 		Expected: 10,
+	})
+}
+
+func TestParseStateMalformedJSON(t *testing.T) {
+	_, err := quarantine.ParseState(strings.NewReader(`{bad json`))
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a malformed JSON string",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+}
+
+func TestQuarantinedTestIDsEmptyState(t *testing.T) {
+	s := quarantine.NewEmptyState()
+
+	ids := s.QuarantinedTestIDs()
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a state with no quarantined tests",
+		Should:   "return a non-nil empty slice",
+		Actual:   ids != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a state with no quarantined tests",
+		Should:   "return zero IDs",
+		Actual:   len(ids),
+		Expected: 0,
+	})
+}
+
+func TestMergeBothEmpty(t *testing.T) {
+	local := quarantine.NewEmptyState()
+	remote := quarantine.NewEmptyState()
+
+	merged := quarantine.Merge(local, remote)
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "two empty states",
+		Should:   "produce a merged state with zero tests",
+		Actual:   len(merged.Tests),
+		Expected: 0,
 	})
 }
 
