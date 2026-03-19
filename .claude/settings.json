@@ -6,10 +6,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/reject-v2-frameworks.sh \"$TOOL_INPUT\""
-          },
-          {
-            "type": "command",
             "command": ".claude/hooks/reject-secrets-in-files.sh \"$TOOL_INPUT\""
           }
         ]
