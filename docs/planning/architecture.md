@@ -8,49 +8,30 @@ Quarantine is a developer tool that automatically detects, disables (quarantines
 
 ## 2. System Architecture
 
-```
-+---------------------------+       +----------------------------------+
-|        CI Runner          |       |          GitHub                  |
-|                           |       |                                  |
-|  +---------------------+ |       |  +----------------------------+  |
-|  |   quarantine CLI    |--------->|  | quarantine/state branch   |  |
-|  |   (Go binary)       | |  (1)  |  | (quarantine.json)         |  |
-|  +---------------------+ |       |  +----------------------------+  |
-|    |              |       |       |                                  |
-|    | (2) run      |       |       |  +----------------------------+  |
-|    | tests with   |       |  (3)  |  | GitHub Artifacts          |  |
-|    v  exclusions  |       |------>|  | (test run results, 90d)   |  |
-|  +-------------+  |      |       |  +----------------------------+  |
-|  | Test Runner |  |      |       |                                  |
-|  | (jest,      |  |      |  (4)  |  +----------------------------+  |
-|  |  rspec,etc) |  |      |------>|  | GitHub Issues             |  |
-|  +-------------+  |      |       |  | (one per flaky test)      |  |
-|        |          |      |       |  +----------------------------+  |
-|        v          v      |       |                                  |
-|  +---------------------+ |       +-----------------|----------------+
-|  | JUnit XML           | |                         |
-|  | (quarantined tests  | |                         | (6) poll
-|  |  already excluded)  | |                         |    artifacts
-|  +---------------------+ |                         |
-+---------------------------+                         |
-                                                      v
-                                    +----------------------------------+
-                                    |   Dashboard Server               |
-                                    |   (React Router v7 + SQLite +    |
-                                    |    Tailwind)                     |
-                                    |                                  |
-                                    |   - Flaky test trends            |
-                                    |   - Cross-repo analytics         |
-                                    |   - Quarantine management        |
-                                    +----------------------------------+
+```mermaid
+sequenceDiagram
+    participant CI as CI Runner
+    participant CLI as quarantine CLI
+    participant Runner as Test Runner (jest/rspec/vitest)
+    participant State as quarantine/state branch
+    participant Artifacts as GitHub Artifacts
+    participant Issues as GitHub Issues
+    participant Dashboard as Dashboard Server
 
-Numbered flows:
-  (1) Read/write quarantine.json via GitHub Contents API (SHA-based CAS)
-  (2) CLI wraps test command (with exclusion flags for Jest/Vitest), captures JUnit XML output
-  (3) Upload test run results as GitHub Artifacts
-  (4) Create/check GitHub Issues for flaky tests
-  (5) [Removed -- quarantined tests are excluded before execution per ADR-003]
-  (6) Dashboard polls GitHub Artifacts API (every 5 min, staggered)
+    CI->>CLI: quarantine run -- <test cmd>
+    CLI->>State: read quarantine.json (Contents API)
+    State-->>CLI: quarantine list + SHA
+    CLI->>Runner: run tests with exclusion flags
+    Runner-->>CLI: JUnit XML output
+    CLI->>CLI: parse failures, re-run each up to N times
+    CLI->>State: write updated quarantine.json (SHA-based CAS)
+    CLI->>Artifacts: upload test run results
+    CLI->>Issues: create/check GitHub Issues for flaky tests
+    CLI-->>CI: exit 0 (quarantined failures suppressed)
+    loop every 5 min (staggered)
+        Dashboard->>Artifacts: poll for new artifacts (ETag)
+        Artifacts-->>Dashboard: new results
+    end
 ```
 
 ## 3. Component Breakdown
@@ -376,16 +357,15 @@ SQLite is configured with WAL mode for concurrent reads alongside serialized wri
 
 **[v1] Single Docker container:**
 
-```
-+----------------------------------------------+
-|  Docker container                            |
-|                                              |
-|  React Router v7 server (Node.js)            |
-|  SQLite database (WAL mode, volume-mounted)  |
-|  Background polling worker                   |
-+----------------------------------------------+
-        |
-   Volume mount: /data/quarantine.db
+```mermaid
+flowchart TD
+    subgraph docker["Docker container"]
+        server["React Router v7 server (Node.js)"]
+        sqlite["SQLite database (WAL mode, volume-mounted)"]
+        poller["Background polling worker"]
+    end
+    vol[("Volume mount:<br/>/data/quarantine.db")]
+    docker -.-> vol
 ```
 
 - Deploy behind a reverse proxy (nginx, Caddy, or cloud LB).
