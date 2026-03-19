@@ -397,8 +397,11 @@ sequenceDiagram
     Dev->>CLI: quarantine init
 
     alt quarantine.yml already exists
-        CLI-->>Dev: Error: quarantine.yml already exists.<br>Use --force to overwrite.
-        Note over CLI: Exit 2
+        CLI-->>Dev: Prompt: quarantine.yml already exists. Overwrite? [y/N]
+        alt Developer enters n or presses enter
+            Note over CLI: Print "Aborted. Existing quarantine.yml preserved." and exit 0
+        end
+        Note over CLI: Developer entered y — proceed with init
     end
 
     CLI-->>Dev: Prompt: Select test framework<br>(rspec / jest / vitest)

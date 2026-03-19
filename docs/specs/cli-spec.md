@@ -98,7 +98,7 @@ Initialize quarantine for a repository. This command is required before
         - name: Run tests
           run: quarantine run -- jest --ci --reporters=default --reporters=jest-junit
           env:
-            QUARANTINE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            QUARANTINE_GITHUB_TOKEN: ${{ secrets.QUARANTINE_GITHUB_TOKEN }}
 
         - name: Upload quarantine results
           if: always()

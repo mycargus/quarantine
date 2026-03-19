@@ -40,7 +40,7 @@ quarantine state on GitHub.`,
 
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newRunCmd())
-	rootCmd.AddCommand(newValidateCmd())
+	rootCmd.AddCommand(newDoctorCmd())
 	rootCmd.AddCommand(newVersionCmd())
 
 	return rootCmd
@@ -92,16 +92,16 @@ command and its arguments.`,
 	return cmd
 }
 
-func newValidateCmd() *cobra.Command {
+func newDoctorCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "validate",
+		Use:   "doctor",
 		Short: "Validate quarantine.yml configuration",
 		Long: `Validate quarantine.yml configuration. Reads and validates all fields
 against the schema, prints the resolved configuration, and reports errors
 and warnings.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// TODO: Implement in M1.
-			fmt.Println("[quarantine] validate is not yet implemented.")
+			fmt.Println("[quarantine] doctor is not yet implemented.")
 			return nil
 		},
 	}
