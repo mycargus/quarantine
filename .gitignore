@@ -18,3 +18,7 @@ e2e/.pnpm-store/
 
 # Toolchain
 !.tool-versions
+**/.claude/settings.local.json
+
+# Secrets
+.env
