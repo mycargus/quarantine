@@ -74,7 +74,7 @@ non-sensitive and visible in CI logs.
 
 ```bash
 # Build the CLI binary first
-cd cli && make cli-build && cd ..
+make cli-build
 
 # Set credentials
 export QUARANTINE_GITHUB_TOKEN=ghp_your_token_here

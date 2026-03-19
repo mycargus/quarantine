@@ -47,13 +47,14 @@ quarantine state on GitHub.`,
 }
 
 func newInitCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize quarantine for a repository",
 		Long: `Initialize quarantine for a repository. Creates quarantine.yml,
 validates GitHub token/permissions, and creates the quarantine/state branch.`,
 		RunE: runInit,
 	}
+	return cmd
 }
 
 func newRunCmd() *cobra.Command {

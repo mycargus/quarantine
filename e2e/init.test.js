@@ -3,7 +3,6 @@
  *
  * Exercises the full `quarantine init` flow against a real GitHub repository.
  * Requires the CLI binary to be built and three environment variables to be set.
- * Skips automatically when env vars are absent (e.g., local dev without credentials).
  *
  * Required env vars:
  *   QUARANTINE_GITHUB_TOKEN  — PAT with repo scope
@@ -11,15 +10,15 @@
  *   QUARANTINE_TEST_REPO     — repository name (e.g. "quarantine-test-fixture")
  *
  * Optional:
- *   QUARANTINE_BIN           — path to quarantine binary (default: ../cli/bin/quarantine)
+ *   QUARANTINE_BIN           — path to quarantine binary (default: ../bin/quarantine)
  */
 
 import { describe, test, beforeAll, afterAll } from 'vitest'
+import { assert } from 'riteway/vitest'
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execSync, spawnSync } from 'node:child_process'
-import { assert } from 'riteway'
 
 const BRANCH = 'quarantine/state'
 
@@ -28,7 +27,7 @@ const owner = process.env.QUARANTINE_TEST_OWNER
 const repo = process.env.QUARANTINE_TEST_REPO
 const binPath =
   process.env.QUARANTINE_BIN ??
-  new URL('../cli/bin/quarantine', import.meta.url).pathname
+  new URL('../bin/quarantine', import.meta.url).pathname
 
 // --- GitHub API helpers ---
 
@@ -70,10 +69,14 @@ async function getFileOnBranch(path) {
 
 // --- Test suite ---
 
+if (!token) throw new Error('QUARANTINE_GITHUB_TOKEN is required')
+if (!owner) throw new Error('QUARANTINE_TEST_OWNER is required')
+if (!repo) throw new Error('QUARANTINE_TEST_REPO is required')
+
 let dir
 let result // spawnSync result
 
-describe.skipIf(!token || !owner || !repo)(
+describe(
   'quarantine init — E2E against real GitHub',
   () => {
     beforeAll(async () => {
@@ -114,19 +117,19 @@ describe.skipIf(!token || !owner || !repo)(
 
     test('exits without error', () => {
       assert({
-        given: 'a valid token, git repo, and empty test repository',
-        should: 'exit with code 0',
+        given: 'quarantine init command',
+        should: 'exit without error',
         actual: result.status,
-        expected: 0,
+        expected: 0
       })
     })
 
     test('prints success message', () => {
       assert({
-        given: 'a successful init run',
-        should: 'print "Quarantine initialized successfully"',
+        given: 'successful init',
+        should: 'print success message',
         actual: result.stdout.includes('Quarantine initialized successfully'),
-        expected: true,
+        expected: true
       })
     })
 
@@ -134,19 +137,19 @@ describe.skipIf(!token || !owner || !repo)(
       const path = join(dir, 'quarantine.yml')
       const content = existsSync(path) ? readFileSync(path, 'utf8') : ''
       assert({
-        given: 'init completed successfully',
+        given: 'successful init',
         should: 'create quarantine.yml with version: 1',
         actual: content.includes('version: 1'),
-        expected: true,
+        expected: true
       })
     })
 
     test('creates quarantine/state branch on GitHub', async () => {
       assert({
-        given: 'init completed successfully',
-        should: 'create the quarantine/state branch on GitHub',
+        given: 'successful init',
+        should: 'create quarantine/state branch on GitHub',
         actual: await branchExists(),
-        expected: true,
+        expected: true
       })
     })
 
@@ -154,10 +157,10 @@ describe.skipIf(!token || !owner || !repo)(
       const raw = await getFileOnBranch('quarantine.json')
       const state = JSON.parse(raw)
       assert({
-        given: 'quarantine.json written to quarantine/state branch',
-        should: 'contain version: 1',
+        given: 'quarantine.json on quarantine/state branch',
+        should: 'have version: 1',
         actual: state.version,
-        expected: 1,
+        expected: 1
       })
     })
 
@@ -165,10 +168,10 @@ describe.skipIf(!token || !owner || !repo)(
       const raw = await getFileOnBranch('quarantine.json')
       const state = JSON.parse(raw)
       assert({
-        given: 'quarantine.json written to quarantine/state branch',
+        given: 'quarantine.json on quarantine/state branch',
         should: 'contain a tests object',
         actual: typeof state.tests,
-        expected: 'object',
+        expected: 'object'
       })
     })
   },

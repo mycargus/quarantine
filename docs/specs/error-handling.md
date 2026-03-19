@@ -584,7 +584,7 @@ function determineExitCode(testResult, infraErrors, strict):
 | Warning | `[quarantine] WARNING:` | Degraded mode, skipped actions, partial parse |
 | Info | `[quarantine]` | Normal operation summaries (only with `--verbose`) |
 
-All log output goes to stderr. Stdout is reserved for the test runner's output.
+For `quarantine run`, all log output goes to stderr. Stdout is reserved for the test runner's output. Interactive commands (`init`, `doctor`) write to stdout since they do not wrap a test runner.
 
 ### HTTP client configuration
 

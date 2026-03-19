@@ -18,6 +18,11 @@ import (
 
 // runInit implements the `quarantine init` command.
 func runInit(cmd *cobra.Command, args []string) error {
+	// Route init output to stdout. Cobra v1.8+ defaults cmd.Printf to stderr
+	// (via OutOrStderr), which is correct for `quarantine run` where stdout is
+	// reserved for the test runner. `init` is interactive setup — no test
+	// runner — so stdout is safe and expected.
+	cmd.SetOut(cmd.OutOrStdout())
 	in := bufio.NewReader(cmd.InOrStdin())
 
 	// Step 1: Check for existing quarantine.yml.
