@@ -157,6 +157,13 @@ func TestParseRemoteNotAGitRepo(t *testing.T) {
 		Actual:   err != nil,
 		Expected: true,
 	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a directory without a .git folder",
+		Should:   "return the 'not a git repository' error message",
+		Actual:   err.Error(),
+		Expected: "not a git repository: run 'quarantine init' from the root of a git repository",
+	})
 }
 
 func TestParseRemoteNonGitHubOrigin(t *testing.T) {

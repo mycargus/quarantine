@@ -429,6 +429,97 @@ func TestQuarantinedTestIDsEmptyState(t *testing.T) {
 	})
 }
 
+func TestMergeConflictRemoteWinsOnCountButLocalHasEarlierFirstFlakyAt(t *testing.T) {
+	// Remote wins the flaky-count check, but local has an earlier first_flaky_at.
+	// Merge must still pull in local's earlier timestamp.
+	local := quarantine.NewEmptyState()
+	local.AddTest(quarantine.Entry{
+		TestID:        "a::b::c",
+		FilePath:      "a",
+		Classname:     "b",
+		Name:          "c",
+		Suite:         "b",
+		FirstFlakyAt:  "2026-03-01T00:00:00Z",
+		LastFlakyAt:   "2026-03-10T00:00:00Z",
+		FlakyCount:    3,
+		QuarantinedAt: "2026-03-01T00:00:00Z",
+		QuarantinedBy: "cli-auto",
+	})
+
+	remote := quarantine.NewEmptyState()
+	remote.AddTest(quarantine.Entry{
+		TestID:        "a::b::c",
+		FilePath:      "a",
+		Classname:     "b",
+		Name:          "c",
+		Suite:         "b",
+		FirstFlakyAt:  "2026-03-05T00:00:00Z",
+		LastFlakyAt:   "2026-03-14T00:00:00Z",
+		FlakyCount:    10,
+		QuarantinedAt: "2026-03-05T00:00:00Z",
+		QuarantinedBy: "cli-auto",
+	})
+
+	merged := quarantine.Merge(local, remote)
+	entry := merged.Tests["a::b::c"]
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a conflict where remote has flaky_count 10 and local has 3",
+		Should:   "keep the higher flaky_count (10)",
+		Actual:   entry.FlakyCount,
+		Expected: 10,
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a conflict where local has an earlier first_flaky_at (2026-03-01) despite losing the count",
+		Should:   "preserve the earliest first_flaky_at (local's 2026-03-01)",
+		Actual:   entry.FirstFlakyAt,
+		Expected: "2026-03-01T00:00:00Z",
+	})
+}
+
+func TestMergeConflictWinnerHasEmptyFirstFlakyAtLoserHasTimestamp(t *testing.T) {
+	// Local wins the flaky-count check but has no first_flaky_at.
+	// Remote has a first_flaky_at that should be preserved in the merged result.
+	local := quarantine.NewEmptyState()
+	local.AddTest(quarantine.Entry{
+		TestID:        "a::b::c",
+		FilePath:      "a",
+		Classname:     "b",
+		Name:          "c",
+		Suite:         "b",
+		FirstFlakyAt:  "",
+		LastFlakyAt:   "2026-03-14T00:00:00Z",
+		FlakyCount:    10,
+		QuarantinedAt: "2026-03-14T00:00:00Z",
+		QuarantinedBy: "cli-auto",
+	})
+
+	remote := quarantine.NewEmptyState()
+	remote.AddTest(quarantine.Entry{
+		TestID:        "a::b::c",
+		FilePath:      "a",
+		Classname:     "b",
+		Name:          "c",
+		Suite:         "b",
+		FirstFlakyAt:  "2026-03-01T00:00:00Z",
+		LastFlakyAt:   "2026-03-10T00:00:00Z",
+		FlakyCount:    5,
+		QuarantinedAt: "2026-03-01T00:00:00Z",
+		QuarantinedBy: "cli-auto",
+	})
+
+	merged := quarantine.Merge(local, remote)
+	entry := merged.Tests["a::b::c"]
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a conflict where the winner (local) has an empty first_flaky_at and the loser (remote) has a timestamp",
+		Should:   "use remote's first_flaky_at rather than leaving it empty",
+		Actual:   entry.FirstFlakyAt,
+		Expected: "2026-03-01T00:00:00Z",
+	})
+}
+
 func TestMergeBothEmpty(t *testing.T) {
 	local := quarantine.NewEmptyState()
 	remote := quarantine.NewEmptyState()

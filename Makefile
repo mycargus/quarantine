@@ -1,4 +1,4 @@
-.PHONY: cli-build cli-test cli-lint dash-build dash-test dash-lint schemas-validate test-all
+.PHONY: cli-build cli-test cli-lint cli-mutate dash-build dash-test dash-lint dash-mutate schemas-validate test-all mutate-all
 
 # --- CLI (Go) ---
 
@@ -11,6 +11,13 @@ cli-test:
 cli-lint:
 	cd cli && golangci-lint run
 
+cli-mutate:
+	@echo "Running mutation tests on each package (gremlins requires per-package runs)..."
+	cd cli && for pkg in ./internal/config ./internal/git ./internal/github ./internal/parser ./internal/quarantine ./cmd/quarantine; do \
+		echo "--- $$pkg ---"; \
+		gremlins unleash -S lctkvsr --invert-assignments $$pkg; \
+	done
+
 # --- Dashboard (TypeScript) ---
 
 dash-build:
@@ -22,6 +29,9 @@ dash-test:
 dash-lint:
 	cd dashboard && pnpm run lint
 
+dash-mutate:
+	cd dashboard && pnpm exec stryker run
+
 # --- Schemas ---
 
 schemas-validate:
@@ -31,3 +41,5 @@ schemas-validate:
 # --- Aggregate ---
 
 test-all: cli-test dash-test schemas-validate
+
+mutate-all: cli-mutate dash-mutate

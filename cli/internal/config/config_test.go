@@ -410,14 +410,14 @@ retries: 10
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a quarantine.yml with retries: 1 (minimum valid)",
 		Should:   "not produce a retries error",
-		Actual:   containsString(errsMin, "Invalid retries value"),
+		Actual:   containsString(errsMin, "Invalid retries value: 1. Must be between 1 and 10."),
 		Expected: false,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a quarantine.yml with retries: 10 (maximum valid)",
 		Should:   "not produce a retries error",
-		Actual:   containsString(errsMax, "Invalid retries value"),
+		Actual:   containsString(errsMax, "Invalid retries value: 10. Must be between 1 and 10."),
 		Expected: false,
 	})
 }
@@ -540,6 +540,125 @@ labels:
 		Should:   "not produce a labels error",
 		Actual:   containsString(errs, "Custom labels"),
 		Expected: false,
+	})
+}
+
+// --- Labels: empty labels list produces no error ---
+
+func TestValidateNoLabelsFieldProducesNoCustomLabelsError(t *testing.T) {
+	cfg := parseYAML(t, `
+version: 1
+framework: jest
+`)
+
+	errs, _ := cfg.Validate()
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a quarantine.yml with no labels field",
+		Should:   "not produce a custom-labels error",
+		Actual:   containsString(errs, "Custom labels are not supported in this version. Only ['quarantine'] is accepted."),
+		Expected: false,
+	})
+}
+
+// --- ApplyDefaults does not overwrite already-set values ---
+
+func TestApplyDefaultsDoesNotOverwriteJUnitXML(t *testing.T) {
+	cfg := parseYAML(t, `
+version: 1
+framework: jest
+junitxml: my-custom-junit.xml
+`)
+
+	cfg.ApplyDefaults()
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a config with junitxml already set",
+		Should:   "not overwrite junitxml with the framework default",
+		Actual:   cfg.JUnitXML,
+		Expected: "my-custom-junit.xml",
+	})
+}
+
+func TestApplyDefaultsDoesNotOverwriteIssueTracker(t *testing.T) {
+	// Use a non-default value so the mutated condition (issue_tracker != "")
+	// would visibly overwrite it with "github".
+	cfg := parseYAML(t, `
+version: 1
+framework: jest
+issue_tracker: jira
+`)
+
+	cfg.ApplyDefaults()
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a config with issue_tracker already set to a non-default value",
+		Should:   "not overwrite issue_tracker with the default",
+		Actual:   cfg.IssueTracker,
+		Expected: "jira",
+	})
+}
+
+func TestApplyDefaultsDoesNotOverwriteLabels(t *testing.T) {
+	// Use a non-default label so the mutated condition (len(labels) != 0)
+	// would visibly overwrite it with ["quarantine"].
+	cfg := parseYAML(t, `
+version: 1
+framework: jest
+labels:
+  - flaky
+`)
+
+	cfg.ApplyDefaults()
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a config with labels already set to a non-default value",
+		Should:   "not overwrite labels",
+		Actual:   len(cfg.Labels),
+		Expected: 1,
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a config with labels already set to a non-default value",
+		Should:   "preserve the existing label value",
+		Actual:   cfg.Labels[0],
+		Expected: "flaky",
+	})
+}
+
+func TestApplyDefaultsDoesNotOverwriteGitHubPRCommentFalse(t *testing.T) {
+	cfg := parseYAML(t, `
+version: 1
+framework: jest
+notifications:
+  github_pr_comment: false
+`)
+
+	cfg.ApplyDefaults()
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a config with github_pr_comment explicitly set to false",
+		Should:   "not overwrite the value with the default (true)",
+		Actual:   *cfg.Notifications.GitHubPRComment,
+		Expected: false,
+	})
+}
+
+func TestApplyDefaultsDoesNotOverwriteStorageBranch(t *testing.T) {
+	cfg := parseYAML(t, `
+version: 1
+framework: jest
+storage:
+  branch: my-custom-branch
+`)
+
+	cfg.ApplyDefaults()
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a config with storage.branch already set",
+		Should:   "not overwrite storage.branch",
+		Actual:   cfg.Storage.Branch,
+		Expected: "my-custom-branch",
 	})
 }
 
