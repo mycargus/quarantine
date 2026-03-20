@@ -74,23 +74,49 @@ type TestResult struct {
 	FailureMessage *string `json:"failure_message"`
 }
 
+// anyRootTestSuites is TestSuites without an XMLName constraint, so it
+// matches any root element name (used for the first-pass decode attempt).
+type anyRootTestSuites struct {
+	TestSuites []TestSuite `xml:"testsuite"`
+}
+
 // Parse reads JUnit XML from a reader and returns parsed test results.
+// Handles both <testsuites> (Jest, Vitest) and bare <testsuite> (RSpec) roots.
 func Parse(r io.Reader) ([]TestResult, error) {
-	var suites TestSuites
-	decoder := xml.NewDecoder(r)
-	if err := decoder.Decode(&suites); err != nil {
-		return nil, fmt.Errorf("failed to parse JUnit XML: %w", err)
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read JUnit XML: %w", err)
 	}
 
+	// Try flexible root decode first: looks for nested <testsuite> elements
+	// regardless of root element name (covers <testsuites> and any wrapper).
+	var wrapper anyRootTestSuites
+	if xmlErr := xml.Unmarshal(data, &wrapper); xmlErr != nil {
+		return nil, fmt.Errorf("failed to parse JUnit XML: %w", xmlErr)
+	}
+
+	if len(wrapper.TestSuites) > 0 {
+		return suitesToResults(wrapper.TestSuites), nil
+	}
+
+	// Fall back to bare <testsuite> root (RSpec): testcases are direct children.
+	var suite TestSuite
+	if xmlErr := xml.Unmarshal(data, &suite); xmlErr == nil && len(suite.TestCases) > 0 {
+		return suitesToResults([]TestSuite{suite}), nil
+	}
+
+	return []TestResult{}, nil
+}
+
+// suitesToResults converts a slice of TestSuite into TestResult entries.
+func suitesToResults(suites []TestSuite) []TestResult {
 	var results []TestResult
-	for _, suite := range suites.TestSuites {
+	for _, suite := range suites {
 		for _, tc := range suite.TestCases {
-			result := toTestResult(tc, suite)
-			results = append(results, result)
+			results = append(results, toTestResult(tc, suite))
 		}
 	}
-
-	return results, nil
+	return results
 }
 
 // toTestResult converts a parsed TestCase into a TestResult with a
