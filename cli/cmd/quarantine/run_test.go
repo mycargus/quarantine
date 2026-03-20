@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mycargus/quarantine/internal/config"
 	"github.com/mycargus/quarantine/internal/parser"
 	riteway "github.com/mycargus/riteway-golang"
 )
@@ -139,6 +140,33 @@ framework: jest
 	})
 }
 
+// --- Scenario 52 (variant): -- separator present but no command after it ---
+
+func TestRunEmptyArgsAfterSeparator(t *testing.T) {
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+`)
+
+	output, err := executeRunCmd(t, []string{"--config", configPath, "--"}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "-- separator present but no command after it",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "-- separator present but no command after it",
+		Should:   "print error about missing test command",
+		Actual:   strings.Contains(output, "missing '--' separator"),
+		Expected: true,
+	})
+}
+
 // --- Scenario 53: Test command not found ---
 
 func TestRunCommandNotFound(t *testing.T) {
@@ -146,26 +174,18 @@ func TestRunCommandNotFound(t *testing.T) {
 version: 1
 framework: jest
 `)
+	args := []string{"--config", configPath, "--", "jset", "--ci"}
+	env := map[string]string{"QUARANTINE_GITHUB_TOKEN": "ghp_test"}
 
-	output, err := executeRunCmd(t, []string{"--config", configPath, "--", "jset", "--ci"}, map[string]string{
-		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
-	})
-
-	var gotExitCode int
-	if err == nil {
-		gotExitCode = 0
-	} else if code, ok := err.(exitCodeError); ok {
-		gotExitCode = int(code)
-	} else {
-		gotExitCode = 2
-	}
+	exitCode := executeRunCmdWithExitCode(t, args, env)
 	riteway.Assert(t, riteway.Case[int]{
 		Given:    "a typo in the test command (jset instead of jest)",
 		Should:   "exit with quarantine error code (2)",
-		Actual:   gotExitCode,
+		Actual:   exitCode,
 		Expected: 2,
 	})
 
+	output, _ := executeRunCmd(t, args, env)
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a typo in the test command (jset instead of jest)",
 		Should:   "print command not found error with the command name",
@@ -759,6 +779,216 @@ framework: jest
 	})
 }
 
+// --- Scenario 51 (verbose output): config resolution trace ---
+
+func TestRunVerboseConfigResolution(t *testing.T) {
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+`)
+
+	// Use a nonexistent command so the run exits at LookPath — no GitHub API needed.
+	output, err := executeRunCmd(t, []string{
+		"--config", configPath,
+		"--verbose",
+		"--", "nonexistent-command-xyz",
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--verbose flag and nonexistent test command",
+		Should:   "return an error (command not found)",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--verbose flag set",
+		Should:   "print config resolution block",
+		Actual:   strings.Contains(output, "[verbose] Config resolution:"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--verbose flag set with jest framework from config",
+		Should:   "include framework in resolution output",
+		Actual:   strings.Contains(output, "framework = jest"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--verbose flag set",
+		Should:   "print total time even on error exit",
+		Actual:   strings.Contains(output, "[verbose] Total time:"),
+		Expected: true,
+	})
+}
+
+// --- Scenario 51 (verbose output): API call details ---
+
+func TestRunVerboseAPICall(t *testing.T) {
+	dir := t.TempDir()
+
+	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="1" failures="0" errors="0" time="0.1">
+  <testsuite name="__tests__/a.test.js" tests="1" errors="0" failures="0" skipped="0"
+             timestamp="2026-03-15T14:22:10" time="0.1">
+    <testcase classname="A" name="passes" file="__tests__/a.test.js" time="0.1">
+    </testcase>
+  </testsuite>
+</testsuites>`
+
+	xmlPath := filepath.Join(dir, "junit.xml")
+	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
+
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+`)
+
+	server := fakeGitHubAPI(t, true)
+	defer server.Close()
+
+	resultsPath := filepath.Join(dir, "results.json")
+	output, err := executeRunCmd(t, []string{
+		"--config", configPath,
+		"--junitxml", xmlPath,
+		"--output", resultsPath,
+		"--verbose",
+		"--", scriptPath,
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--verbose flag with all tests passing",
+		Should:   "exit without error",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--verbose flag set",
+		Should:   "print API call with GET /repos/ endpoint",
+		Actual:   strings.Contains(output, "[verbose] API call: GET /repos/"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--verbose flag set with branch existing",
+		Should:   "print 200 status for branch check",
+		Actual:   strings.Contains(output, "-> 200"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--verbose flag set",
+		Should:   "print config resolution",
+		Actual:   strings.Contains(output, "[verbose] Config resolution:"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--verbose flag set",
+		Should:   "print total time",
+		Actual:   strings.Contains(output, "[verbose] Total time:"),
+		Expected: true,
+	})
+}
+
+// --- Scenario 51 (verbose output): branch not found logs 404 ---
+
+func TestRunBranchNotFound(t *testing.T) {
+	dir := t.TempDir()
+	scriptPath := writeTestScript(t, dir, "", "", 0)
+
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+github:
+  owner: testowner
+  repo: testrepo
+`)
+
+	server := fakeGitHubAPI(t, false) // branch does not exist
+	defer server.Close()
+
+	output, err := executeRunCmd(t, []string{
+		"--config", configPath,
+		"--junitxml", filepath.Join(dir, "junit.xml"),
+		"--output", filepath.Join(dir, "results.json"),
+		"--", scriptPath,
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "quarantine/state branch does not exist (404)",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "quarantine/state branch does not exist",
+		Should:   "print 'not initialized' error message",
+		Actual:   strings.Contains(output, "Run 'quarantine init' first"),
+		Expected: true,
+	})
+}
+
+// --- Scenario 51 (verbose output): verbose with no token logs skipped ---
+
+func TestRunVerboseNoToken(t *testing.T) {
+	dir := t.TempDir()
+	junitXML := `<?xml version="1.0" encoding="UTF-8"?><testsuites tests="1"><testsuite name="s.test.js" tests="1"><testcase classname="S" name="t" file="s.test.js" time="0.001"></testcase></testsuite></testsuites>`
+	xmlPath := filepath.Join(dir, "junit.xml")
+	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
+
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+github:
+  owner: testowner
+  repo: testrepo
+`)
+
+	output, err := executeRunCmd(t, []string{
+		"--config", configPath,
+		"--junitxml", xmlPath,
+		"--output", filepath.Join(dir, "results.json"),
+		"--verbose",
+		"--", scriptPath,
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN": "",
+		"GITHUB_TOKEN":            "",
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no GitHub token set",
+		Should:   "exit without error (degraded mode continues)",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no GitHub token set",
+		Should:   "print WARNING about missing token",
+		Actual:   strings.Contains(output, "[quarantine] WARNING:"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no GitHub token and --verbose flag",
+		Should:   "print verbose API call skipped message",
+		Actual:   strings.Contains(output, "[verbose] API call: skipped (no token)"),
+		Expected: true,
+	})
+}
+
 // --- Scenario 43: Framework override from config ---
 
 func TestRunFrameworkFromConfig(t *testing.T) {
@@ -1042,7 +1272,114 @@ retries: 1
 	}
 }
 
+// --- Scenario 64 (variant): --retries 0 is treated as "not set" ---
+
+func TestRunRetriesZeroUsesDefault(t *testing.T) {
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+`)
+
+	// Use a nonexistent command to exit at LookPath — config resolution fires first.
+	output, err := executeRunCmd(t, []string{
+		"--config", configPath,
+		"--retries", "0",
+		"--verbose",
+		"--", "nonexistent-command-xyz",
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
+	})
+
+	// Exits at LookPath — error expected.
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--retries 0 with nonexistent command",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--retries 0 treated as unset",
+		Should:   "use default retries (3) reported as default source in verbose output",
+		Actual:   strings.Contains(output, "retries   = 3") && strings.Contains(output, "source: default"),
+		Expected: true,
+	})
+}
+
 // --- Pure function unit tests ---
+
+func TestConfigResolutionTrace(t *testing.T) {
+	cfg := &config.Config{
+		Framework: "jest",
+		Retries:   3,
+		JUnitXML:  "junit.xml",
+	}
+
+	lines := configResolutionTrace(cfg, 0, 0, "", "")
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "jest config with all values at defaults",
+		Should:   "return 4 trace lines",
+		Actual:   len(lines),
+		Expected: 4,
+	})
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "jest config with all values at defaults",
+		Should:   "include framework with config source",
+		Actual:   lines[1],
+		Expected: "[verbose]   framework = jest (source: config)",
+	})
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "retries not set in config file or flag",
+		Should:   "report retries as default source",
+		Actual:   lines[2],
+		Expected: "[verbose]   retries   = 3 (source: default)",
+	})
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "junitxml not set in config file or flag",
+		Should:   "report junitxml as default source",
+		Actual:   lines[3],
+		Expected: "[verbose]   junitxml  = junit.xml (source: default)",
+	})
+}
+
+func TestConfigResolutionTraceSourceAttribution(t *testing.T) {
+	cfg := &config.Config{
+		Framework: "rspec",
+		Retries:   5,
+		JUnitXML:  "override.xml",
+	}
+
+	// Both values came from the CLI flag.
+	linesFromFlag := configResolutionTrace(cfg, 5, 0, "override.xml", "")
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "retries set via --retries flag",
+		Should:   "report retries as flag source",
+		Actual:   linesFromFlag[2],
+		Expected: "[verbose]   retries   = 5 (source: flag)",
+	})
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "junitxml set via --junitxml flag",
+		Should:   "report junitxml as flag source",
+		Actual:   linesFromFlag[3],
+		Expected: "[verbose]   junitxml  = override.xml (source: flag)",
+	})
+
+	// Both values came from the config file (not overridden by flag).
+	linesFromConfig := configResolutionTrace(cfg, 0, 5, "", "override.xml")
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "retries set in config file (not flag)",
+		Should:   "report retries as config source",
+		Actual:   linesFromConfig[2],
+		Expected: "[verbose]   retries   = 5 (source: config)",
+	})
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "junitxml set in config file (not flag)",
+		Should:   "report junitxml as config source",
+		Actual:   linesFromConfig[3],
+		Expected: "[verbose]   junitxml  = override.xml (source: config)",
+	})
+}
 
 func TestMergeParseResults(t *testing.T) {
 	r1 := []parser.TestResult{{TestID: "a", Status: "passed"}}
