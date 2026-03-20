@@ -42,6 +42,13 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("verbose and quiet are mutually exclusive")
 	}
 
+	runStart := time.Now()
+	defer func() {
+		if verbose {
+			cmd.PrintErrf("[verbose] Total time: %dms\n", time.Since(runStart).Milliseconds())
+		}
+	}()
+
 	configPath, _ := cmd.Flags().GetString("config")
 	cfg, err := config.Load(configPath)
 	if err != nil {
@@ -49,14 +56,28 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("not initialized")
 	}
 
+	// Snapshot pre-defaults values for verbose source attribution.
+	cfgRetries := cfg.Retries
+	cfgJUnitXML := cfg.JUnitXML
+
+	// Read CLI flags before ApplyDefaults so we know what was explicitly set.
+	junitxmlFlag, _ := cmd.Flags().GetString("junitxml")
+	retriesFlag, _ := cmd.Flags().GetInt("retries")
+
 	cfg.ApplyDefaults()
 
-	// Apply CLI flag overrides.
-	if junitxmlFlag, _ := cmd.Flags().GetString("junitxml"); junitxmlFlag != "" {
+	// Apply CLI flag overrides (after defaults, so flags win).
+	if junitxmlFlag != "" {
 		cfg.JUnitXML = junitxmlFlag
 	}
-	if retriesFlag, _ := cmd.Flags().GetInt("retries"); retriesFlag != 0 {
+	if retriesFlag != 0 {
 		cfg.Retries = retriesFlag
+	}
+
+	if verbose {
+		for _, line := range configResolutionTrace(cfg, retriesFlag, cfgRetries, junitxmlFlag, cfgJUnitXML) {
+			cmd.PrintErrln(line)
+		}
 	}
 
 	// Verify test command exists.
@@ -68,8 +89,31 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check quarantine/state branch exists.
-	if err := checkBranchExists(cmd, cfg); err != nil {
+	check, err := checkBranchExists(cfg)
+	if err != nil {
+		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
 		return err
+	}
+	if check.warnMsg != "" {
+		cmd.PrintErrf("[quarantine] WARNING: %s\n", check.warnMsg)
+	}
+	if verbose {
+		if check.skipped {
+			cmd.PrintErrf("[verbose] API call: skipped (no token)\n")
+		} else if check.endpoint != "" {
+			elapsedMs := check.elapsed.Milliseconds()
+			if check.apiErr != nil {
+				cmd.PrintErrf("[verbose] API call: %s -> error (%dms)\n", check.endpoint, elapsedMs)
+			} else if check.exists {
+				cmd.PrintErrf("[verbose] API call: %s -> 200 (%dms)\n", check.endpoint, elapsedMs)
+			} else {
+				cmd.PrintErrf("[verbose] API call: %s -> 404 (%dms)\n", check.endpoint, elapsedMs)
+			}
+		}
+	}
+	if !check.skipped && check.apiErr == nil && !check.exists {
+		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
+		return fmt.Errorf("not initialized")
 	}
 
 	// Execute test command.
@@ -135,8 +179,21 @@ func runRun(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// branchCheckResult holds the result of a branch existence check.
+type branchCheckResult struct {
+	skipped  bool          // true if check was skipped (no token — degraded mode)
+	warnMsg  string        // non-empty if a [quarantine] WARNING should be emitted
+	exists   bool          // true if the branch was found
+	elapsed  time.Duration // round-trip time for the API call
+	endpoint string        // e.g. "GET /repos/owner/repo/git/ref/heads/quarantine/state"
+	apiErr   error         // non-fatal GetRef error
+}
+
 // checkBranchExists verifies the quarantine/state branch exists via GitHub API.
-func checkBranchExists(cmd *cobra.Command, cfg *config.Config) error {
+// Returns (zero, error) for fatal configuration errors (owner/repo unresolvable).
+// Returns (result, nil) for successful checks or degraded mode (no token, API error).
+// Callers are responsible for printing warnings and verbose output from the result.
+func checkBranchExists(cfg *config.Config) (branchCheckResult, error) {
 	owner, repo := cfg.GitHub.Owner, cfg.GitHub.Repo
 	if owner == "" || repo == "" {
 		if cwd, err := os.Getwd(); err == nil {
@@ -145,31 +202,39 @@ func checkBranchExists(cmd *cobra.Command, cfg *config.Config) error {
 	}
 
 	if owner == "" || repo == "" {
-		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
-		return fmt.Errorf("not initialized")
+		return branchCheckResult{}, fmt.Errorf("not initialized")
 	}
 
-	client, err := gh.NewClient(owner, repo)
-	if err != nil {
-		// No token — proceed if we can (degraded mode for branch check).
-		cmd.PrintErrf("[quarantine] WARNING: %v\n", err)
-		return nil
+	client, clientErr := gh.NewClient(owner, repo)
+	if clientErr != nil {
+		return branchCheckResult{
+			skipped: true,
+			warnMsg: clientErr.Error(),
+		}, nil
 	}
+
+	branch := cfg.Storage.Branch
+	endpoint := fmt.Sprintf("GET /repos/%s/%s/git/ref/heads/%s", owner, repo, branch)
 
 	ctx := context.Background()
-	branch := cfg.Storage.Branch
-	_, exists, err := client.GetRef(ctx, branch)
-	if err != nil {
-		cmd.PrintErrf("[quarantine] WARNING: Could not check branch '%s': %v\n", branch, err)
-		return nil
+	apiStart := time.Now()
+	_, exists, apiErr := client.GetRef(ctx, branch)
+	elapsed := time.Since(apiStart)
+
+	if apiErr != nil {
+		return branchCheckResult{
+			endpoint: endpoint,
+			elapsed:  elapsed,
+			apiErr:   apiErr,
+			warnMsg:  fmt.Sprintf("Could not check branch '%s': %v", branch, apiErr),
+		}, nil
 	}
 
-	if !exists {
-		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
-		return fmt.Errorf("not initialized")
-	}
-
-	return nil
+	return branchCheckResult{
+		endpoint: endpoint,
+		elapsed:  elapsed,
+		exists:   exists,
+	}, nil
 }
 
 // parseAttempt holds the outcome of attempting to parse one JUnit XML file.
@@ -303,6 +368,38 @@ func writeResults(res result.Result, path string) error {
 	}
 
 	return os.WriteFile(path, data, 0644)
+}
+
+// configResolutionTrace returns verbose log lines describing how each config field
+// was resolved. This is a pure function — no I/O.
+//
+// Parameters:
+//   - cfg: config after ApplyDefaults and flag overrides have been applied
+//   - retriesFlag: value from --retries flag (0 = not set)
+//   - cfgRetries: cfg.Retries before ApplyDefaults (0 = not set in file)
+//   - junitxmlFlag: value from --junitxml flag ("" = not set)
+//   - cfgJUnitXML: cfg.JUnitXML before ApplyDefaults ("" = not set in file)
+func configResolutionTrace(cfg *config.Config, retriesFlag, cfgRetries int, junitxmlFlag, cfgJUnitXML string) []string {
+	retriesSource := "default"
+	if retriesFlag != 0 {
+		retriesSource = "flag"
+	} else if cfgRetries != 0 {
+		retriesSource = "config"
+	}
+
+	junitxmlSource := "default"
+	if junitxmlFlag != "" {
+		junitxmlSource = "flag"
+	} else if cfgJUnitXML != "" {
+		junitxmlSource = "config"
+	}
+
+	return []string{
+		"[verbose] Config resolution:",
+		fmt.Sprintf("[verbose]   framework = %s (source: config)", cfg.Framework),
+		fmt.Sprintf("[verbose]   retries   = %d (source: %s)", cfg.Retries, retriesSource),
+		fmt.Sprintf("[verbose]   junitxml  = %s (source: %s)", cfg.JUnitXML, junitxmlSource),
+	}
 }
 
 // exitCodeError is an error that carries a specific exit code.
