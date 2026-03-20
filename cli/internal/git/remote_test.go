@@ -3,6 +3,7 @@ package git_test
 import (
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 
 	riteway "github.com/mycargus/riteway-golang"
@@ -163,6 +164,57 @@ func TestParseRemoteNotAGitRepo(t *testing.T) {
 		Should:   "return the 'not a git repository' error message",
 		Actual:   err.Error(),
 		Expected: "not a git repository: run 'quarantine init' from the root of a git repository",
+	})
+}
+
+func TestParseRemoteSuccess(t *testing.T) {
+	dir := t.TempDir()
+	runGit(t, dir, "init", "-b", "main")
+	runGit(t, dir, "remote", "add", "origin", "https://github.com/my-org/my-project.git")
+
+	owner, repo, err := git.ParseRemote(dir)
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "a git repo with a GitHub origin remote",
+		Should:   "parse without error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a git repo with origin https://github.com/my-org/my-project.git",
+		Should:   "return owner my-org",
+		Actual:   owner,
+		Expected: "my-org",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a git repo with origin https://github.com/my-org/my-project.git",
+		Should:   "return repo my-project",
+		Actual:   repo,
+		Expected: "my-project",
+	})
+}
+
+func TestParseRemoteNoOrigin(t *testing.T) {
+	dir := t.TempDir()
+	runGit(t, dir, "init", "-b", "main")
+	// No remote added.
+
+	_, _, err := git.ParseRemote(dir)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a git repo with no remotes",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a git repo with no remotes",
+		Should:   "error message contains 'could not get git remote'",
+		Actual:   strings.Contains(err.Error(), "could not get git remote"),
+		Expected: true,
 	})
 }
 

@@ -49,6 +49,55 @@ func TestComputeSummary(t *testing.T) {
 	})
 }
 
+func TestBuildEmptyTests(t *testing.T) {
+	meta := result.Metadata{
+		RunID:     "run-1",
+		Repo:      "owner/repo",
+		Framework: "jest",
+	}
+
+	res := result.Build([]parser.TestResult{}, meta)
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "Build called with empty test slice",
+		Should:   "return Summary.Total == 0",
+		Actual:   res.Summary.Total,
+		Expected: 0,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "Build called with empty test slice",
+		Should:   "return empty Tests slice",
+		Actual:   len(res.Tests),
+		Expected: 0,
+	})
+}
+
+func TestBuildWithPRNumber(t *testing.T) {
+	n := 42
+	meta := result.Metadata{
+		RunID:    "run-2",
+		Repo:     "owner/repo",
+		PRNumber: &n,
+	}
+
+	res := result.Build([]parser.TestResult{}, meta)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "Build called with PRNumber set to 42",
+		Should:   "set a non-nil PRNumber on the result",
+		Actual:   res.PRNumber != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "Build called with PRNumber set to 42",
+		Should:   "set PRNumber to 42",
+		Actual:   *res.PRNumber,
+		Expected: 42,
+	})
+}
+
 func TestBuild(t *testing.T) {
 	msg := "assertion failed"
 	tests := []parser.TestResult{
