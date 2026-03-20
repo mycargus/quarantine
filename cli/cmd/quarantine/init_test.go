@@ -692,6 +692,71 @@ func TestInitAPIUnreachable(t *testing.T) {
 	})
 }
 
+// --- Retries prompt: non-default and invalid input ---
+
+func TestInitCustomRetriesInput(t *testing.T) {
+	dir := t.TempDir()
+	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+
+	// No token so init fails after writing config — retries is written before GitHub ops.
+	_, _ = executeInitCmd(t,
+		"jest\n5\n\n", // framework=jest, retries=5, junitxml=default
+		dir,
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN": "",
+			"GITHUB_TOKEN":            "",
+		},
+	)
+
+	content, readErr := os.ReadFile(dir + "/quarantine.yml")
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "retries input '5' provided at the prompt",
+		Should:   "write quarantine.yml without error",
+		Actual:   readErr == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "retries input '5' provided at the prompt",
+		Should:   "write 'retries: 5' to quarantine.yml",
+		Actual:   strings.Contains(string(content), "retries: 5"),
+		Expected: true,
+	})
+}
+
+func TestInitInvalidRetriesInputUsesDefault(t *testing.T) {
+	dir := t.TempDir()
+	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+
+	// No token so init fails after writing config.
+	_, _ = executeInitCmd(t,
+		"jest\nabc\n\n", // framework=jest, retries=invalid, junitxml=default
+		dir,
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN": "",
+			"GITHUB_TOKEN":            "",
+		},
+	)
+
+	content, readErr := os.ReadFile(dir + "/quarantine.yml")
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "invalid retries input 'abc' provided at the prompt",
+		Should:   "write quarantine.yml without error",
+		Actual:   readErr == nil,
+		Expected: true,
+	})
+
+	// writeConfig omits the retries key when it equals the default (3).
+	// If the mutation fires (err == nil → err != nil), Atoi("abc") returns (0, err);
+	// err != nil becomes true → retries is set to 0 → written as "retries: 0".
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "invalid retries input 'abc' (Atoi fails)",
+		Should:   "not write a retries key (default 3 is omitted by writeConfig)",
+		Actual:   !strings.Contains(string(content), "retries:"),
+		Expected: true,
+	})
+}
+
 // --- writeConfig unit test ---
 
 func TestWriteConfigFailure(t *testing.T) {
