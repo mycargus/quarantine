@@ -91,6 +91,17 @@ var frameworkDefaults = map[string]string{
 	"vitest": "junit-report.xml",
 }
 
+// FrameworkDefaultJUnit returns the default junitxml glob pattern for a framework.
+// Returns an empty string for unknown frameworks.
+func FrameworkDefaultJUnit(framework string) string {
+	return frameworkDefaults[framework]
+}
+
+// IsValidFramework reports whether the given framework name is supported.
+func IsValidFramework(framework string) bool {
+	return validFrameworks[framework]
+}
+
 // Load reads and parses a quarantine.yml file from the given path.
 func Load(path string) (*Config, error) {
 	f, err := os.Open(path)

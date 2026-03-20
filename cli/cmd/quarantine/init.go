@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
+	"github.com/mycargus/quarantine/internal/config"
 	"github.com/mycargus/quarantine/internal/git"
 	ghclient "github.com/mycargus/quarantine/internal/github"
 	"github.com/mycargus/quarantine/internal/quarantine"
@@ -39,12 +40,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// Step 2: Prompt for framework.
 	framework := ""
-	validFrameworks := map[string]bool{"jest": true, "rspec": true, "vitest": true}
 	for {
 		cmd.Printf("Which test framework? [rspec/jest/vitest] ")
 		input, _ := in.ReadString('\n')
 		input = strings.TrimSpace(input)
-		if validFrameworks[input] {
+		if config.IsValidFramework(input) {
 			framework = input
 			break
 		}
@@ -57,7 +57,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	retries := parseRetriesInput(retriesInput, 3)
 
 	// Step 4: Prompt for junitxml path.
-	defaultJUnit := frameworkDefaultJUnit(framework)
+	defaultJUnit := config.FrameworkDefaultJUnit(framework)
 	cmd.Printf("Path/glob for JUnit XML output? [%s] ", defaultJUnit)
 	junitInput, _ := in.ReadString('\n')
 	junitInput = strings.TrimSpace(junitInput)
@@ -73,7 +73,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Step 6: Validate GitHub token.
-	token := githubToken()
+	token := ghclient.ResolveToken()
 	if token == "" {
 		cmd.Printf(`
 Error: No GitHub token found. Set QUARANTINE_GITHUB_TOKEN or GITHUB_TOKEN.

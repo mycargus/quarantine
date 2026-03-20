@@ -64,6 +64,12 @@ func resolveToken() string {
 	return os.Getenv("GITHUB_TOKEN")
 }
 
+// ResolveToken checks QUARANTINE_GITHUB_TOKEN first, then GITHUB_TOKEN.
+// Exported for use by other packages in the CLI.
+func ResolveToken() string {
+	return resolveToken()
+}
+
 // repoPath returns the API path prefix for the configured repository.
 func (c *Client) repoPath() string {
 	return fmt.Sprintf("/repos/%s/%s", c.owner, c.repo)
