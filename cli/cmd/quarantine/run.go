@@ -189,17 +189,24 @@ type branchCheckResult struct {
 	apiErr   error         // non-fatal GetRef error
 }
 
-// checkBranchExists verifies the quarantine/state branch exists via GitHub API.
-// Returns (zero, error) for fatal configuration errors (owner/repo unresolvable).
-// Returns (result, nil) for successful checks or degraded mode (no token, API error).
-// Callers are responsible for printing warnings and verbose output from the result.
-func checkBranchExists(cfg *config.Config) (branchCheckResult, error) {
-	owner, repo := cfg.GitHub.Owner, cfg.GitHub.Repo
+// resolveOwnerRepo returns the GitHub owner and repo from config, falling back
+// to the git remote in the current working directory.
+func resolveOwnerRepo(cfg *config.Config) (owner, repo string) {
+	owner, repo = cfg.GitHub.Owner, cfg.GitHub.Repo
 	if owner == "" || repo == "" {
 		if cwd, err := os.Getwd(); err == nil {
 			owner, repo, _ = git.ParseRemote(cwd)
 		}
 	}
+	return owner, repo
+}
+
+// checkBranchExists verifies the quarantine/state branch exists via GitHub API.
+// Returns (zero, error) for fatal configuration errors (owner/repo unresolvable).
+// Returns (result, nil) for successful checks or degraded mode (no token, API error).
+// Callers are responsible for printing warnings and verbose output from the result.
+func checkBranchExists(cfg *config.Config) (branchCheckResult, error) {
+	owner, repo := resolveOwnerRepo(cfg)
 
 	if owner == "" || repo == "" {
 		return branchCheckResult{}, fmt.Errorf("not initialized")
@@ -304,12 +311,7 @@ func mergeParseResults(attempts []parseAttempt) ([]parser.TestResult, []string) 
 
 // buildMetadata constructs result metadata from config and environment.
 func buildMetadata(cfg *config.Config) result.Metadata {
-	owner, repo := cfg.GitHub.Owner, cfg.GitHub.Repo
-	if owner == "" || repo == "" {
-		if cwd, err := os.Getwd(); err == nil {
-			owner, repo, _ = git.ParseRemote(cwd)
-		}
-	}
+	owner, repo := resolveOwnerRepo(cfg)
 
 	repoStr := repoString(owner, repo)
 

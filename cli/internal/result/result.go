@@ -63,9 +63,9 @@ type Metadata struct {
 	RetryCount int
 }
 
-// Build constructs a Result from parsed test results and metadata.
+// BuildAt constructs a Result from parsed test results, metadata, and a timestamp.
 // This is a pure function — no I/O.
-func Build(tests []parser.TestResult, meta Metadata) Result {
+func BuildAt(tests []parser.TestResult, meta Metadata, timestamp string) Result {
 	entries := make([]TestEntry, len(tests))
 	summary := ComputeSummary(tests)
 
@@ -90,7 +90,7 @@ func Build(tests []parser.TestResult, meta Metadata) Result {
 		Branch:     meta.Branch,
 		CommitSHA:  meta.CommitSHA,
 		PRNumber:   meta.PRNumber,
-		Timestamp:  time.Now().UTC().Format(time.RFC3339),
+		Timestamp:  timestamp,
 		CLIVersion: meta.CLIVersion,
 		Framework:  meta.Framework,
 		Config: ConfigInfo{
@@ -99,6 +99,11 @@ func Build(tests []parser.TestResult, meta Metadata) Result {
 		Summary: summary,
 		Tests:   entries,
 	}
+}
+
+// Build constructs a Result from parsed test results and metadata.
+func Build(tests []parser.TestResult, meta Metadata) Result {
+	return BuildAt(tests, meta, time.Now().UTC().Format(time.RFC3339))
 }
 
 // ComputeSummary tallies test results by status.

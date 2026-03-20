@@ -1,11 +1,31 @@
 package runner_test
 
 import (
+	"context"
+	"io"
 	"testing"
 
 	"github.com/mycargus/quarantine/internal/runner"
 	riteway "github.com/mycargus/riteway-golang"
 )
+
+func TestRunStartFails(t *testing.T) {
+	exitCode, err := runner.Run(context.Background(), "/nonexistent/path", nil, io.Discard, io.Discard)
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a non-existent command path",
+		Should:   "return exit code -1",
+		Actual:   exitCode,
+		Expected: -1,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a non-existent command path",
+		Should:   "return a non-nil error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+}
 
 func TestRerunCommand(t *testing.T) {
 	cmd, args := runner.RerunCommand(runner.Jest, "my test", "MyClass", "src/foo.test.js", "")
@@ -59,6 +79,20 @@ func TestRerunCommand(t *testing.T) {
 	})
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "unknown framework",
+		Should:   "return nil args",
+		Actual:   args == nil,
+		Expected: true,
+	})
+
+	cmd, args = runner.RerunCommand(runner.Jest, "my test", "MyClass", "src/foo.test.js", "custom-runner --test {{name}}")
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a non-empty customTemplate",
+		Should:   "return the template as the command",
+		Actual:   cmd,
+		Expected: "custom-runner --test {{name}}",
+	})
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a non-empty customTemplate",
 		Should:   "return nil args",
 		Actual:   args == nil,
 		Expected: true,

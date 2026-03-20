@@ -608,6 +608,94 @@ func TestQuarantinedTestIDsPopulated(t *testing.T) {
 	})
 }
 
+func TestNewEmptyStateAtUsesProvidedTimestamp(t *testing.T) {
+	s := quarantine.NewEmptyStateAt("2026-01-01T00:00:00Z")
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "NewEmptyStateAt called with a fixed timestamp",
+		Should:   "use the provided timestamp for updated_at",
+		Actual:   s.UpdatedAt,
+		Expected: "2026-01-01T00:00:00Z",
+	})
+}
+
+func TestMarshalAtUsesProvidedTimestamp(t *testing.T) {
+	s := quarantine.NewEmptyStateAt("2026-01-01T00:00:00Z")
+	data, err := s.MarshalAt("2026-06-01T12:00:00Z")
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "MarshalAt called with a fixed timestamp",
+		Should:   "marshal without error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	parsed, _ := quarantine.ParseState(strings.NewReader(string(data)))
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "MarshalAt called with timestamp 2026-06-01T12:00:00Z",
+		Should:   "write that timestamp to updated_at",
+		Actual:   parsed.UpdatedAt,
+		Expected: "2026-06-01T12:00:00Z",
+	})
+}
+
+func TestMergeAtUsesProvidedTimestamp(t *testing.T) {
+	local := quarantine.NewEmptyState()
+	remote := quarantine.NewEmptyState()
+
+	merged := quarantine.MergeAt(local, remote, "2026-05-01T00:00:00Z")
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "MergeAt called with a fixed timestamp",
+		Should:   "use the provided timestamp for updated_at",
+		Actual:   merged.UpdatedAt,
+		Expected: "2026-05-01T00:00:00Z",
+	})
+}
+
+func TestMergeConflictBothFlakyCountZeroKeepsRemote(t *testing.T) {
+	// When both local and remote have FlakyCount == 0, the local > check
+	// (0 > 0 == false) does not override remote, so remote entry wins.
+	local := quarantine.NewEmptyState()
+	local.AddTest(quarantine.Entry{
+		TestID:        "a::b::c",
+		FilePath:      "a",
+		Classname:     "b",
+		Name:          "c",
+		Suite:         "b",
+		FirstFlakyAt:  "2026-03-01T00:00:00Z",
+		LastFlakyAt:   "2026-03-10T00:00:00Z",
+		FlakyCount:    0,
+		QuarantinedAt: "2026-03-01T00:00:00Z",
+		QuarantinedBy: "cli-auto",
+	})
+
+	remote := quarantine.NewEmptyState()
+	remote.AddTest(quarantine.Entry{
+		TestID:        "a::b::c",
+		FilePath:      "a",
+		Classname:     "b",
+		Name:          "c",
+		Suite:         "b",
+		FirstFlakyAt:  "2026-03-01T00:00:00Z",
+		LastFlakyAt:   "2026-03-14T00:00:00Z",
+		FlakyCount:    0,
+		QuarantinedAt: "2026-03-01T00:00:00Z",
+		QuarantinedBy: "cli-auto",
+	})
+
+	merged := quarantine.Merge(local, remote)
+	entry := merged.Tests["a::b::c"]
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a conflict where both local and remote have flaky_count 0",
+		Should:   "keep remote's last_flaky_at (local does not override when 0 > 0 is false)",
+		Actual:   entry.LastFlakyAt,
+		Expected: "2026-03-14T00:00:00Z",
+	})
+}
+
 func TestMergeConflictPreservesEarliestFirstFlakyAt(t *testing.T) {
 	// Local has the higher flaky count but a later first_flaky_at.
 	// Remote has the earlier first_flaky_at.
