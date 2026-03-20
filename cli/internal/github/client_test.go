@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	riteway "github.com/mycargus/riteway-golang"
@@ -278,6 +279,56 @@ func TestCreateRefNonCreatedStatus(t *testing.T) {
 		Given:    "POST /git/refs returns 409",
 		Should:   "return an APIError with status 409",
 		Actual:   errors.As(err, &apiErr) && apiErr.StatusCode == 409,
+		Expected: true,
+	})
+}
+
+// --- GetRef invalid JSON ---
+
+func TestGetRefInvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{bad json`))
+	}))
+	t.Cleanup(server.Close)
+
+	c := newTestClient(t, server.URL)
+	_, _, err := c.GetRef(context.Background(), "quarantine/state")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "GET /git/ref returns 200 with invalid JSON body",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+}
+
+// --- doWithRetry: both attempts fail ---
+
+// TestGetRepoNetworkErrorRetriesAndFails verifies the doWithRetry behavior when
+// both the initial request and the retry fail with a network error.
+// Note: this test takes ~2 seconds because doWithRetry sleeps between attempts.
+func TestGetRepoNetworkErrorRetriesAndFails(t *testing.T) {
+	// Start a server, capture its URL, then close it so every connection
+	// attempt gets "connection refused" — simulating a persistent network failure.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	serverURL := server.URL
+	server.Close()
+
+	c := newTestClient(t, serverURL)
+	_, err := c.GetRepo(context.Background())
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "the GitHub API server is unreachable on both attempts",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "the GitHub API server is unreachable on both attempts",
+		Should:   "return an error containing 'GitHub API request failed'",
+		Actual:   strings.Contains(err.Error(), "GitHub API request failed"),
 		Expected: true,
 	})
 }
