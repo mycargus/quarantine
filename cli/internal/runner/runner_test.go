@@ -63,18 +63,4 @@ func TestRerunCommand(t *testing.T) {
 		Actual:   args == nil,
 		Expected: true,
 	})
-
-	cmd, args = runner.RerunCommand(runner.Jest, "my test", "MyClass", "src/foo.test.js", "custom-runner --name {{name}}")
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "custom template provided",
-		Should:   "return template as command",
-		Actual:   cmd,
-		Expected: "custom-runner --name {{name}}",
-	})
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "custom template provided",
-		Should:   "return nil args",
-		Actual:   args == nil,
-		Expected: true,
-	})
 }

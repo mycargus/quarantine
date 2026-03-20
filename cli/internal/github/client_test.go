@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -23,6 +24,7 @@ func newTestClient(t *testing.T, serverURL string) *ghclient.Client {
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
+	c.SetRetryDelay(0)
 	return c
 }
 
@@ -228,6 +230,38 @@ func TestGetRef404ReturnsNoError(t *testing.T) {
 	})
 }
 
+func TestGetRefSuccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc123","type":"commit"}}`)
+	}))
+	t.Cleanup(server.Close)
+
+	c := newTestClient(t, server.URL)
+	sha, exists, err := c.GetRef(context.Background(), "quarantine/state")
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "GET /git/ref returns 200 with valid JSON",
+		Should:   "return no error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "GET /git/ref returns 200",
+		Should:   "return exists=true",
+		Actual:   exists,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "GET /git/ref returns 200 with sha abc123",
+		Should:   "return the SHA",
+		Actual:   sha,
+		Expected: "abc123",
+	})
+}
+
 func TestGetRefUnexpectedStatus(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -387,5 +421,24 @@ func TestPutContentsEmptySHAOmitsField(t *testing.T) {
 		Should:   "omit 'sha' field from request body",
 		Actual:   hasSHA,
 		Expected: false,
+	})
+}
+
+func TestPutContentsNonEmptySHAIncludesField(t *testing.T) {
+	var requestBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&requestBody)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	c := newTestClient(t, server.URL)
+	_ = c.PutContents(context.Background(), "quarantine.json", "update", []byte(`{}`), "abc123")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "PutContents called with non-empty sha 'abc123'",
+		Should:   "include 'sha' field in request body",
+		Actual:   requestBody["sha"] == "abc123",
+		Expected: true,
 	})
 }

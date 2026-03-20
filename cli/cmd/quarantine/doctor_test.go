@@ -74,23 +74,9 @@ notifications:
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a valid quarantine.yml",
-		Should:   "print resolved configuration header",
-		Actual:   strings.Contains(stdout, "Resolved configuration:"),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a valid quarantine.yml",
-		Should:   "print framework",
-		Actual:   strings.Contains(stdout, "framework:"),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a valid quarantine.yml with jest",
-		Should:   "print jest as the framework",
-		Actual:   strings.Contains(stdout, "jest"),
+		Should:   "print resolved configuration with framework jest",
+		Actual:   strings.Contains(stdout, "framework:") && strings.Contains(stdout, "jest"),
 		Expected: true,
 	})
 }

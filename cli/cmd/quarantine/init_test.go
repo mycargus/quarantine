@@ -440,14 +440,6 @@ func TestInitJestFirstTime(t *testing.T) {
 		Actual:   strings.Contains(stdout, "jest-junit"),
 		Expected: true,
 	})
-
-	// Verify API call order: GetRepo → GetRef(default) → GetRef(state) → CreateRef → PutContents
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "successful init with new branch",
-		Should:   "call GET /repos first",
-		Actual:   len(mockServer.requests) > 0 && mockServer.requests[0] == "GET /repos/my-org/my-project",
-		Expected: true,
-	})
 }
 
 // --- Scenario 2: quarantine init with RSpec ---

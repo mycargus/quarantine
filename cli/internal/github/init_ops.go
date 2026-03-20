@@ -195,8 +195,8 @@ func (c *Client) newRequestWithContext(ctx context.Context, method, path string,
 func (c *Client) doWithRetry(req *http.Request) (*http.Response, error) {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		// Retry once after 2 seconds for network errors.
-		time.Sleep(2 * time.Second)
+		// Retry once after a delay for network errors.
+		time.Sleep(c.retryDelay)
 		resp, err = c.httpClient.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("GitHub API request failed: %w", err)

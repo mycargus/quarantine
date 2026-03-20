@@ -534,6 +534,80 @@ func TestMergeBothEmpty(t *testing.T) {
 	})
 }
 
+func TestRemoveTest(t *testing.T) {
+	s := quarantine.NewEmptyState()
+	s.AddTest(quarantine.Entry{TestID: "a::b::c"})
+	s.RemoveTest("a::b::c")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a state after AddTest then RemoveTest",
+		Should:   "not contain the removed test",
+		Actual:   s.HasTest("a::b::c"),
+		Expected: false,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a state after AddTest then RemoveTest",
+		Should:   "have zero tests",
+		Actual:   len(s.Tests),
+		Expected: 0,
+	})
+}
+
+func TestHasTest(t *testing.T) {
+	s := quarantine.NewEmptyState()
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "an empty state",
+		Should:   "return false for HasTest on unknown ID",
+		Actual:   s.HasTest("a::b::c"),
+		Expected: false,
+	})
+
+	s.AddTest(quarantine.Entry{TestID: "a::b::c"})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a state after AddTest",
+		Should:   "return true for HasTest on the added ID",
+		Actual:   s.HasTest("a::b::c"),
+		Expected: true,
+	})
+}
+
+func TestQuarantinedTestIDsPopulated(t *testing.T) {
+	s := quarantine.NewEmptyState()
+	s.AddTest(quarantine.Entry{TestID: "a::b::c"})
+	s.AddTest(quarantine.Entry{TestID: "d::e::f"})
+
+	ids := s.QuarantinedTestIDs()
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a state with two quarantined tests",
+		Should:   "return two IDs",
+		Actual:   len(ids),
+		Expected: 2,
+	})
+
+	idSet := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		idSet[id] = true
+	}
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a state with tests 'a::b::c' and 'd::e::f'",
+		Should:   "include 'a::b::c' in the returned IDs",
+		Actual:   idSet["a::b::c"],
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a state with tests 'a::b::c' and 'd::e::f'",
+		Should:   "include 'd::e::f' in the returned IDs",
+		Actual:   idSet["d::e::f"],
+		Expected: true,
+	})
+}
+
 func TestMergeConflictPreservesEarliestFirstFlakyAt(t *testing.T) {
 	// Local has the higher flaky count but a later first_flaky_at.
 	// Remote has the earlier first_flaky_at.

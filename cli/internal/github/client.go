@@ -22,6 +22,7 @@ type Client struct {
 	token      string
 	owner      string
 	repo       string
+	retryDelay time.Duration
 }
 
 // NewClient creates a new GitHub API client. The token is resolved from
@@ -46,7 +47,13 @@ func NewClient(owner, repo string) (*Client, error) {
 		token:      token,
 		owner:      owner,
 		repo:       repo,
+		retryDelay: 2 * time.Second,
 	}, nil
+}
+
+// SetRetryDelay overrides the retry delay (used in tests to eliminate sleeps).
+func (c *Client) SetRetryDelay(d time.Duration) {
+	c.retryDelay = d
 }
 
 // resolveToken checks QUARANTINE_GITHUB_TOKEN first, then GITHUB_TOKEN.
