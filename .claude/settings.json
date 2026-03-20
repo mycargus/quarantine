@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/warn-destructive-git.sh \"$TOOL_INPUT\""
+            "command": ".claude/hooks/reject-destructive-git.sh \"$TOOL_INPUT\""
           }
         ]
       }
