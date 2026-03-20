@@ -52,15 +52,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Step 3: Prompt for retries.
-	retries := 3
 	cmd.Printf("How many retries for failing tests? [3] ")
 	retriesInput, _ := in.ReadString('\n')
-	retriesInput = strings.TrimSpace(retriesInput)
-	if retriesInput != "" {
-		if n, err := strconv.Atoi(retriesInput); err == nil {
-			retries = n
-		}
-	}
+	retries := parseRetriesInput(retriesInput, 3)
 
 	// Step 4: Prompt for junitxml path.
 	defaultJUnit := frameworkDefaultJUnit(framework)
@@ -176,6 +170,19 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 	cmd.Printf("%s", formatInitSummary(framework, retries, junitxml, branchExists))
 
 	return nil
+}
+
+// parseRetriesInput parses a retries string, returning defaultVal for empty or invalid input.
+// This is a pure function — no I/O.
+func parseRetriesInput(input string, defaultVal int) int {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return defaultVal
+	}
+	if n, err := strconv.Atoi(input); err == nil {
+		return n
+	}
+	return defaultVal
 }
 
 // writeConfig writes quarantine.yml with the given settings.

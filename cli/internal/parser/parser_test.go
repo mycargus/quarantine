@@ -276,6 +276,46 @@ func TestParseAllStatusTypes(t *testing.T) {
 		Actual:   *results[1].FailureMessage,
 		Expected: "expected true but got false",
 	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a skipped test case with time=0.000",
+		Should:   "produce DurationMs of 0",
+		Actual:   results[3].DurationMs,
+		Expected: 0,
+	})
+}
+
+func TestParseEmptyFileAndSuiteName(t *testing.T) {
+	const raw = `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="">
+    <testcase classname="SomeClass" name="test name" time="0.010">
+    </testcase>
+  </testsuite>
+</testsuites>`
+
+	results, err := parser.Parse(strings.NewReader(raw))
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "a JUnit XML with empty suite name and no file attribute on testcase",
+		Should:   "parse without error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a testcase with no file attribute inside a testsuite with empty name",
+		Should:   "have an empty FilePath",
+		Actual:   results[0].FilePath,
+		Expected: "",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a testcase with no file attribute inside a testsuite with empty name",
+		Should:   "construct TestID as '::SomeClass::test name'",
+		Actual:   results[0].TestID,
+		Expected: "::SomeClass::test name",
+	})
 }
 
 func TestParseSinglePassRSpec(t *testing.T) {

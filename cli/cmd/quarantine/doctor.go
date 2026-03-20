@@ -57,23 +57,13 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	cmd.Printf("  junitxml:        %s%s\n", cfg.JUnitXML, junitxmlNote)
 
 	// github.owner / github.repo — auto-detect if not set from config.
-	owner, repo := cfg.GitHub.Owner, cfg.GitHub.Repo
-	ownerNote, repoNote := "", ""
-	if owner == "" || repo == "" {
+	var detectedOwner, detectedRepo string
+	if cfg.GitHub.Owner == "" || cfg.GitHub.Repo == "" {
 		if cwd, cwdErr := os.Getwd(); cwdErr == nil {
-			detectedOwner, detectedRepo, remoteErr := git.ParseRemote(cwd)
-			if remoteErr == nil {
-				if owner == "" {
-					owner = detectedOwner
-					ownerNote = " (auto-detected)"
-				}
-				if repo == "" {
-					repo = detectedRepo
-					repoNote = " (auto-detected)"
-				}
-			}
+			detectedOwner, detectedRepo, _ = git.ParseRemote(cwd)
 		}
 	}
+	owner, repo, ownerNote, repoNote := resolveDisplayOwnerRepo(cfg.GitHub.Owner, cfg.GitHub.Repo, detectedOwner, detectedRepo)
 	cmd.Printf("  github.owner:    %s%s\n", owner, ownerNote)
 	cmd.Printf("  github.repo:     %s%s\n", repo, repoNote)
 
@@ -100,6 +90,25 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// resolveDisplayOwnerRepo determines owner/repo display values with annotation notes.
+// This is a pure function — no I/O.
+func resolveDisplayOwnerRepo(cfgOwner, cfgRepo, detectedOwner, detectedRepo string) (owner, repo, ownerNote, repoNote string) {
+	owner, repo = cfgOwner, cfgRepo
+	if owner == "" {
+		owner = detectedOwner
+		if owner != "" {
+			ownerNote = " (auto-detected)"
+		}
+	}
+	if repo == "" {
+		repo = detectedRepo
+		if repo != "" {
+			repoNote = " (auto-detected)"
+		}
+	}
+	return
 }
 
 // frameworkDefaultJUnit returns the default junitxml glob for a framework.
