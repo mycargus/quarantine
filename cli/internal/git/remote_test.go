@@ -133,6 +133,17 @@ func TestParseGitHubURLSSHMissingOwner(t *testing.T) {
 	})
 }
 
+func TestParseGitHubURLHTTPSTrailingSlash(t *testing.T) {
+	_, _, err := git.ParseGitHubURL("https://github.com/owner/")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "an HTTPS URL with a trailing slash (empty repo segment)",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+}
+
 func TestParseGitHubURLHTTPSSinglePathComponent(t *testing.T) {
 	_, _, err := git.ParseGitHubURL("https://github.com/owner")
 

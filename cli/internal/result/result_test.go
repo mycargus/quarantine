@@ -73,6 +73,39 @@ func TestBuildEmptyTests(t *testing.T) {
 	})
 }
 
+func TestBuildAtUsesProvidedTimestamp(t *testing.T) {
+	meta := result.Metadata{
+		RunID: "run-1",
+		Repo:  "owner/repo",
+	}
+
+	res := result.BuildAt([]parser.TestResult{}, meta, "2026-01-15T10:00:00Z")
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "BuildAt called with timestamp 2026-01-15T10:00:00Z",
+		Should:   "use the provided timestamp",
+		Actual:   res.Timestamp,
+		Expected: "2026-01-15T10:00:00Z",
+	})
+}
+
+func TestBuildWithPRNumberNil(t *testing.T) {
+	meta := result.Metadata{
+		RunID:    "run-nil",
+		Repo:     "owner/repo",
+		PRNumber: nil,
+	}
+
+	res := result.BuildAt([]parser.TestResult{}, meta, "2026-01-01T00:00:00Z")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "BuildAt called with PRNumber nil",
+		Should:   "set PRNumber to nil on the result",
+		Actual:   res.PRNumber == nil,
+		Expected: true,
+	})
+}
+
 func TestBuildWithPRNumber(t *testing.T) {
 	n := 42
 	meta := result.Metadata{

@@ -179,6 +179,24 @@ func TestGetRepo404(t *testing.T) {
 	})
 }
 
+func TestGetRepo500(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(server.Close)
+
+	c := newTestClient(t, server.URL)
+	_, err := c.GetRepo(context.Background())
+
+	var apiErr *ghclient.APIError
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "GET /repos returns 500",
+		Should:   "return an APIError with status 500",
+		Actual:   errors.As(err, &apiErr) && apiErr.StatusCode == 500,
+		Expected: true,
+	})
+}
+
 func TestGetRepoInvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

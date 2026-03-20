@@ -41,14 +41,20 @@ type Entry struct {
 	QuarantinedBy   string `json:"quarantined_by"`
 }
 
+// NewEmptyStateAt returns an empty quarantine state with the given timestamp.
+// This is a pure function — no I/O.
+func NewEmptyStateAt(timestamp string) *State {
+	return &State{
+		Version:   1,
+		UpdatedAt: timestamp,
+		Tests:     make(map[string]Entry),
+	}
+}
+
 // NewEmptyState returns an empty quarantine state suitable for initial
 // creation.
 func NewEmptyState() *State {
-	return &State{
-		Version:   1,
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
-		Tests:     make(map[string]Entry),
-	}
+	return NewEmptyStateAt(time.Now().UTC().Format(time.RFC3339))
 }
 
 // ParseState reads and parses quarantine.json from a reader.
@@ -60,10 +66,16 @@ func ParseState(r io.Reader) (*State, error) {
 	return &state, nil
 }
 
+// MarshalAt serializes the state to JSON using the given timestamp.
+// This is a pure function — no I/O.
+func (s *State) MarshalAt(timestamp string) ([]byte, error) {
+	s.UpdatedAt = timestamp
+	return json.MarshalIndent(s, "", "  ")
+}
+
 // Marshal serializes the state to JSON.
 func (s *State) Marshal() ([]byte, error) {
-	s.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	return json.MarshalIndent(s, "", "  ")
+	return s.MarshalAt(time.Now().UTC().Format(time.RFC3339))
 }
 
 // AddTest adds or updates a quarantined test entry.
@@ -91,13 +103,13 @@ func (s *State) QuarantinedTestIDs() []string {
 	return ids
 }
 
-// Merge combines two states, producing a union of quarantined tests.
+// MergeAt combines two states using the given timestamp. Pure function — no I/O.
 // Per ADR-012, quarantine wins on conflict: if a test is quarantined in
 // either state, it remains quarantined in the merged result.
-func Merge(local, remote *State) *State {
+func MergeAt(local, remote *State, timestamp string) *State {
 	merged := &State{
 		Version:   1,
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		UpdatedAt: timestamp,
 		Tests:     make(map[string]Entry),
 	}
 
@@ -136,4 +148,11 @@ func Merge(local, remote *State) *State {
 	}
 
 	return merged
+}
+
+// Merge combines two states, producing a union of quarantined tests.
+// Per ADR-012, quarantine wins on conflict: if a test is quarantined in
+// either state, it remains quarantined in the merged result.
+func Merge(local, remote *State) *State {
+	return MergeAt(local, remote, time.Now().UTC().Format(time.RFC3339))
 }

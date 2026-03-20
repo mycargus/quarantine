@@ -574,6 +574,18 @@ framework: jest
 
 // --- ApplyDefaults does not overwrite already-set values ---
 
+func TestApplyDefaultsUnknownFramework(t *testing.T) {
+	cfg := &config.Config{Framework: "pytest"}
+	cfg.ApplyDefaults()
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a config with unknown framework 'pytest'",
+		Should:   "leave JUnitXML empty (no default for unknown framework)",
+		Actual:   cfg.JUnitXML,
+		Expected: "",
+	})
+}
+
 func TestApplyDefaultsDoesNotOverwriteJUnitXML(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1

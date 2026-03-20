@@ -1476,3 +1476,109 @@ func TestRepoString(t *testing.T) {
 		Expected: "",
 	})
 }
+
+// --- 2A: checkBranchExists with unresolvable owner/repo ---
+
+func TestCheckBranchExistsUnresolvableOwnerRepo(t *testing.T) {
+	// Change to a non-git temp directory so ParseRemote also fails.
+	dir := t.TempDir()
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+
+	cfg := &config.Config{} // empty github.owner / github.repo
+
+	_, err = checkBranchExists(cfg)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config with no owner/repo and cwd is not a git repo",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config with no owner/repo and cwd is not a git repo",
+		Should:   "error message contains 'not initialized'",
+		Actual:   strings.Contains(err.Error(), "not initialized"),
+		Expected: true,
+	})
+}
+
+// --- 2D: parseJUnitXML with invalid glob pattern ---
+
+func TestRunInvalidJUnitXMLGlob(t *testing.T) {
+	dir := t.TempDir()
+	scriptPath := writeTestScript(t, dir, "", "", 0)
+
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+github:
+  owner: testowner
+  repo: testrepo
+`)
+
+	server := fakeGitHubAPI(t, true)
+	defer server.Close()
+
+	output, _ := executeRunCmd(t, []string{
+		"--config", configPath,
+		"--junitxml", "[bad",
+		"--output", filepath.Join(dir, "results.json"),
+		"--", scriptPath,
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "invalid glob pattern '[bad'",
+		Should:   "print a WARNING about the invalid glob",
+		Actual:   strings.Contains(output, "WARNING"),
+		Expected: true,
+	})
+}
+
+// --- 2E: empty XML with non-zero exit code ---
+
+func TestRunEmptyXMLNonZeroExit(t *testing.T) {
+	dir := t.TempDir()
+	xmlPath := filepath.Join(dir, "junit.xml")
+	// Valid but empty XML: parser returns non-nil empty slice.
+	emptyXML := `<testsuites tests="0"></testsuites>`
+	scriptPath := writeTestScript(t, dir, xmlPath, emptyXML, 2)
+
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+github:
+  owner: testowner
+  repo: testrepo
+`)
+
+	server := fakeGitHubAPI(t, true)
+	defer server.Close()
+
+	exitCode := executeRunCmdWithExitCode(t, []string{
+		"--config", configPath,
+		"--junitxml", xmlPath,
+		"--output", filepath.Join(dir, "results.json"),
+		"--", scriptPath,
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "empty XML and test script exits with code 2",
+		Should:   "propagate runner's exit code (2)",
+		Actual:   exitCode,
+		Expected: 2,
+	})
+}
