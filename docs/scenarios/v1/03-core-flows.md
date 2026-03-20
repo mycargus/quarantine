@@ -232,3 +232,69 @@ issue closed). The suite also contains test C (deterministic pass), test D
 10. Exits with code 1 (test E is a genuine failure).
 
 ---
+
+### Scenario 67: Normal CI run with RSpec — all tests pass [M2]
+
+**Risk:** RSpec JUnit XML uses a different structure (classname-based file path extraction, no `file` attribute) that could silently produce incorrect test IDs or fail to parse, undetected because only Jest is tested end-to-end.
+
+**Given** the CLI is configured with `framework: rspec` and `junitxml: rspec.xml`
+in `quarantine.yml`, the `quarantine/state` branch exists, and all tests in the
+suite are deterministic
+
+**When** CI executes
+`quarantine run -- rspec --format RspecJunitFormatter --out rspec.xml`
+
+**Then** the CLI:
+1. Checks `quarantine/state` branch exists — OK.
+2. Runs the RSpec command. All tests pass.
+3. Parses the RSpec-formatted JUnit XML (`rspec.xml`). Extracts `file_path` from
+   the classname using RSpec-specific rules (per cli-spec.md).
+4. Constructs `test_id` as `file_path::classname::name` for each test case.
+5. Writes results to `.quarantine/results.json` with correct test counts and
+   `framework: "rspec"`.
+6. Exits with code 0.
+
+---
+
+### Scenario 68: Normal CI run with Vitest — all tests pass [M2]
+
+**Risk:** Vitest JUnit XML uses the suite `name` attribute for file path extraction, which differs from both Jest (explicit `file` attribute) and RSpec (classname-based). Incorrect parsing would produce wrong test IDs.
+
+**Given** the CLI is configured with `framework: vitest` and
+`junitxml: junit-report.xml` in `quarantine.yml`, the `quarantine/state` branch
+exists, and all tests in the suite are deterministic
+
+**When** CI executes `quarantine run -- vitest run --reporter=junit`
+
+**Then** the CLI:
+1. Checks `quarantine/state` branch exists — OK.
+2. Runs the Vitest command. All tests pass.
+3. Parses the Vitest-formatted JUnit XML (`junit-report.xml`). Extracts
+   `file_path` from the suite `name` attribute using Vitest-specific rules
+   (per cli-spec.md).
+4. Constructs `test_id` as `file_path::classname::name` for each test case.
+5. Writes results to `.quarantine/results.json` with correct test counts and
+   `framework: "vitest"`.
+6. Exits with code 0.
+
+---
+
+### Scenario 69: CI run with test failures — no retries [M2]
+
+**Risk:** Without retry logic (M3), the CLI might exit 0 on test failure or exit 2 (quarantine error) instead of correctly propagating exit 1 for test failures.
+
+**Given** the CLI is configured in CI, the `quarantine/state` branch exists, and
+one test in the suite has a genuine bug
+
+**When** CI executes
+`quarantine run -- jest --ci --reporters=default --reporters=jest-junit`
+and the test `CheckoutService > should apply discount` fails
+
+**Then** the CLI:
+1. Checks `quarantine/state` branch exists — OK.
+2. Runs the test suite. The runner exits non-zero.
+3. Parses the JUnit XML. Finds `should apply discount` with status `failed`.
+4. Writes results to `.quarantine/results.json` with `summary.failed: 1`.
+5. Exits with code 1 (test failure — not a quarantine error).
+
+---

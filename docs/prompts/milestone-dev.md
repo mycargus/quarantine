@@ -10,9 +10,9 @@ Use this prompt when implementing predefined milestones.
 ## Prompt
 
 ```
-Implement milestone N
+Implement milestone N.
 
-Before writing any code, read `docs/milestones/m{N}.md` in the current context and use an Explore subagent to answer the following:
+Before writing any code, read `docs/milestones/m{N}.md` in the current context and answer the following:
 - Do the acceptance scenarios cover all acceptance criteria? If no, you MUST flag any gaps.
 - Are there ambiguities or contradictions? If so, you MUST stop and ask.
 

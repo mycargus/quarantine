@@ -92,6 +92,42 @@ Treats this as "no XML produced" and exits with the test runner's exit code.
 
 ---
 
+### Scenario 70: Signal forwarding to child process [M2]
+
+**Risk:** If the CLI does not forward SIGINT/SIGTERM to the child test process, Ctrl-C in a terminal or CI cancellation leaves orphaned test runner processes consuming resources.
+
+**Given** the CLI is running `quarantine run -- jest --ci` and the test suite is
+mid-execution
+
+**When** the CLI process receives SIGINT (e.g., Ctrl-C) or SIGTERM (e.g., CI
+cancellation)
+
+**Then** the CLI:
+1. Forwards the signal to the child test runner process.
+2. Waits for the child process to exit.
+3. Does not attempt to parse JUnit XML (the run was interrupted).
+4. Exits with code 130 (SIGINT) or 143 (SIGTERM), matching standard Unix signal
+   exit conventions.
+
+---
+
+### Scenario 71: --retries CLI flag overrides config retries value [M2]
+
+**Risk:** A developer sets `retries: 1` in `quarantine.yml` for normal runs but
+wants to run a quick one-shot pass with `--retries 0` (or a different value) in
+a specific CI job. If the flag is silently ignored, retry behavior is wrong and
+the discrepancy is invisible.
+
+**Given** `quarantine.yml` contains `retries: 1`
+
+**When** the developer runs `quarantine run --retries 3 -- <test command>`
+
+**Then** the CLI uses `retries: 3` for this run (flag wins over config). The
+`results.json` artifact reflects `config.retry_count: 3`. Exits with code 0 if
+all tests pass.
+
+---
+
 ### Scenario 57: All tests in the suite are quarantined — Jest/Vitest [M4]
 
 **Risk:** Excluding all tests causes the test runner to report "no tests found" (exit non-zero), which the CLI misinterprets as a test failure and exits 1.
