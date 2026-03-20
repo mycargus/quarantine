@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Rejects writes that contain GitHub token patterns
 # Tokens must come from env vars only, never in config files
 
