@@ -47,6 +47,20 @@ func TestComputeSummary(t *testing.T) {
 		Actual:   result.ComputeSummary([]parser.TestResult{{Status: "unknown"}}),
 		Expected: result.Summary{Total: 1},
 	})
+
+	riteway.Assert(t, riteway.Case[result.Summary]{
+		Given:    "all failed tests",
+		Should:   "count all as failed",
+		Actual:   result.ComputeSummary([]parser.TestResult{{Status: "failed"}, {Status: "failed"}, {Status: "failed"}}),
+		Expected: result.Summary{Total: 3, Failed: 3},
+	})
+
+	riteway.Assert(t, riteway.Case[result.Summary]{
+		Given:    "all skipped tests",
+		Should:   "count all as skipped",
+		Actual:   result.ComputeSummary([]parser.TestResult{{Status: "skipped"}, {Status: "skipped"}}),
+		Expected: result.Summary{Total: 2, Skipped: 2},
+	})
 }
 
 func TestBuildEmptyTests(t *testing.T) {

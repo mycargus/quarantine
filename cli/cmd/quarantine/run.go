@@ -312,24 +312,26 @@ func mergeParseResults(attempts []parseAttempt) ([]parser.TestResult, []string) 
 // buildMetadata constructs result metadata from config and environment.
 func buildMetadata(cfg *config.Config) result.Metadata {
 	owner, repo := resolveOwnerRepo(cfg)
-
-	repoStr := repoString(owner, repo)
-
 	branch := getEnvOrGit("GITHUB_REF_NAME", "git", "rev-parse", "--abbrev-ref", "HEAD")
 	commitSHA := getEnvOrGit("GITHUB_SHA", "git", "rev-parse", "HEAD")
 	runID := os.Getenv("GITHUB_RUN_ID")
 	if runID == "" {
 		runID = fmt.Sprintf("local-%d", time.Now().UnixNano())
 	}
+	return assembleMetadata(owner, repo, branch, commitSHA, runID, cfg.Framework, cfg.Retries)
+}
 
+// assembleMetadata builds a Metadata struct from pre-resolved values.
+// This is a pure function — no I/O.
+func assembleMetadata(owner, repo, branch, commitSHA, runID, framework string, retries int) result.Metadata {
 	return result.Metadata{
 		RunID:      runID,
-		Repo:       repoStr,
+		Repo:       repoString(owner, repo),
 		Branch:     branch,
 		CommitSHA:  commitSHA,
 		CLIVersion: version,
-		Framework:  cfg.Framework,
-		RetryCount: cfg.Retries,
+		Framework:  framework,
+		RetryCount: retries,
 	}
 }
 

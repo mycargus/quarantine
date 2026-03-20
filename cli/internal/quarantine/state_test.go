@@ -534,6 +534,72 @@ func TestMergeBothEmpty(t *testing.T) {
 	})
 }
 
+func TestMergeLocalOnlyOneEntry(t *testing.T) {
+	local := quarantine.NewEmptyState()
+	local.AddTest(quarantine.Entry{
+		TestID:        "a::b::c",
+		FilePath:      "a",
+		Classname:     "b",
+		Name:          "c",
+		Suite:         "b",
+		FirstFlakyAt:  "2026-03-01T00:00:00Z",
+		LastFlakyAt:   "2026-03-10T00:00:00Z",
+		FlakyCount:    1,
+		QuarantinedAt: "2026-03-01T00:00:00Z",
+		QuarantinedBy: "cli-auto",
+	})
+	remote := quarantine.NewEmptyState()
+
+	merged := quarantine.MergeAt(local, remote, "2026-03-20T00:00:00Z")
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "local with one entry and an empty remote",
+		Should:   "produce a merged state with one test",
+		Actual:   len(merged.Tests),
+		Expected: 1,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "local with one entry and an empty remote",
+		Should:   "contain the local entry in the merged state",
+		Actual:   merged.HasTest("a::b::c"),
+		Expected: true,
+	})
+}
+
+func TestMergeRemoteOnlyOneEntry(t *testing.T) {
+	local := quarantine.NewEmptyState()
+	remote := quarantine.NewEmptyState()
+	remote.AddTest(quarantine.Entry{
+		TestID:        "d::e::f",
+		FilePath:      "d",
+		Classname:     "e",
+		Name:          "f",
+		Suite:         "e",
+		FirstFlakyAt:  "2026-03-05T00:00:00Z",
+		LastFlakyAt:   "2026-03-12T00:00:00Z",
+		FlakyCount:    1,
+		QuarantinedAt: "2026-03-05T00:00:00Z",
+		QuarantinedBy: "cli-auto",
+	})
+
+	merged := quarantine.MergeAt(local, remote, "2026-03-20T00:00:00Z")
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "an empty local and remote with one entry",
+		Should:   "produce a merged state with one test",
+		Actual:   len(merged.Tests),
+		Expected: 1,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "an empty local and remote with one entry",
+		Should:   "contain the remote entry in the merged state",
+		Actual:   merged.HasTest("d::e::f"),
+		Expected: true,
+	})
+}
+
 func TestRemoveTest(t *testing.T) {
 	s := quarantine.NewEmptyState()
 	s.AddTest(quarantine.Entry{TestID: "a::b::c"})

@@ -15,11 +15,9 @@ import (
 )
 
 // initTestServer creates a minimal mock GitHub API server for init tests.
-// It records the sequence of requests made against it.
 type initTestServer struct {
-	server       *httptest.Server
-	requests     []string // method + path for each request
-	defaultBranch string
+	server         *httptest.Server
+	defaultBranch  string
 	existingBranch bool // if true, GET /git/ref/heads/quarantine/state returns 200
 }
 
@@ -36,7 +34,6 @@ func newInitTestServer(t *testing.T, opts ...func(*initTestServer)) *initTestSer
 
 	// GET /repos/{owner}/{repo} — repo info
 	mux.HandleFunc("/repos/my-org/my-project", func(w http.ResponseWriter, r *http.Request) {
-		s.requests = append(s.requests, r.Method+" "+r.URL.Path)
 		if r.Method != http.MethodGet {
 			http.NotFound(w, r)
 			return
@@ -52,7 +49,6 @@ func newInitTestServer(t *testing.T, opts ...func(*initTestServer)) *initTestSer
 
 	// GET /repos/{owner}/{repo}/git/ref/heads/{branch}
 	mux.HandleFunc("/repos/my-org/my-project/git/ref/heads/", func(w http.ResponseWriter, r *http.Request) {
-		s.requests = append(s.requests, r.Method+" "+r.URL.Path)
 		if r.Method != http.MethodGet {
 			http.NotFound(w, r)
 			return
@@ -86,7 +82,6 @@ func newInitTestServer(t *testing.T, opts ...func(*initTestServer)) *initTestSer
 
 	// POST /repos/{owner}/{repo}/git/refs — create branch
 	mux.HandleFunc("/repos/my-org/my-project/git/refs", func(w http.ResponseWriter, r *http.Request) {
-		s.requests = append(s.requests, r.Method+" "+r.URL.Path)
 		if r.Method != http.MethodPost {
 			http.NotFound(w, r)
 			return
@@ -104,7 +99,6 @@ func newInitTestServer(t *testing.T, opts ...func(*initTestServer)) *initTestSer
 
 	// PUT /repos/{owner}/{repo}/contents/quarantine.json
 	mux.HandleFunc("/repos/my-org/my-project/contents/quarantine.json", func(w http.ResponseWriter, r *http.Request) {
-		s.requests = append(s.requests, r.Method+" "+r.URL.Path)
 		if r.Method != http.MethodPut {
 			http.NotFound(w, r)
 			return
