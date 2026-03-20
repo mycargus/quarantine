@@ -60,6 +60,17 @@ framework: jest
 	})
 }
 
+func TestLoadFileNotFound(t *testing.T) {
+	_, err := config.Load("/nonexistent/path/quarantine.yml")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a path that does not exist",
+		Should:   "return a non-nil error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+}
+
 func TestParseInvalidYAML(t *testing.T) {
 	yaml := `version: [unclosed`
 
