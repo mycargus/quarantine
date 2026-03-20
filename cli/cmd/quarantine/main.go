@@ -13,6 +13,10 @@ var version = "0.1.0"
 
 func main() {
 	if err := newRootCmd().Execute(); err != nil {
+		// Exit code 1 for test failures, 2 for quarantine errors.
+		if code, ok := err.(exitCodeError); ok {
+			os.Exit(int(code))
+		}
 		os.Exit(2)
 	}
 }
@@ -34,8 +38,7 @@ quarantine state on GitHub.`,
 	rootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		cmd.PrintErrln("Error:", err)
 		cmd.PrintErrln(cmd.UsageString())
-		os.Exit(2)
-		return nil
+		return err
 	})
 
 	rootCmd.AddCommand(newInitCmd())
@@ -67,12 +70,14 @@ state on GitHub.
 
 The -- separator is required. Everything after -- is treated as the test
 command and its arguments.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// TODO: Implement in M2.
-			fmt.Println("[quarantine] run is not yet implemented.")
-			return nil
-		},
+		RunE: runRun,
 	}
+
+	// Unknown flags in `run` likely mean the user forgot `--`.
+	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		cmd.PrintErrln(separatorErrorMsg)
+		return fmt.Errorf("missing separator")
+	})
 
 	// Flags will be added in M2-M5 as features are implemented.
 	cmd.Flags().String("config", "quarantine.yml", "Path to configuration file")
