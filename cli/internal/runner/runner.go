@@ -5,7 +5,11 @@ package runner
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
 )
 
 // Framework identifies a test framework supported by the CLI.
@@ -24,24 +28,39 @@ type RunResult struct {
 	Stderr   []byte
 }
 
-// Run executes the given test command and returns its result.
-func Run(ctx context.Context, command string, args []string) (*RunResult, error) {
+// Run executes the given test command, piping stdout and stderr to the
+// provided writers. Forwards SIGINT and SIGTERM to the child process.
+// Returns the exit code.
+func Run(ctx context.Context, command string, args []string, stdout, stderr io.Writer) (int, error) {
 	cmd := exec.CommandContext(ctx, command, args...)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 
-	output, err := cmd.CombinedOutput()
-	exitCode := 0
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
-		} else {
-			return nil, fmt.Errorf("failed to execute test command: %w", err)
-		}
+	if err := cmd.Start(); err != nil {
+		return -1, fmt.Errorf("failed to execute test command: %w", err)
 	}
 
-	return &RunResult{
-		ExitCode: exitCode,
-		Stdout:   output,
-	}, nil
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+
+	go func() {
+		for sig := range sigCh {
+			if cmd.Process != nil {
+				_ = cmd.Process.Signal(sig)
+			}
+		}
+	}()
+
+	err := cmd.Wait()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return exitErr.ExitCode(), nil
+		}
+		return -1, fmt.Errorf("failed to execute test command: %w", err)
+	}
+
+	return 0, nil
 }
 
 // RerunCommand returns the framework-specific command and arguments for
