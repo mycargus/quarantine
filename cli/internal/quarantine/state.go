@@ -69,8 +69,9 @@ func ParseState(r io.Reader) (*State, error) {
 // MarshalAt serializes the state to JSON using the given timestamp.
 // This is a pure function — no I/O.
 func (s *State) MarshalAt(timestamp string) ([]byte, error) {
-	s.UpdatedAt = timestamp
-	return json.MarshalIndent(s, "", "  ")
+	snapshot := *s
+	snapshot.UpdatedAt = timestamp
+	return json.MarshalIndent(&snapshot, "", "  ")
 }
 
 // Marshal serializes the state to JSON.

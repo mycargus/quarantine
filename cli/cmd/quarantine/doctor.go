@@ -7,6 +7,7 @@ import (
 
 	"github.com/mycargus/quarantine/internal/config"
 	"github.com/mycargus/quarantine/internal/git"
+	ghclient "github.com/mycargus/quarantine/internal/github"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +26,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	errs, warns := cfg.Validate()
 
 	// Check for GitHub token — append warning if missing.
-	if githubToken() == "" {
+	if ghclient.ResolveToken() == "" {
 		warns = append(warns, "No GitHub token found in environment. 'quarantine run' will fail unless QUARANTINE_GITHUB_TOKEN or GITHUB_TOKEN is set.")
 	}
 
@@ -49,7 +50,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	cmd.Printf("  framework:       %s\n", cfg.Framework)
 	cmd.Printf("  retries:         %d\n", cfg.Retries)
 
-	defaultJunit := frameworkDefaultJUnit(cfg.Framework)
+	defaultJunit := config.FrameworkDefaultJUnit(cfg.Framework)
 	junitxmlNote := ""
 	if cfg.JUnitXML == defaultJunit {
 		junitxmlNote = " (default)"
@@ -111,21 +112,4 @@ func resolveDisplayOwnerRepo(cfgOwner, cfgRepo, detectedOwner, detectedRepo stri
 	return
 }
 
-// frameworkDefaultJUnit returns the default junitxml glob for a framework.
-func frameworkDefaultJUnit(framework string) string {
-	defaults := map[string]string{
-		"jest":   "junit.xml",
-		"rspec":  "rspec.xml",
-		"vitest": "junit-report.xml",
-	}
-	return defaults[framework]
-}
-
-// githubToken resolves the GitHub token from environment variables.
-func githubToken() string {
-	if t := os.Getenv("QUARANTINE_GITHUB_TOKEN"); t != "" {
-		return t
-	}
-	return os.Getenv("GITHUB_TOKEN")
-}
 
