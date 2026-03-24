@@ -1,6 +1,7 @@
 # CLI (Go)
 bin/
 cli/quarantine
+.quarantine/
 
 # Dashboard (TypeScript)
 dashboard/node_modules/
