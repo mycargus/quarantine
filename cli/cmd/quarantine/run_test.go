@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mycargus/quarantine/internal/config"
 	riteway "github.com/mycargus/riteway-golang"
 )
 
@@ -206,6 +207,39 @@ framework: jest
 		Given:    "a typo in the test command (jset instead of jest)",
 		Should:   "print command not found error with the command name",
 		Actual:   strings.Contains(output, `command not found: "jset"`),
+		Expected: true,
+	})
+}
+
+// --- 2A: checkBranchExists with unresolvable owner/repo ---
+
+func TestCheckBranchExistsUnresolvableOwnerRepo(t *testing.T) {
+	// Change to a non-git temp directory so ParseRemote also fails.
+	dir := t.TempDir()
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+
+	cfg := &config.Config{} // empty github.owner / github.repo
+
+	_, err = checkBranchExists(cfg)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config with no owner/repo and cwd is not a git repo",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config with no owner/repo and cwd is not a git repo",
+		Should:   "error message contains 'not initialized'",
+		Actual:   strings.Contains(err.Error(), "not initialized"),
 		Expected: true,
 	})
 }
