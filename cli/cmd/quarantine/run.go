@@ -71,6 +71,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 		cfg.JUnitXML = junitxmlFlag
 	}
 	if retriesFlag != 0 {
+		if retriesFlag < 1 || retriesFlag > 10 {
+			cmd.PrintErrf("Error: --retries value %d is out of range. Must be between 1 and 10.\n", retriesFlag)
+			return fmt.Errorf("retries out of range")
+		}
 		cfg.Retries = retriesFlag
 	}
 
@@ -144,9 +148,12 @@ func runRun(cmd *cobra.Command, args []string) error {
 		testResults = []parser.TestResult{}
 	}
 
+	// Retry failing tests individually.
+	retryOutcomes := retryFailingTests(ctx, testResults, cfg)
+
 	// Build results.
 	meta := buildMetadata(cfg)
-	res := result.Build(testResults, meta)
+	res := result.BuildWithRetries(testResults, retryOutcomes, meta)
 
 	// Write results.json.
 	outputPath, _ := cmd.Flags().GetString("output")
@@ -163,6 +170,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		cmd.PrintErrf("  Passed:          %d\n", res.Summary.Passed)
 		cmd.PrintErrf("  Failed:          %d\n", res.Summary.Failed)
 		cmd.PrintErrf("  Skipped:         %d\n", res.Summary.Skipped)
+		cmd.PrintErrf("  Flaky:           %d\n", res.Summary.FlakyDetected)
 	}
 
 	// Determine exit code based on test results.
@@ -177,6 +185,52 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// retryFailingTests reruns each failed test individually up to cfg.Retries times.
+// Returns a map of TestID -> RetryOutcome for tests that were retried.
+// Exits the retry loop early for each test on the first passing attempt.
+func retryFailingTests(ctx context.Context, tests []parser.TestResult, cfg *config.Config) map[string]result.RetryOutcome {
+	outcomes := make(map[string]result.RetryOutcome)
+
+	for _, t := range tests {
+		if t.Status != "failed" && t.Status != "error" {
+			continue
+		}
+
+		rerunCmd, rerunArgs := runner.RerunCommand(
+			runner.Framework(cfg.Framework),
+			t.Name, t.Classname, t.FilePath,
+			cfg.RerunCommand,
+		)
+
+		var attempts []result.RetryEntry
+		for attempt := 1; attempt <= cfg.Retries; attempt++ {
+			rerunExitCode, runErr := runner.Run(ctx, rerunCmd, rerunArgs, os.Stdout, os.Stderr)
+			if runErr != nil {
+				attempts = append(attempts, result.RetryEntry{
+					Attempt: attempt,
+					Status:  "failed",
+				})
+				continue
+			}
+			status := "failed"
+			if rerunExitCode == 0 {
+				status = "passed"
+			}
+			attempts = append(attempts, result.RetryEntry{
+				Attempt: attempt,
+				Status:  status,
+			})
+			if status == "passed" {
+				break
+			}
+		}
+
+		outcomes[t.TestID] = result.RetryOutcome{Attempts: attempts}
+	}
+
+	return outcomes
 }
 
 // branchCheckResult holds the result of a branch existence check.

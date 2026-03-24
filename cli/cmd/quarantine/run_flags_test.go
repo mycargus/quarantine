@@ -345,3 +345,113 @@ framework: jest
 		Expected: true,
 	})
 }
+
+// --- AC7: --retries flag range validation ---
+
+func TestRunRetriesAboveMaxExitsTwo(t *testing.T) {
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+`)
+
+	exitCode := executeRunCmdWithExitCode(t, []string{
+		"--config", configPath,
+		"--retries", "11",
+		"--", "echo", "hi",
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "--retries 11 (above maximum of 10)",
+		Should:   "exit with code 2 (quarantine error)",
+		Actual:   exitCode,
+		Expected: 2,
+	})
+}
+
+func TestRunRetriesBelowMinExitsTwo(t *testing.T) {
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+`)
+
+	exitCode := executeRunCmdWithExitCode(t, []string{
+		"--config", configPath,
+		"--retries", "-1",
+		"--", "echo", "hi",
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "--retries -1 (below minimum of 1)",
+		Should:   "exit with code 2 (quarantine error)",
+		Actual:   exitCode,
+		Expected: 2,
+	})
+}
+
+func TestRunRetriesOneIsValid(t *testing.T) {
+	dir := t.TempDir()
+	xmlPath := filepath.Join(dir, "junit.xml")
+	scriptPath := writeTestScript(t, dir, xmlPath, `<?xml version="1.0"?><testsuites tests="1"><testsuite name="s.test.js" tests="1"><testcase classname="S" name="t" file="s.test.js" time="0.001"></testcase></testsuite></testsuites>`, 0)
+
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+`)
+
+	server := fakeGitHubAPI(t, true)
+	defer server.Close()
+
+	exitCode := executeRunCmdWithExitCode(t, []string{
+		"--config", configPath,
+		"--junitxml", xmlPath,
+		"--output", filepath.Join(dir, "results.json"),
+		"--retries", "1",
+		"--", scriptPath,
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "--retries 1 (minimum valid value)",
+		Should:   "exit with code 0 (valid flag)",
+		Actual:   exitCode,
+		Expected: 0,
+	})
+}
+
+func TestRunRetriesTenIsValid(t *testing.T) {
+	dir := t.TempDir()
+	xmlPath := filepath.Join(dir, "junit.xml")
+	scriptPath := writeTestScript(t, dir, xmlPath, `<?xml version="1.0"?><testsuites tests="1"><testsuite name="s.test.js" tests="1"><testcase classname="S" name="t" file="s.test.js" time="0.001"></testcase></testsuite></testsuites>`, 0)
+
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+`)
+
+	server := fakeGitHubAPI(t, true)
+	defer server.Close()
+
+	exitCode := executeRunCmdWithExitCode(t, []string{
+		"--config", configPath,
+		"--junitxml", xmlPath,
+		"--output", filepath.Join(dir, "results.json"),
+		"--retries", "10",
+		"--", scriptPath,
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "--retries 10 (maximum valid value)",
+		Should:   "exit with code 0 (valid flag)",
+		Actual:   exitCode,
+		Expected: 0,
+	})
+}

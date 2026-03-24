@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 )
 
@@ -63,17 +64,34 @@ func Run(ctx context.Context, command string, args []string, stdout, stderr io.W
 	return 0, nil
 }
 
+// jestRegexSpecialChars lists the regex special characters that must be
+// escaped in Jest --testNamePattern values. Backslash is listed first so
+// that added escape characters are not re-escaped.
+var jestRegexSpecialChars = []string{"\\", ".", "(", ")", "[", "]"}
+
+// EscapeJestPattern escapes regex special characters in a Jest test name so it
+// can be passed safely to --testNamePattern.
+// This is a pure function — no I/O.
+func EscapeJestPattern(name string) string {
+	for _, ch := range jestRegexSpecialChars {
+		name = strings.ReplaceAll(name, ch, `\`+ch)
+	}
+	return name
+}
+
 // RerunCommand returns the framework-specific command and arguments for
 // rerunning a single failed test.
 func RerunCommand(fw Framework, name, classname, file, customTemplate string) (string, []string) {
 	if customTemplate != "" {
-		// TODO: Implement placeholder substitution for custom rerun_command.
-		return customTemplate, nil
+		result := strings.ReplaceAll(customTemplate, "{name}", name)
+		result = strings.ReplaceAll(result, "{classname}", classname)
+		result = strings.ReplaceAll(result, "{file}", file)
+		return result, nil
 	}
 
 	switch fw {
 	case Jest:
-		return "jest", []string{"--testNamePattern", name}
+		return "jest", []string{"--testNamePattern", EscapeJestPattern(name)}
 	case RSpec:
 		return "rspec", []string{"-e", name}
 	case Vitest:

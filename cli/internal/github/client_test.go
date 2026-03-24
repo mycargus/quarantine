@@ -422,41 +422,37 @@ func TestPutContentsNonOKStatus(t *testing.T) {
 	})
 }
 
-func TestPutContentsEmptySHAOmitsField(t *testing.T) {
-	var requestBody map[string]interface{}
+func TestPutContentsWithoutSHAConflictsWhenFileAlreadyExists(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewDecoder(r.Body).Decode(&requestBody)
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(http.StatusConflict)
 	}))
 	t.Cleanup(server.Close)
 
 	c := newTestClient(t, server.URL)
-	_ = c.PutContents(context.Background(), "quarantine.json", "init", []byte(`{}`), "")
+	err := c.PutContents(context.Background(), "quarantine.json", "init", []byte(`{}`), "")
 
-	_, hasSHA := requestBody["sha"]
+	var apiErr *ghclient.APIError
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "PutContents called with empty sha",
-		Should:   "omit 'sha' field from request body",
-		Actual:   hasSHA,
-		Expected: false,
+		Given:    "PutContents called without sha and server responds with 409",
+		Should:   "return a conflict error",
+		Actual:   errors.As(err, &apiErr) && apiErr.StatusCode == 409,
+		Expected: true,
 	})
 }
 
-func TestPutContentsNonEmptySHAIncludesField(t *testing.T) {
-	var requestBody map[string]interface{}
+func TestPutContentsWithValidSHASucceeds(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewDecoder(r.Body).Decode(&requestBody)
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(server.Close)
 
 	c := newTestClient(t, server.URL)
-	_ = c.PutContents(context.Background(), "quarantine.json", "update", []byte(`{}`), "abc123")
+	err := c.PutContents(context.Background(), "quarantine.json", "update", []byte(`{}`), "abc123")
 
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "PutContents called with non-empty sha 'abc123'",
-		Should:   "include 'sha' field in request body",
-		Actual:   requestBody["sha"] == "abc123",
-		Expected: true,
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "PutContents called with a valid sha and server responds with 200",
+		Should:   "return no error",
+		Actual:   err,
+		Expected: nil,
 	})
 }
