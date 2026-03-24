@@ -123,7 +123,7 @@ Phase 1 is sequential. Each milestone builds on the prior one. A single agent
    passes.
 5. Unit tests cover: config parsing and validation (all fields, all error
    cases), token resolution, git remote parsing.
-6. Integration test: `quarantine init` against a real GitHub repo creates the
+6. E2E test: `quarantine init` against a real GitHub repo creates the
    branch and file.
 
 **Key implementation notes:**
@@ -379,7 +379,7 @@ ensures compatibility when integrated.
 9. Unit tests cover: quarantine state read/write/merge, CAS retry logic,
    framework-specific exclusion flag construction, exclude pattern matching,
    degraded mode behavior, exit code determination with quarantine state.
-10. Integration test: full flow against a real GitHub repo with a known-flaky
+10. E2E test: full flow against a real GitHub repo with a known-flaky
     test.
 
 **Key implementation notes:**
@@ -478,7 +478,7 @@ ensures compatibility when integrated.
 9. Unit tests cover: issue body template rendering, PR comment template
    rendering with all conditional sections, dedup search query construction,
    `test_hash` generation, PR number detection from `GITHUB_EVENT_PATH`.
-10. Integration test: full end-to-end against a real GitHub repo and PR.
+10. E2E test: full end-to-end against a real GitHub repo and PR.
 
 **Key implementation notes:**
 
