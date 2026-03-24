@@ -20,8 +20,8 @@ Then work through the manifest one scenario at a time:
 
 1. TDD. `/mikey:tdd --validate <scenario-file>`
 2. Validate. `/mikey:testify <path> --with-design` — you MUST fix all issues before moving on.
-3. Lint and Test. `make lint-all` and carefully consider whether to fix the issues the way the linter suggests. `make 
-4. Commit. `git commit -m "milestone {N}: <rest of commit message`
+3. Lint and Test. `make lint-all` and carefully consider whether to fix the issues the way the linter suggests.
+4. Commit. `git commit -m "milestone {N}: <rest of commit message>`
 5. Verify. `/verify-milestone {N}` when all scenarios are done. You MUST fix failures before reporting completion.
 6. Report. Summarize what was implemented, what was verified, and any deviations from the manifest.
 
