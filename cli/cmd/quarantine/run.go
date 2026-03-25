@@ -229,6 +229,35 @@ func runRun(cmd *cobra.Command, args []string) error {
 		printDryRunSummary(cmd, res)
 	}
 
+	// Create GitHub issues for newly detected flaky tests and post PR comment.
+	if !dryRun && ghClient != nil {
+		prFlag, _ := cmd.Flags().GetInt("pr")
+		eventPath := os.Getenv("GITHUB_EVENT_PATH")
+		prNumber, _ := detectPRNumber(prFlag, eventPath)
+
+		branch := meta.Branch
+		commitSHA := meta.CommitSHA
+
+		issueRefs := createIssuesForNewFlakyTests(ctx, cmd, ghClient, res, excludePatterns, branch, commitSHA, prNumber)
+
+		prCommentEnabled := cfg.Notifications.GitHubPRComment == nil || *cfg.Notifications.GitHubPRComment
+		if prCommentEnabled {
+			flakyEntries := buildFlakyEntries(res, issueRefs)
+			commentData := PRCommentData{
+				Total:         res.Summary.Total,
+				Passed:        res.Summary.Passed,
+				Failed:        res.Summary.Failed,
+				Flaky:         res.Summary.FlakyDetected,
+				Quarantined:   res.Summary.Quarantined,
+				Unquarantined: len(removedTestIDs),
+				Version:       version,
+				NewlyFlaky:    flakyEntries,
+			}
+			commentBody := renderPRComment(commentData)
+			postOrUpdatePRComment(ctx, cmd, ghClient, prNumber, commentBody)
+		}
+	}
+
 	// Warn when all tests are quarantined (nothing meaningful ran or all suppressed).
 	// Only fire when quarantine state was loaded and had entries — otherwise
 	// Total==0 could just mean an empty test suite or degraded mode.
