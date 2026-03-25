@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -383,7 +384,12 @@ func writeUpdatedQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *c
 	branch := cfg.Storage.Branch
 	reQuarantined, writeErr := cas.WriteStateWithCAS(ctx, client, state, content, sha, branch, 3, removedTestIDs)
 	if writeErr != nil {
-		cmd.PrintErrf("[quarantine] WARNING: Cannot write quarantine state: %v\n", writeErr)
+		var apiErr *gh.APIError
+		if errors.As(writeErr, &apiErr) && apiErr.StatusCode == 403 {
+			cmd.PrintErrf("[quarantine] WARNING: Branch '%s' is protected. Quarantine state saved to Actions cache. A workflow with write access must apply the update.\n", branch)
+		} else {
+			cmd.PrintErrf("[quarantine] WARNING: Cannot write quarantine state: %v\n", writeErr)
+		}
 	}
 	for _, testID := range reQuarantined {
 		cmd.PrintErrf("[quarantine] WARNING: Test '%s' was unquarantined (issue closed) but re-quarantined due to concurrent update. It will be unquarantined on the next build.\n", testID)
