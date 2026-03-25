@@ -16,12 +16,25 @@ Before writing any code, read `docs/milestones/m{N}.md` in the current context a
 - Do the acceptance scenarios cover all acceptance criteria? If no, you MUST flag any gaps.
 - Are there ambiguities or contradictions? If so, you MUST stop and ask.
 
-Then work through the manifest one scenario at a time:
+Then work through the manifest ONE SCENARIO AT A TIME:
 
-1. TDD. `/mikey:tdd --validate <scenario-file>`
+1. TDD. `/mikey:tdd --validate <scenario-file>#<scenario-number>`
+   - ONE scenario per invocation. Do NOT batch multiple scenarios.
+   - Batching defeats the Red-Green-Refactor discipline of TDD.
+   - Start with integration or e2e tests. They catch real issues faster
+     than unit tests and drive better design. Add unit tests for pure
+     functions extracted during the Refactor step.
 2. Validate. `/mikey:testify <path> --with-design` — you MUST fix all issues before moving on.
-3. Lint and Test. `make lint-all` and carefully consider whether to fix the issues the way the linter suggests.
-4. Commit. `git commit -m "milestone {N}: <rest of commit message>`
+3. Commit. Every chunk of work MUST be committed with a passing build:
+   - `make cli-build && make cli-test && make cli-lint` (CLI milestones)
+   - `make dash-build && make dash-test && make dash-lint` (dashboard milestones)
+   - Commit message: `milestone {N}: <description of what changed>`
+   - Each commit is a safe rollback point. Never accumulate uncommitted work
+     across multiple scenarios.
+4. E2E. Run `make e2e-test` after the first scenario that touches GitHub API
+   integration. Do NOT wait until the end — e2e tests catch issues that
+   unit and integration tests miss (API caching, shell execution, real
+   network behavior).
 5. Verify. `/verify-milestone {N}` when all scenarios are done. You MUST fix failures before reporting completion.
 6. Report. Summarize what was implemented, what was verified, and any deviations from the manifest.
 

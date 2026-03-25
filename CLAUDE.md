@@ -5,13 +5,14 @@ Flaky test detection and quarantine for CI pipelines. Go CLI + React dashboard.
 ## Commands
 
 ```bash
-make test-all          # Run all tests (CLI + dashboard)
+make test-all          # Run all tests (CLI + dashboard + e2e)
 make cli-build         # Build CLI binary to bin/quarantine
 make cli-test          # Go tests
 make cli-lint          # golangci-lint
 make dash-build        # Dashboard production build
 make dash-test         # Dashboard tests
 make dash-lint         # Biome lint
+make e2e-test          # E2E tests (requires e2e/.env with GitHub credentials)
 ```
 
 ## Architecture
@@ -65,3 +66,4 @@ Do not expand without discussion:
 - Do not make assumptions -- verify APIs, fields, and features exist in official docs first.
 - Admit when you're not sure. Ask clarification questions.
 - Consult `docs/` before making design decisions.
+- Do not use milestone identifiers (M1, M2, etc.) in file names, code comments, or variable names. The only acceptable place is the `milestone N:` prefix in git commit subjects.
