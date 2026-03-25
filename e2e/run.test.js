@@ -17,6 +17,7 @@ import { describe, test, beforeAll, beforeEach, afterEach } from 'vitest'
 import { assert } from 'riteway/vitest'
 import {
   mkdtempSync,
+  mkdirSync,
   rmSync,
   readFileSync,
   writeFileSync,
@@ -85,6 +86,7 @@ async function writeFileOnBranch(filePath, content, sha, message) {
 }
 
 async function resetQuarantineState() {
+  // Always read the current SHA first — the CLI may have updated the file.
   const file = await getFileOnBranch(STATE_FILE)
   const emptyState = JSON.stringify(
     { version: 1, updated_at: new Date().toISOString(), tests: {} },
@@ -97,6 +99,41 @@ async function resetQuarantineState() {
     file?.sha,
     'test: reset quarantine state',
   )
+}
+
+async function createBranchWithEmptyState() {
+  // Resolve the default branch SHA to use as the base.
+  const repoRes = await ghRequest('GET', '')
+  if (repoRes.status !== 200) {
+    const text = await repoRes.text()
+    throw new Error(`createBranchWithEmptyState: GET repo failed ${repoRes.status}: ${text}`)
+  }
+  const { default_branch: defaultBranch } = await repoRes.json()
+
+  const refRes = await ghRequest('GET', `/git/ref/heads/${defaultBranch}`)
+  if (refRes.status !== 200) {
+    const text = await refRes.text()
+    throw new Error(`createBranchWithEmptyState: GET ref failed ${refRes.status}: ${text}`)
+  }
+  const { object: { sha } } = await refRes.json()
+
+  // Create the quarantine/state branch.
+  const createRes = await ghRequest('POST', '/git/refs', {
+    ref: `refs/heads/${BRANCH}`,
+    sha,
+  })
+  if (createRes.status !== 201) {
+    const text = await createRes.text()
+    throw new Error(`createBranchWithEmptyState: create ref failed ${createRes.status}: ${text}`)
+  }
+
+  // Write an empty quarantine.json to the new branch.
+  const emptyState = JSON.stringify(
+    { version: 1, updated_at: new Date().toISOString(), tests: {} },
+    null,
+    2,
+  )
+  await writeFileOnBranch(STATE_FILE, emptyState, null, 'chore: initialize quarantine state')
 }
 
 // --- Local setup helpers ---
@@ -143,18 +180,19 @@ describe('quarantine run — E2E against real GitHub', () => {
 
   beforeAll(async () => {
     if (!(await branchExists())) {
-      throw new Error(
-        "quarantine/state branch does not exist. Run 'quarantine init' against the test fixture first.",
-      )
+      await createBranchWithEmptyState()
     }
   })
 
-  beforeEach(async () => {
+  beforeEach(() => {
     dir = createWorkDir()
-    await resetQuarantineState()
+    // State is already clean: afterEach of the previous test resets it,
+    // and beforeAll ensures the branch exists with an empty initial state.
   })
 
   afterEach(async () => {
+    // Reset state before cleanup so the next test always starts clean,
+    // regardless of what the CLI wrote during this test.
     await resetQuarantineState()
     if (dir) {
       rmSync(dir, { recursive: true, force: true })
@@ -227,15 +265,19 @@ describe('quarantine run — E2E against real GitHub', () => {
 
   // -----------------------------------------------------------------------
   // Scenario: Flaky test detected — quarantine.json updated on GitHub
+  //
+  // The main run script writes a failing JUnit XML and exits 1.
+  // A fake `jest` binary on PATH exits 0 on each retry invocation —
+  // simulating the test passing individually without needing a real runner.
+  // The CLI's default Jest rerun command (`jest --testNamePattern "..."`)
+  // picks up the fake binary via the prepended PATH.
   // -----------------------------------------------------------------------
 
   describe('flaky test detected', () => {
     test('adds the flaky test to quarantine.json on the GitHub branch', async () => {
-      // The main run script writes a failing JUnit XML and exits 1.
-      // A separate retry script (via rerun_command) just exits 0 — simulating
-      // the test passing on individual retry without needing a real test runner.
       const xmlPath = join(dir, 'junit.xml')
 
+      // Main run: write failing XML and exit 1.
       makeScript(
         dir,
         'fake-jest-main',
@@ -252,15 +294,12 @@ XMLEOF
 exit 1`,
       )
 
-      const retryScriptPath = makeScript(dir, 'fake-jest-retry', 'exit 0')
+      // Fake `jest` binary on PATH: always exits 0 (successful retry).
+      const binDir = join(dir, 'bin')
+      mkdirSync(binDir)
+      makeScript(binDir, 'jest', 'exit 0')
 
-      writeConfig(
-        dir,
-        `version: 1
-framework: jest
-rerun_command: "${retryScriptPath} {name}"
-`,
-      )
+      writeConfig(dir, 'version: 1\nframework: jest\n')
 
       const resultsPath = join(dir, 'results.json')
       const mainScriptPath = join(dir, 'fake-jest-main')
@@ -271,7 +310,9 @@ rerun_command: "${retryScriptPath} {name}"
         '--junitxml', xmlPath,
         '--output', resultsPath,
         '--', mainScriptPath,
-      ])
+      ], {
+        PATH: `${binDir}:${process.env.PATH}`,
+      })
 
       assert({
         given: 'quarantine run detecting a flaky test (fails first, passes on retry)',
@@ -348,7 +389,7 @@ rerun_command: "${retryScriptPath} {name}"
       )
 
       // JUnit XML contains only the non-quarantined test
-      // (the quarantined test was excluded from execution).
+      // (the quarantined one was excluded from execution by the CLI).
       const xmlPath = join(dir, 'junit.xml')
       writeFileSync(
         xmlPath,

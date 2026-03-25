@@ -23,5 +23,8 @@ if (existsSync(envFile)) {
 export default defineConfig({
   test: {
     testTimeout: 120_000,
+    // Run test files sequentially — all e2e suites share the same GitHub
+    // repo state and would race if run in parallel.
+    fileParallelism: false,
   },
 })
