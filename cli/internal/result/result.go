@@ -168,6 +168,8 @@ func BuildAtWithRetries(tests []parser.TestResult, retries map[string]RetryOutco
 			summary.Skipped++
 		case "flaky":
 			summary.FlakyDetected++
+		case "quarantined":
+			summary.Quarantined++
 		}
 
 		entries[i] = entry
