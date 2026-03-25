@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,10 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mycargus/quarantine/internal/cas"
 	"github.com/mycargus/quarantine/internal/config"
 	"github.com/mycargus/quarantine/internal/git"
 	gh "github.com/mycargus/quarantine/internal/github"
 	"github.com/mycargus/quarantine/internal/parser"
+	qstate "github.com/mycargus/quarantine/internal/quarantine"
 	"github.com/mycargus/quarantine/internal/result"
 	"github.com/mycargus/quarantine/internal/runner"
 	"github.com/spf13/cobra"
@@ -120,12 +123,29 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("not initialized")
 	}
 
+	ctx := context.Background()
+
+	// M4: Read quarantine state from the quarantine/state branch.
+	qState, qStateContent, qStateSHA := loadQuarantineState(ctx, cmd, cfg)
+
+	// M4: Batch-check closed issues and remove unquarantined tests from in-memory state.
+	if qState != nil {
+		removeUnquarantinedTests(ctx, cmd, cfg, qState)
+	}
+
+	// M4: Augment the test command with framework-specific exclusion flags.
+	if qState != nil && qState.Tests != nil {
+		exclusionArgs := buildExclusionArgsFromState(runner.Framework(cfg.Framework), qState)
+		if len(exclusionArgs) > 0 {
+			testArgs = append(testArgs, exclusionArgs...)
+		}
+	}
+
 	// Execute test command.
 	if !quiet {
 		cmd.PrintErrf("[quarantine] Running: %s %s\n", testCmd, strings.Join(testArgs, " "))
 	}
 
-	ctx := context.Background()
 	exitCode, runErr := runner.Run(ctx, testCmd, testArgs, os.Stdout, os.Stderr)
 	if runErr != nil {
 		cmd.PrintErrf("[quarantine] WARNING: Failed to execute test command: %v\n", runErr)
@@ -148,12 +168,24 @@ func runRun(cmd *cobra.Command, args []string) error {
 		testResults = []parser.TestResult{}
 	}
 
-	// Retry failing tests individually.
+	// M4: For RSpec, apply post-execution filtering to suppress quarantined failures.
+	if qState != nil && runner.Framework(cfg.Framework) == runner.RSpec {
+		testResults = qstate.FilterQuarantinedFailures(testResults, qState)
+	}
+
+	// Retry failing tests individually (skip quarantined tests).
 	retryOutcomes := retryFailingTests(ctx, testResults, cfg)
 
 	// Build results.
 	meta := buildMetadata(cfg)
 	res := result.BuildWithRetries(testResults, retryOutcomes, meta)
+
+	// M4: Add newly detected flaky tests to quarantine state and write via CAS.
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	if qState != nil && !dryRun {
+		addNewFlakyTests(qState, res)
+		writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA)
+	}
 
 	// Write results.json.
 	outputPath, _ := cmd.Flags().GetString("output")
@@ -185,6 +217,156 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// loadQuarantineState reads the quarantine.json file from the quarantine/state branch.
+// Returns nil state on error (degraded mode — operation continues without quarantine awareness).
+// Also returns raw content and SHA for subsequent CAS writes.
+func loadQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *config.Config) (*qstate.State, []byte, string) {
+	owner, repo := resolveOwnerRepo(cfg)
+	if owner == "" || repo == "" {
+		return nil, nil, ""
+	}
+
+	client, err := gh.NewClient(owner, repo)
+	if err != nil {
+		cmd.PrintErrf("[quarantine] WARNING: Cannot load quarantine state: %v\n", err)
+		return nil, nil, ""
+	}
+	client.SetRateLimitWarningFunc(func(msg string) {
+		cmd.PrintErrln(msg)
+	})
+
+	branch := cfg.Storage.Branch
+	content, sha, err := client.GetContents(ctx, "quarantine.json", branch)
+	if err != nil {
+		cmd.PrintErrf("[quarantine] WARNING: Cannot read quarantine state: %v. Continuing in degraded mode.\n", err)
+		return nil, nil, ""
+	}
+
+	if len(content) == 0 {
+		// File not found — use empty state.
+		return qstate.NewEmptyState(), nil, ""
+	}
+
+	state, err := qstate.ParseState(bytes.NewReader(content))
+	if err != nil {
+		cmd.PrintErrf("[quarantine] WARNING: Cannot parse quarantine state: %v. Continuing in degraded mode.\n", err)
+		return nil, nil, ""
+	}
+
+	return state, content, sha
+}
+
+// removeUnquarantinedTests batch-checks issue status and removes tests whose
+// issues are closed from the in-memory quarantine state.
+func removeUnquarantinedTests(ctx context.Context, cmd *cobra.Command, cfg *config.Config, state *qstate.State) {
+	owner, repo := resolveOwnerRepo(cfg)
+	if owner == "" || repo == "" {
+		return
+	}
+
+	client, err := gh.NewClient(owner, repo)
+	if err != nil {
+		cmd.PrintErrf("[quarantine] WARNING: Cannot check issue status: %v. Quarantine state unchanged.\n", err)
+		return
+	}
+
+	label := "quarantine"
+	if len(cfg.Labels) > 0 {
+		label = cfg.Labels[0]
+	}
+
+	closedNumbers, _, _, searchErr := client.SearchClosedIssues(ctx, label)
+	if searchErr != nil {
+		cmd.PrintErrf("[quarantine] WARNING: Cannot check issue status: %v. Quarantine state unchanged.\n", searchErr)
+		return
+	}
+
+	closedSet := make(map[int]bool, len(closedNumbers))
+	for _, n := range closedNumbers {
+		closedSet[n] = true
+	}
+
+	for testID, entry := range state.Tests {
+		if entry.IssueNumber != nil && closedSet[*entry.IssueNumber] {
+			state.RemoveTest(testID)
+		}
+	}
+}
+
+// buildExclusionArgsFromState returns the framework-specific exclusion flags
+// for tests in the quarantine state. Pure logic wrapped in I/O context.
+// This is a thin adapter — pure function is in runner.BuildExclusionArgs.
+func buildExclusionArgsFromState(fw runner.Framework, state *qstate.State) []string {
+	entries := make([]qstate.Entry, 0, len(state.Tests))
+	for _, e := range state.Tests {
+		entries = append(entries, e)
+	}
+	return runner.BuildExclusionArgs(fw, entries)
+}
+
+// addNewFlakyTests adds newly detected flaky tests from the run results to the
+// quarantine state. A test is newly flaky if it is not already in the state
+// and its result status is "flaky".
+func addNewFlakyTests(state *qstate.State, res result.Result) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	for _, t := range res.Tests {
+		if t.Status != "flaky" {
+			continue
+		}
+		if state.HasTest(t.TestID) {
+			// Already quarantined — update last_flaky_at and flaky count.
+			entry := state.Tests[t.TestID]
+			entry.LastFlakyAt = now
+			entry.FlakyCount++
+			state.AddTest(entry)
+			continue
+		}
+		// New flaky test — add to state.
+		state.AddTest(qstate.Entry{
+			TestID:        t.TestID,
+			FilePath:      t.FilePath,
+			Classname:     t.Classname,
+			Name:          t.Name,
+			FirstFlakyAt:  now,
+			LastFlakyAt:   now,
+			FlakyCount:    1,
+			QuarantinedAt: now,
+			QuarantinedBy: "auto",
+		})
+	}
+}
+
+// writeUpdatedQuarantineState writes the updated quarantine state to GitHub via CAS.
+// On error, logs a warning (degraded mode — never breaks the build).
+func writeUpdatedQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *config.Config, state *qstate.State, originalContent []byte, sha string) {
+	owner, repo := resolveOwnerRepo(cfg)
+	if owner == "" || repo == "" {
+		return
+	}
+
+	client, err := gh.NewClient(owner, repo)
+	if err != nil {
+		cmd.PrintErrf("[quarantine] WARNING: Cannot write quarantine state: %v\n", err)
+		return
+	}
+
+	content, marshalErr := state.Marshal()
+	if marshalErr != nil {
+		cmd.PrintErrf("[quarantine] WARNING: Cannot marshal quarantine state: %v\n", marshalErr)
+		return
+	}
+
+	// If content is unchanged, skip the write.
+	if bytes.Equal(content, originalContent) {
+		return
+	}
+
+	branch := cfg.Storage.Branch
+	if writeErr := cas.WriteStateWithCAS(ctx, client, state, content, sha, branch, 3); writeErr != nil {
+		cmd.PrintErrf("[quarantine] WARNING: Cannot write quarantine state: %v\n", writeErr)
+	}
 }
 
 // retryFailingTests reruns each failed test individually up to cfg.Retries times.
