@@ -265,6 +265,15 @@ func TestRenderPRCommentNilFlakySection(t *testing.T) {
 	})
 }
 
+func TestBuildQuarantinedEntriesNilState(t *testing.T) {
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "nil quarantine state",
+		Should:   "return nil without panicking",
+		Actual:   buildQuarantinedEntries(nil) == nil,
+		Expected: true,
+	})
+}
+
 // Verify that the JSON event parsing is correct.
 func TestDetectPRNumberFromEventFileInvalidJSON(t *testing.T) {
 	eventPath := filepath.Join(t.TempDir(), "event.json")

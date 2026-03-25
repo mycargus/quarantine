@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	gh "github.com/mycargus/quarantine/internal/github"
+	qstate "github.com/mycargus/quarantine/internal/quarantine"
 	"github.com/mycargus/quarantine/internal/result"
 	"github.com/spf13/cobra"
 )
@@ -94,16 +95,40 @@ type FlakyEntry struct {
 	IssueNum int
 }
 
+// QuarantinedEntry holds data for a single already-quarantined (excluded) test in the PR comment.
+type QuarantinedEntry struct {
+	Name     string
+	IssueURL string
+	IssueNum int
+	Since    string
+}
+
+// UnquarantinedEntry holds data for a single unquarantined test in the PR comment.
+type UnquarantinedEntry struct {
+	Name     string
+	IssueURL string
+	IssueNum int
+}
+
+// FailureEntry holds data for a single genuine failure in the PR comment.
+type FailureEntry struct {
+	Name    string
+	Message string
+}
+
 // PRCommentData holds the data needed to render the PR comment.
 type PRCommentData struct {
-	Total      int
-	Passed     int
-	Failed     int
-	Flaky      int
-	Quarantined int
-	Unquarantined int
-	Version    string
-	NewlyFlaky []FlakyEntry
+	Total             int
+	Passed            int
+	Failed            int
+	Flaky             int
+	Quarantined       int
+	Unquarantined     int
+	Version           string
+	NewlyFlaky        []FlakyEntry
+	QuarantinedTests  []QuarantinedEntry
+	UnquarantinedTests []UnquarantinedEntry
+	Failures          []FailureEntry
 }
 
 // renderPRComment renders the PR comment body from the given data.
@@ -133,6 +158,36 @@ func renderPRComment(data PRCommentData) string {
 		}
 		sb.WriteString("\nThese tests failed initially but passed on retry. They have been quarantined\n")
 		sb.WriteString("and will be excluded from future runs until their issues are resolved.\n")
+	}
+
+	if len(data.QuarantinedTests) > 0 {
+		fmt.Fprintf(&sb, "\n### Quarantined Tests (Excluded)\n\n%d quarantined tests were excluded from this run:\n\n", len(data.QuarantinedTests))
+		sb.WriteString("<details>\n<summary>View excluded tests</summary>\n\n")
+		sb.WriteString("| Test | Issue | Quarantined since |\n")
+		sb.WriteString("|------|-------|-------------------|\n")
+		for _, q := range data.QuarantinedTests {
+			fmt.Fprintf(&sb, "| `%s` | [#%d](%s) | %s |\n", q.Name, q.IssueNum, q.IssueURL, q.Since)
+		}
+		sb.WriteString("\n</details>\n")
+	}
+
+	if len(data.UnquarantinedTests) > 0 {
+		sb.WriteString("\n### Unquarantined Tests\n\nThe following tests have been unquarantined because their tracking issues were closed:\n\n")
+		sb.WriteString("| Test | Issue |\n")
+		sb.WriteString("|------|-------|\n")
+		for _, u := range data.UnquarantinedTests {
+			fmt.Fprintf(&sb, "| `%s` | [#%d](%s) (closed) |\n", u.Name, u.IssueNum, u.IssueURL)
+		}
+		sb.WriteString("\nThese tests are now running normally again. If they fail, they will be treated\nas genuine failures.\n")
+	}
+
+	if len(data.Failures) > 0 {
+		sb.WriteString("\n### Real Failures\n\nThe following tests failed and are NOT flaky (failed all retries):\n\n")
+		sb.WriteString("| Test | Failure message |\n")
+		sb.WriteString("|------|------------------|\n")
+		for _, f := range data.Failures {
+			fmt.Fprintf(&sb, "| `%s` | `%s` |\n", f.Name, f.Message)
+		}
 	}
 
 	sb.WriteString("\n---\n")
@@ -251,6 +306,66 @@ func buildFlakyEntries(res result.Result, issueRefs map[string]issueRef) []Flaky
 			Name:     t.Name,
 			IssueURL: ref.URL,
 			IssueNum: ref.Number,
+		})
+	}
+	return entries
+}
+
+// buildQuarantinedEntries converts quarantine state entries to PR comment quarantined entries.
+// This is a pure function — no I/O.
+func buildQuarantinedEntries(state *qstate.State) []QuarantinedEntry {
+	if state == nil {
+		return nil
+	}
+	var entries []QuarantinedEntry
+	for _, e := range state.Tests {
+		num := 0
+		if e.IssueNumber != nil {
+			num = *e.IssueNumber
+		}
+		entries = append(entries, QuarantinedEntry{
+			Name:     e.Name,
+			IssueURL: e.IssueURL,
+			IssueNum: num,
+			Since:    e.QuarantinedAt,
+		})
+	}
+	return entries
+}
+
+// buildUnquarantinedEntries converts removed quarantine entries to PR comment unquarantined entries.
+// This is a pure function — no I/O.
+func buildUnquarantinedEntries(removed []qstate.Entry) []UnquarantinedEntry {
+	var entries []UnquarantinedEntry
+	for _, e := range removed {
+		num := 0
+		if e.IssueNumber != nil {
+			num = *e.IssueNumber
+		}
+		entries = append(entries, UnquarantinedEntry{
+			Name:     e.Name,
+			IssueURL: e.IssueURL,
+			IssueNum: num,
+		})
+	}
+	return entries
+}
+
+// buildFailureEntries converts result tests to PR comment failure entries.
+// This is a pure function — no I/O.
+func buildFailureEntries(res result.Result) []FailureEntry {
+	var entries []FailureEntry
+	for _, t := range res.Tests {
+		if t.Status != "failed" {
+			continue
+		}
+		msg := ""
+		if t.FailureMessage != nil {
+			msg = *t.FailureMessage
+		}
+		entries = append(entries, FailureEntry{
+			Name:    t.Name,
+			Message: msg,
 		})
 	}
 	return entries

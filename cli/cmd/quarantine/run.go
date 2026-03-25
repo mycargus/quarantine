@@ -161,9 +161,13 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	// Batch-check closed issues and remove unquarantined tests from in-memory state.
-	var removedTestIDs []string
+	var removedEntries []qstate.Entry
 	if qState != nil {
-		removedTestIDs = removeUnquarantinedTests(ctx, cmd, cfg, qState, ghClient)
+		removedEntries = removeUnquarantinedTests(ctx, cmd, cfg, qState, ghClient)
+	}
+	removedTestIDs := make([]string, len(removedEntries))
+	for i, e := range removedEntries {
+		removedTestIDs[i] = e.TestID
 	}
 
 	// Augment the test command with framework-specific exclusion flags.
@@ -244,14 +248,17 @@ func runRun(cmd *cobra.Command, args []string) error {
 		if prCommentEnabled {
 			flakyEntries := buildFlakyEntries(res, issueRefs)
 			commentData := PRCommentData{
-				Total:         res.Summary.Total,
-				Passed:        res.Summary.Passed,
-				Failed:        res.Summary.Failed,
-				Flaky:         res.Summary.FlakyDetected,
-				Quarantined:   res.Summary.Quarantined,
-				Unquarantined: len(removedTestIDs),
-				Version:       version,
-				NewlyFlaky:    flakyEntries,
+				Total:              res.Summary.Total,
+				Passed:             res.Summary.Passed,
+				Failed:             res.Summary.Failed,
+				Flaky:              res.Summary.FlakyDetected,
+				Quarantined:        res.Summary.Quarantined,
+				Unquarantined:      len(removedTestIDs),
+				Version:            version,
+				NewlyFlaky:         flakyEntries,
+				QuarantinedTests:   buildQuarantinedEntries(qState),
+				UnquarantinedTests: buildUnquarantinedEntries(removedEntries),
+				Failures:           buildFailureEntries(res),
 			}
 			commentBody := renderPRComment(commentData)
 			postOrUpdatePRComment(ctx, cmd, ghClient, prNumber, commentBody)
@@ -330,9 +337,9 @@ func loadQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *config.Co
 
 // removeUnquarantinedTests batch-checks issue status and removes tests whose
 // issues are closed from the in-memory quarantine state.
-// Returns the list of test IDs that were removed.
+// Returns the full entries for tests that were removed (for PR comment rendering).
 // client may be nil — in that case the check is skipped (state unchanged, empty slice returned).
-func removeUnquarantinedTests(ctx context.Context, cmd *cobra.Command, cfg *config.Config, state *qstate.State, client *gh.Client) []string {
+func removeUnquarantinedTests(ctx context.Context, cmd *cobra.Command, cfg *config.Config, state *qstate.State, client *gh.Client) []qstate.Entry {
 	if client == nil {
 		return nil
 	}
@@ -356,11 +363,11 @@ func removeUnquarantinedTests(ctx context.Context, cmd *cobra.Command, cfg *conf
 		closedSet[n] = true
 	}
 
-	var removed []string
+	var removed []qstate.Entry
 	for testID, entry := range state.Tests {
 		if entry.IssueNumber != nil && closedSet[*entry.IssueNumber] {
 			state.RemoveTest(testID)
-			removed = append(removed, testID)
+			removed = append(removed, entry)
 		}
 	}
 	return removed
