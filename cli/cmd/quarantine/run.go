@@ -226,6 +226,11 @@ func runRun(cmd *cobra.Command, args []string) error {
 		printDryRunSummary(cmd, res)
 	}
 
+	// Warn when all tests are quarantined (nothing meaningful ran or all suppressed).
+	if allTestsQuarantined(res) {
+		cmd.PrintErrln("[quarantine] WARNING: All tests are quarantined. The entire test suite was skipped. Review and close resolved quarantine issues.")
+	}
+
 	// Write results.json.
 	outputPath, _ := cmd.Flags().GetString("output")
 	if err := writeResults(res, outputPath); err != nil {
@@ -710,6 +715,18 @@ func emitDegradedWarning(cmd *cobra.Command, reason string) {
 	if os.Getenv("GITHUB_ACTIONS") != "" {
 		cmd.PrintErrf("::warning title=Quarantine Degraded Mode::%s\n", reason)
 	}
+}
+
+// allTestsQuarantined reports whether the result indicates that every test in
+// the suite was accounted for by quarantine — either because exclusion flags
+// caused no tests to run (Total == 0, Jest case) or because post-execution
+// filtering suppressed all results (Total > 0 && Quarantined == Total, RSpec case).
+// This is a pure function — no I/O.
+func allTestsQuarantined(res result.Result) bool {
+	if res.Summary.Total == 0 {
+		return true
+	}
+	return res.Summary.Total > 0 && res.Summary.Quarantined == res.Summary.Total
 }
 
 // exitCodeError is an error that carries a specific exit code.
