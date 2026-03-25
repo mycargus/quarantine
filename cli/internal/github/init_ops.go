@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -192,6 +193,8 @@ func (c *Client) newRequestWithContext(ctx context.Context, method, path string,
 }
 
 // doWithRetry executes an HTTP request with retry-once-on-network-error behavior.
+// After a successful response, it checks rate limit headers and fires the warning
+// callback if remaining < 10% of limit.
 func (c *Client) doWithRetry(req *http.Request) (*http.Response, error) {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -202,5 +205,42 @@ func (c *Client) doWithRetry(req *http.Request) (*http.Response, error) {
 			return nil, fmt.Errorf("GitHub API request failed: %w", err)
 		}
 	}
+	c.checkRateLimit(resp)
 	return resp, nil
+}
+
+// checkRateLimit inspects X-RateLimit-* headers and fires the warning callback
+// if the remaining quota is below 10% of the total limit.
+func (c *Client) checkRateLimit(resp *http.Response) {
+	if c.rateLimitWarningFn == nil {
+		return
+	}
+	limitStr := resp.Header.Get("X-RateLimit-Limit")
+	remainingStr := resp.Header.Get("X-RateLimit-Remaining")
+	resetStr := resp.Header.Get("X-RateLimit-Reset")
+	if limitStr == "" || remainingStr == "" {
+		return
+	}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit == 0 {
+		return
+	}
+	remaining, err := strconv.Atoi(remainingStr)
+	if err != nil {
+		return
+	}
+	if remaining*10 < limit {
+		var resetTime string
+		if ts, parseErr := strconv.ParseInt(resetStr, 10, 64); parseErr == nil {
+			resetTime = time.Unix(ts, 0).UTC().Format("15:04:05")
+		} else {
+			resetTime = resetStr
+		}
+		msg := fmt.Sprintf(
+			"[quarantine] WARNING: GitHub API rate limit low (%d remaining, resets at %s UTC). "+
+				"Consider using a PAT for higher limits (5,000 req/hr vs 1,000 req/hr for GITHUB_TOKEN).",
+			remaining, resetTime,
+		)
+		c.rateLimitWarningFn(msg)
+	}
 }
