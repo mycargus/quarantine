@@ -3,7 +3,7 @@ name: verify-milestone
 description: Verify a milestone's implementation against its manifest — build, acceptance criteria, flow invariants, and scenario coverage
 argument-hint: "[milestone-number]"
 disable-model-invocation: false
-allowed-tools: Read, Grep, Glob, Bash
+allowed-tools: Read, Grep, Glob, Bash, Edit
 ---
 
 Verify M$1 implementation against its manifest at `docs/milestones/m$1.md`.
@@ -113,3 +113,20 @@ Rules for the report:
 - The Summary line MUST count ALL checks across all sections (build + criteria + invariants + scenario files)
 - If all checks pass, end with: "Milestone M$1 is verified."
 - If any checks fail, end with: "Milestone M$1 has Z unresolved issues."
+
+### 8. Mark milestone as verified
+
+If ALL checks passed (no failures in any section), update the manifest's frontmatter status from `planned` to `verified`:
+
+Use the Edit tool to change:
+```
+status: planned
+```
+to:
+```
+status: verified
+```
+
+in `docs/milestones/m$1.md`.
+
+If any checks failed, do NOT update the status. The manifest stays `planned` until all issues are resolved and verification passes.
