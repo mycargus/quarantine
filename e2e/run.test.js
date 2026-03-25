@@ -85,19 +85,57 @@ async function writeFileOnBranch(filePath, content, sha, message) {
   return (await res.json()).content.sha
 }
 
+// Track the last-known SHA so we can skip a read when writing.
+// Updated by resetQuarantineState and writeQuarantineState.
+let lastKnownStateSHA = null
+
 async function resetQuarantineState() {
-  // Always read the current SHA first — the CLI may have updated the file.
-  const file = await getFileOnBranch(STATE_FILE)
+  // Use tracked SHA when available; fall back to reading from GitHub
+  // (the CLI may have updated the file since our last write).
+  let sha = lastKnownStateSHA
+  if (sha == null) {
+    const file = await getFileOnBranch(STATE_FILE)
+    sha = file?.sha ?? null
+  }
   const emptyState = JSON.stringify(
     { version: 1, updated_at: new Date().toISOString(), tests: {} },
     null,
     2,
   )
-  await writeFileOnBranch(
+  try {
+    lastKnownStateSHA = await writeFileOnBranch(
+      STATE_FILE,
+      emptyState,
+      sha,
+      'test: reset quarantine state',
+    )
+  } catch (err) {
+    // Retry on 409 (stale SHA from CDN cache) — re-read and try once more.
+    if (err.message.includes('409')) {
+      const file = await getFileOnBranch(STATE_FILE)
+      lastKnownStateSHA = await writeFileOnBranch(
+        STATE_FILE,
+        emptyState,
+        file?.sha ?? null,
+        'test: reset quarantine state (retry)',
+      )
+    } else {
+      throw err
+    }
+  }
+}
+
+async function writeQuarantineState(state) {
+  let sha = lastKnownStateSHA
+  if (sha == null) {
+    const file = await getFileOnBranch(STATE_FILE)
+    sha = file?.sha ?? null
+  }
+  lastKnownStateSHA = await writeFileOnBranch(
     STATE_FILE,
-    emptyState,
-    file?.sha,
-    'test: reset quarantine state',
+    JSON.stringify(state, null, 2),
+    sha,
+    'test: write quarantine state',
   )
 }
 
@@ -191,8 +229,9 @@ describe('quarantine run — E2E against real GitHub', () => {
   })
 
   afterEach(async () => {
-    // Reset state before cleanup so the next test always starts clean,
-    // regardless of what the CLI wrote during this test.
+    // The CLI may have written quarantine.json (changing the SHA),
+    // so invalidate the tracked SHA to force a fresh read.
+    lastKnownStateSHA = null
     await resetQuarantineState()
     if (dir) {
       rmSync(dir, { recursive: true, force: true })
@@ -322,7 +361,19 @@ exit 1`,
       })
 
       // Verify quarantine.json was updated on GitHub with the flaky test.
-      const file = await getFileOnBranch(STATE_FILE)
+      // GitHub's CDN may briefly serve stale content after a write.
+      // Retry once after a short delay if the expected test isn't found.
+      let file = await getFileOnBranch(STATE_FILE)
+      if (file) {
+        const state = JSON.parse(file.content)
+        const hasTest = Object.keys(state.tests).some(
+          id => id.includes('FlakyService') && id.includes('should be non-deterministic'),
+        )
+        if (!hasTest) {
+          await new Promise(r => setTimeout(r, 2000))
+          file = await getFileOnBranch(STATE_FILE)
+        }
+      }
 
       assert({
         given: 'quarantine run after flaky test detected',
@@ -359,34 +410,26 @@ exit 1`,
         'src/flaky.test.js::FlakyService::should be non-deterministic'
 
       // Pre-populate quarantine.json on GitHub with one quarantined test.
-      const existing = await getFileOnBranch(STATE_FILE)
-      await writeFileOnBranch(
-        STATE_FILE,
-        JSON.stringify(
-          {
-            version: 1,
-            updated_at: new Date().toISOString(),
-            tests: {
-              [quarantinedTestID]: {
-                test_id: quarantinedTestID,
-                file_path: 'src/flaky.test.js',
-                classname: 'FlakyService',
-                name: 'should be non-deterministic',
-                suite: '',
-                first_flaky_at: new Date().toISOString(),
-                last_flaky_at: new Date().toISOString(),
-                flaky_count: 1,
-                quarantined_at: new Date().toISOString(),
-                quarantined_by: 'auto',
-              },
-            },
+      // Uses writeQuarantineState which tracks the SHA from the last write,
+      // avoiding a stale-SHA 409 from GitHub's CDN cache.
+      await writeQuarantineState({
+        version: 1,
+        updated_at: new Date().toISOString(),
+        tests: {
+          [quarantinedTestID]: {
+            test_id: quarantinedTestID,
+            file_path: 'src/flaky.test.js',
+            classname: 'FlakyService',
+            name: 'should be non-deterministic',
+            suite: '',
+            first_flaky_at: new Date().toISOString(),
+            last_flaky_at: new Date().toISOString(),
+            flaky_count: 1,
+            quarantined_at: new Date().toISOString(),
+            quarantined_by: 'auto',
           },
-          null,
-          2,
-        ),
-        existing?.sha,
-        'test: pre-populate quarantine state for exclusion test',
-      )
+        },
+      })
 
       // JUnit XML contains only the non-quarantined test
       // (the quarantined one was excluded from execution by the CLI).
