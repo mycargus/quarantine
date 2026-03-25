@@ -1,6 +1,7 @@
 package cas_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -49,13 +50,19 @@ func TestWriteStateWithCASSucceedsOnFirstAttempt(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	c := newTestGHClient(t, server.URL)
-	err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "sha-initial", "quarantine/state", 3)
+	reQuarantined, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "sha-initial", "quarantine/state", 3, nil)
 
 	riteway.Assert(t, riteway.Case[error]{
 		Given:    "UpdateContents returns 200 on first attempt",
 		Should:   "return no error",
 		Actual:   err,
 		Expected: nil,
+	})
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "UpdateContents returns 200 on first attempt with no CAS conflict",
+		Should:   "return zero re-quarantined tests",
+		Actual:   len(reQuarantined),
+		Expected: 0,
 	})
 }
 
@@ -93,13 +100,101 @@ func TestWriteStateWithCASRetriesOn409AndSucceeds(t *testing.T) {
 	content := marshalState(t, localState)
 
 	c := newTestGHClient(t, server.URL)
-	err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "stale-sha", "quarantine/state", 3)
+	reQuarantined, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "stale-sha", "quarantine/state", 3, nil)
 
 	riteway.Assert(t, riteway.Case[error]{
 		Given:    "first UpdateContents returns 409, re-read succeeds, second UpdateContents returns 200",
 		Should:   "return no error after retry",
 		Actual:   err,
 		Expected: nil,
+	})
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "local has no tests and remote has one test contributed by Build A",
+		Should:   "return zero re-quarantined tests (new remote test is not a re-quarantine)",
+		Actual:   len(reQuarantined),
+		Expected: 0,
+	})
+}
+
+// TestWriteStateWithCASMergedContentContainsBothBuildsTests verifies scenario 28:
+// after a 409, the content written on retry is the union of both builds' test sets.
+func TestWriteStateWithCASMergedContentContainsBothBuildsTests(t *testing.T) {
+	// Build A wrote ApiService test (remote state).
+	remoteState := quarantine.NewEmptyState()
+	remoteState.AddTest(quarantine.Entry{
+		TestID: "api_test.js::ApiService::should handle timeout",
+		Name:   "should handle timeout",
+	})
+	remoteContent := marshalState(t, remoteState)
+	remoteEncoded := base64.StdEncoding.EncodeToString(remoteContent)
+
+	// Track the content written on the successful PUT.
+	var writtenContent []byte
+	var callCount int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&callCount, 1)
+		if r.Method == "GET" {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"content": remoteEncoded,
+				"sha":     "def456",
+			})
+			return
+		}
+		if n == 1 {
+			// First PUT: Build B's stale SHA → 409
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
+		// Second PUT: merged content → 200. Capture request body.
+		var body struct {
+			Content string `json:"content"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+			decoded, _ := base64.StdEncoding.DecodeString(body.Content)
+			writtenContent = decoded
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	// Build B's local state: CacheService test.
+	localState := quarantine.NewEmptyState()
+	localState.AddTest(quarantine.Entry{
+		TestID: "cache_test.js::CacheService::should handle eviction",
+		Name:   "should handle eviction",
+	})
+	content := marshalState(t, localState)
+
+	c := newTestGHClient(t, server.URL)
+	_, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "abc123", "quarantine/state", 3, nil)
+	if err != nil {
+		t.Fatalf("WriteStateWithCAS: %v", err)
+	}
+
+	// Parse the content that was actually written on retry.
+	merged, parseErr := quarantine.ParseState(bytes.NewReader(writtenContent))
+	if parseErr != nil {
+		t.Fatalf("parse written content: %v", parseErr)
+	}
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "Build A wrote ApiService test; Build B has CacheService test; 409 forces merge",
+		Should:   "write merged state with both tests",
+		Actual:   len(merged.Tests),
+		Expected: 2,
+	})
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "Build B's CacheService test",
+		Should:   "be present in the merged write",
+		Actual:   merged.HasTest("cache_test.js::CacheService::should handle eviction"),
+		Expected: true,
+	})
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "Build A's ApiService test (from remote state)",
+		Should:   "be present in the merged write (no data loss)",
+		Actual:   merged.HasTest("api_test.js::ApiService::should handle timeout"),
+		Expected: true,
 	})
 }
 
@@ -127,7 +222,7 @@ func TestWriteStateWithCASReturnsErrorAfterExhaustingRetries(t *testing.T) {
 	content := marshalState(t, localState)
 
 	c := newTestGHClient(t, server.URL)
-	err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "sha", "quarantine/state", 3)
+	_, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "sha", "quarantine/state", 3, nil)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "all 3 UpdateContents attempts return 409",
@@ -147,12 +242,113 @@ func TestWriteStateWithCASReturnsErrorOnNon409Failure(t *testing.T) {
 	content := marshalState(t, localState)
 
 	c := newTestGHClient(t, server.URL)
-	err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "sha", "quarantine/state", 3)
+	_, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "sha", "quarantine/state", 3, nil)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "UpdateContents returns 403 (non-retryable error)",
 		Should:   "return an error immediately",
 		Actual:   err != nil,
 		Expected: true,
+	})
+}
+
+// --- Scenario 29: Quarantine/unquarantine race — quarantine wins ---
+
+// TestWriteStateWithCASQuarantineWinsOnUnquarantineRace verifies scenario 29:
+// Build B tries to remove a test (unquarantine), but Build A wrote it back.
+// After 409 and merge, the test stays quarantined and re-quarantined IDs are returned.
+func TestWriteStateWithCASQuarantineWinsOnUnquarantineRace(t *testing.T) {
+	// Remote state (Build A wrote this): contains eviction test.
+	remoteState := quarantine.NewEmptyState()
+	remoteState.AddTest(quarantine.Entry{
+		TestID: "cache_test.js::CacheService::should handle eviction",
+		Name:   "should handle eviction",
+	})
+	remoteContent := marshalState(t, remoteState)
+	remoteEncoded := base64.StdEncoding.EncodeToString(remoteContent)
+
+	var callCount int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&callCount, 1)
+		if r.Method == "GET" {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"content": remoteEncoded,
+				"sha":     "def456",
+			})
+			return
+		}
+		if n == 1 {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	// Build B's local state: eviction test was removed (unquarantined), ApiService added.
+	localState := quarantine.NewEmptyState()
+	localState.AddTest(quarantine.Entry{
+		TestID: "api_test.js::ApiService::should handle timeout",
+		Name:   "should handle timeout",
+	})
+	// Notably: eviction test is NOT in localState (Build B removed it).
+	content := marshalState(t, localState)
+
+	// Build B explicitly unquarantined the eviction test (issue closed).
+	removedByB := []string{"cache_test.js::CacheService::should handle eviction"}
+
+	c := newTestGHClient(t, server.URL)
+	reQuarantined, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "abc123", "quarantine/state", 3, removedByB)
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "Build B unquarantined eviction test; Build A wrote it back; 409 forces merge",
+		Should:   "return no error (quarantine wins, write succeeds on retry)",
+		Actual:   err,
+		Expected: nil,
+	})
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "eviction test was in remote (Build A) but not local (Build B unquarantined it)",
+		Should:   "return one re-quarantined test ID",
+		Actual:   len(reQuarantined),
+		Expected: 1,
+	})
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "eviction test re-quarantined after CAS conflict",
+		Should:   "identify the eviction test as re-quarantined",
+		Actual:   reQuarantined[0],
+		Expected: "cache_test.js::CacheService::should handle eviction",
+	})
+}
+
+// TestDetectReQuarantinedIsZeroWhenNoConflict verifies the pure detection:
+// when no CAS conflict occurs, no re-quarantined tests are reported.
+func TestDetectReQuarantinedIsZeroWhenNoConflict(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	localState := quarantine.NewEmptyState()
+	localState.AddTest(quarantine.Entry{
+		TestID: "api_test.js::ApiService::should handle timeout",
+		Name:   "should handle timeout",
+	})
+	content := marshalState(t, localState)
+
+	c := newTestGHClient(t, server.URL)
+	reQuarantined, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "abc123", "quarantine/state", 3, nil)
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "UpdateContents returns 200 on first attempt (no conflict)",
+		Should:   "return no error",
+		Actual:   err,
+		Expected: nil,
+	})
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "no CAS conflict occurred",
+		Should:   "return zero re-quarantined tests",
+		Actual:   len(reQuarantined),
+		Expected: 0,
 	})
 }

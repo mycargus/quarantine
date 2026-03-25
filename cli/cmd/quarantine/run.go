@@ -141,8 +141,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 	qState, qStateContent, qStateSHA := loadQuarantineState(ctx, cmd, cfg, ghClient)
 
 	// Batch-check closed issues and remove unquarantined tests from in-memory state.
+	var removedTestIDs []string
 	if qState != nil {
-		removeUnquarantinedTests(ctx, cmd, cfg, qState, ghClient)
+		removedTestIDs = removeUnquarantinedTests(ctx, cmd, cfg, qState, ghClient)
 	}
 
 	// Augment the test command with framework-specific exclusion flags.
@@ -196,7 +197,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	if qState != nil && !dryRun {
 		addNewFlakyTests(qState, res)
-		writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA, ghClient)
+		writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA, ghClient, removedTestIDs)
 	}
 
 	// Write results.json.
@@ -263,10 +264,11 @@ func loadQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *config.Co
 
 // removeUnquarantinedTests batch-checks issue status and removes tests whose
 // issues are closed from the in-memory quarantine state.
-// client may be nil — in that case the check is skipped (state unchanged).
-func removeUnquarantinedTests(ctx context.Context, cmd *cobra.Command, cfg *config.Config, state *qstate.State, client *gh.Client) {
+// Returns the list of test IDs that were removed.
+// client may be nil — in that case the check is skipped (state unchanged, empty slice returned).
+func removeUnquarantinedTests(ctx context.Context, cmd *cobra.Command, cfg *config.Config, state *qstate.State, client *gh.Client) []string {
 	if client == nil {
-		return
+		return nil
 	}
 
 	label := "quarantine"
@@ -277,7 +279,7 @@ func removeUnquarantinedTests(ctx context.Context, cmd *cobra.Command, cfg *conf
 	closedNumbers, _, _, searchErr := client.SearchClosedIssues(ctx, label)
 	if searchErr != nil {
 		cmd.PrintErrf("[quarantine] WARNING: Cannot check issue status: %v. Quarantine state unchanged.\n", searchErr)
-		return
+		return nil
 	}
 
 	closedSet := make(map[int]bool, len(closedNumbers))
@@ -285,11 +287,14 @@ func removeUnquarantinedTests(ctx context.Context, cmd *cobra.Command, cfg *conf
 		closedSet[n] = true
 	}
 
+	var removed []string
 	for testID, entry := range state.Tests {
 		if entry.IssueNumber != nil && closedSet[*entry.IssueNumber] {
 			state.RemoveTest(testID)
+			removed = append(removed, testID)
 		}
 	}
+	return removed
 }
 
 // buildExclusionArgsFromState returns the framework-specific exclusion flags
@@ -337,8 +342,10 @@ func addNewFlakyTests(state *qstate.State, res result.Result) {
 
 // writeUpdatedQuarantineState writes the updated quarantine state to GitHub via CAS.
 // On error, logs a warning (degraded mode — never breaks the build).
+// removedTestIDs is the list of test IDs that were unquarantined this run; used to
+// detect re-quarantine after CAS conflict and emit a warning per ADR-012.
 // client may be nil — in that case the write is skipped silently.
-func writeUpdatedQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *config.Config, state *qstate.State, originalContent []byte, sha string, client *gh.Client) {
+func writeUpdatedQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *config.Config, state *qstate.State, originalContent []byte, sha string, client *gh.Client, removedTestIDs []string) {
 	if client == nil {
 		return
 	}
@@ -355,8 +362,12 @@ func writeUpdatedQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *c
 	}
 
 	branch := cfg.Storage.Branch
-	if writeErr := cas.WriteStateWithCAS(ctx, client, state, content, sha, branch, 3); writeErr != nil {
+	reQuarantined, writeErr := cas.WriteStateWithCAS(ctx, client, state, content, sha, branch, 3, removedTestIDs)
+	if writeErr != nil {
 		cmd.PrintErrf("[quarantine] WARNING: Cannot write quarantine state: %v\n", writeErr)
+	}
+	for _, testID := range reQuarantined {
+		cmd.PrintErrf("[quarantine] WARNING: Test '%s' was unquarantined (issue closed) but re-quarantined due to concurrent update. It will be unquarantined on the next build.\n", testID)
 	}
 }
 
