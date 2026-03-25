@@ -83,10 +83,20 @@ func EscapeJestPattern(name string) string {
 // rerunning a single failed test.
 func RerunCommand(fw Framework, name, classname, file, customTemplate string) (string, []string) {
 	if customTemplate != "" {
-		result := strings.ReplaceAll(customTemplate, "{name}", name)
-		result = strings.ReplaceAll(result, "{classname}", classname)
-		result = strings.ReplaceAll(result, "{file}", file)
-		return result, nil
+		// Split the template into tokens BEFORE substituting placeholders.
+		// This ensures that placeholder values containing spaces (e.g. a test
+		// name like "should handle timeout") stay as a single argument.
+		parts := SplitShellArgs(customTemplate)
+		for i, p := range parts {
+			p = strings.ReplaceAll(p, "{name}", name)
+			p = strings.ReplaceAll(p, "{classname}", classname)
+			p = strings.ReplaceAll(p, "{file}", file)
+			parts[i] = p
+		}
+		if len(parts) == 0 {
+			return "", nil
+		}
+		return parts[0], parts[1:]
 	}
 
 	switch fw {
@@ -99,4 +109,33 @@ func RerunCommand(fw Framework, name, classname, file, customTemplate string) (s
 	default:
 		return "", nil
 	}
+}
+
+// SplitShellArgs splits a command string into tokens, respecting single and
+// double quotes. Quotes are stripped from the output. This is a pure function.
+func SplitShellArgs(s string) []string {
+	var args []string
+	var current strings.Builder
+	inSingle := false
+	inDouble := false
+
+	for _, r := range s {
+		switch {
+		case r == '\'' && !inDouble:
+			inSingle = !inSingle
+		case r == '"' && !inSingle:
+			inDouble = !inDouble
+		case r == ' ' && !inSingle && !inDouble:
+			if current.Len() > 0 {
+				args = append(args, current.String())
+				current.Reset()
+			}
+		default:
+			current.WriteRune(r)
+		}
+	}
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+	return args
 }
