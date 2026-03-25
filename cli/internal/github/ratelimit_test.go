@@ -3,9 +3,9 @@ package github_test
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	riteway "github.com/mycargus/riteway-golang"
@@ -45,7 +45,7 @@ func TestRateLimitWarningFiredWhenRemainingBelow10Percent(t *testing.T) {
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "API response with X-RateLimit-Remaining=50 (5% of 1000)",
 		Should:   "include remaining count in warning message",
-		Actual:   fmt.Sprintf("%s", warningMsg) != "" && containsStr(warningMsg, "50"),
+		Actual:   strings.Contains(warningMsg, "50"),
 		Expected: true,
 	})
 }
@@ -107,12 +107,3 @@ func TestRateLimitWarningNotFiredWhenHeadersMissing(t *testing.T) {
 	})
 }
 
-// containsStr checks if s contains substr.
-func containsStr(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}

@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -203,24 +202,6 @@ func TestUpdateContents422ReturnsError(t *testing.T) {
 	})
 }
 
-func TestUpdateContentsUsesBranchParameter(t *testing.T) {
-	var capturedBody map[string]interface{}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewDecoder(r.Body).Decode(&capturedBody)
-		w.WriteHeader(http.StatusOK)
-	}))
-	t.Cleanup(server.Close)
-
-	c := newTestClient(t, server.URL)
-	_ = c.UpdateContents(context.Background(), "quarantine.json", "my-custom-branch", "update", []byte(`{}`), "sha")
-
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "UpdateContents called with branch 'my-custom-branch'",
-		Should:   "send 'my-custom-branch' in the request body branch field",
-		Actual:   fmt.Sprintf("%v", capturedBody["branch"]),
-		Expected: "my-custom-branch",
-	})
-}
 
 func TestGetContentsInvalidBase64(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

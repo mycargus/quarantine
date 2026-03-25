@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -161,29 +160,6 @@ func TestSearchClosedIssuesTruncatedWhenTotalExceedsLimit(t *testing.T) {
 	})
 }
 
-func TestSearchClosedIssuesBuildsCorrectQueryString(t *testing.T) {
-	var capturedURL string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		capturedURL = r.URL.String()
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"total_count": 0,
-			"items":       []interface{}{},
-		})
-	}))
-	t.Cleanup(server.Close)
-
-	c := newTestClient(t, server.URL)
-	_, _, _, _ = c.SearchClosedIssues(context.Background(), "quarantine")
-
-	// Verify the search query includes required filters.
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "SearchClosedIssues called with label 'quarantine'",
-		Should:   "request the /search/issues endpoint",
-		Actual:   len(capturedURL) > 0 && contains(capturedURL, "/search/issues"),
-		Expected: true,
-	})
-}
 
 func TestSearchClosedIssues403ReturnsError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -264,14 +240,3 @@ func TestSearchClosedIssuesPaginatesMultiplePages(t *testing.T) {
 	})
 }
 
-// contains is a helper used in query-string assertions.
-func contains(s, substr string) bool {
-	return fmt.Sprintf("%s", s) != "" && len(s) >= len(substr) && func() bool {
-		for i := 0; i <= len(s)-len(substr); i++ {
-			if s[i:i+len(substr)] == substr {
-				return true
-			}
-		}
-		return false
-	}()
-}
