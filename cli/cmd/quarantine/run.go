@@ -220,8 +220,11 @@ func runRun(cmd *cobra.Command, args []string) error {
 	// Add newly detected flaky tests to quarantine state and write via CAS.
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	if qState != nil && !dryRun {
-		addNewFlakyTests(qState, res, excludePatterns)
-		writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA, ghClient, removedTestIDs)
+		flakyAdded := addNewFlakyTests(qState, res, excludePatterns)
+		stateChanged := flakyAdded || len(removedTestIDs) > 0
+		if stateChanged {
+			writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA, ghClient, removedTestIDs)
+		}
 	} else if dryRun && res.Summary.FlakyDetected > 0 {
 		printDryRunSummary(cmd, res)
 	}
@@ -345,7 +348,9 @@ func buildExclusionArgsFromState(fw runner.Framework, state *qstate.State) []str
 // addNewFlakyTests adds newly detected flaky tests from the run results to the
 // quarantine state. A test is newly flaky if it is not already in the state
 // and its result status is "flaky". Tests matching excludePatterns are skipped.
-func addNewFlakyTests(state *qstate.State, res result.Result, excludePatterns []string) {
+// Returns true if the state was modified.
+func addNewFlakyTests(state *qstate.State, res result.Result, excludePatterns []string) bool {
+	changed := false
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, t := range res.Tests {
 		if t.Status != "flaky" {
@@ -360,9 +365,11 @@ func addNewFlakyTests(state *qstate.State, res result.Result, excludePatterns []
 			entry.LastFlakyAt = now
 			entry.FlakyCount++
 			state.AddTest(entry)
+			changed = true
 			continue
 		}
 		// New flaky test — add to state.
+		changed = true
 		state.AddTest(qstate.Entry{
 			TestID:        t.TestID,
 			FilePath:      t.FilePath,
@@ -375,6 +382,7 @@ func addNewFlakyTests(state *qstate.State, res result.Result, excludePatterns []
 			QuarantinedBy: "auto",
 		})
 	}
+	return changed
 }
 
 // writeUpdatedQuarantineState writes the updated quarantine state to GitHub via CAS.
