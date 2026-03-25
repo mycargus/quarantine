@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	riteway "github.com/mycargus/riteway-golang"
@@ -352,6 +353,98 @@ framework: jest
 		Given:    "unquarantined test passes after issue close",
 		Should:   "include the test in results",
 		Actual:   len(res.Tests) > 0,
+		Expected: true,
+	})
+}
+
+// --- Scenario 41: Write to unprotected branch — succeeds directly ---
+
+func TestRunWriteToUnprotectedBranchSucceeds(t *testing.T) {
+	dir := t.TempDir()
+
+	// Start with empty quarantine state — new flaky test will be detected this run.
+	qs := quarantine.NewEmptyState()
+
+	// JUnit XML: one test fails initially, passes on retry → flaky.
+	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="1">
+  <testsuite name="src/payment.test.js" tests="1" failures="1">
+    <testcase classname="PaymentService" name="should process payment"
+              file="src/payment.test.js" time="0.1">
+      <failure message="timeout">timeout</failure>
+    </testcase>
+  </testsuite>
+</testsuites>`
+
+	xmlPath := filepath.Join(dir, "junit.xml")
+	// The rerun script exits 0 — test passes on retry (flaky).
+	rerunScriptPath := filepath.Join(dir, "rerun")
+	if err := os.WriteFile(rerunScriptPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write rerun script: %v", err)
+	}
+	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 1)
+
+	configPath := writeTempConfig(t, fmt.Sprintf(`
+version: 1
+framework: jest
+retries: 1
+rerun_command: %s
+`, rerunScriptPath))
+
+	// Track whether the PUT (write) was called.
+	var putCalled int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.Contains(r.URL.Path, "/git/ref/heads/quarantine/state"):
+			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc123","type":"commit"}}`)
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+			if len(qs.Tests) == 0 {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			content, _ := qs.Marshal()
+			encoded := base64.StdEncoding.EncodeToString(content)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"content": encoded,
+				"sha":     "state-sha-abc",
+			})
+		case strings.Contains(r.URL.Path, "/search/issues"):
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"total_count": 0,
+				"items":       []interface{}{},
+			})
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+			atomic.AddInt32(&putCalled, 1)
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	resultsPath := filepath.Join(dir, "results.json")
+	exitCode := executeRunCmdWithExitCode(t, []string{
+		"--config", configPath,
+		"--junitxml", xmlPath,
+		"--output", resultsPath,
+		"--", scriptPath,
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "unprotected branch and a newly detected flaky test",
+		Should:   "exit with code 0 (flaky test quarantined, not a genuine failure)",
+		Actual:   exitCode,
+		Expected: 0,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "unprotected branch and a newly detected flaky test",
+		Should:   "write updated quarantine.json via PUT (CAS write succeeded)",
+		Actual:   atomic.LoadInt32(&putCalled) > 0,
 		Expected: true,
 	})
 }
