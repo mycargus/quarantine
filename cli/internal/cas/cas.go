@@ -12,6 +12,10 @@ import (
 	"github.com/mycargus/quarantine/internal/quarantine"
 )
 
+// ErrCASExhausted is returned when all CAS retry attempts are exhausted due to
+// repeated 409 conflict responses.
+var ErrCASExhausted = errors.New("CAS write exhausted")
+
 // githubContentsClient is the subset of the GitHub client interface needed for CAS writes.
 type githubContentsClient interface {
 	GetContents(ctx context.Context, path, ref string) (content []byte, sha string, err error)
@@ -92,7 +96,7 @@ func WriteStateWithCAS(
 		currentSHA = remoteSHA
 	}
 
-	return nil, fmt.Errorf("CAS write failed after %d attempts: %w", maxRetries, lastErr)
+	return nil, fmt.Errorf("%w: CAS write failed after %d attempts: %w", ErrCASExhausted, maxRetries, lastErr)
 }
 
 // detectReQuarantined returns the subset of removedTestIDs that reappeared in
