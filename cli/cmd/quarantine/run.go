@@ -307,10 +307,13 @@ func removeUnquarantinedTests(ctx context.Context, cmd *cobra.Command, cfg *conf
 		label = cfg.Labels[0]
 	}
 
-	closedNumbers, _, _, searchErr := client.SearchClosedIssues(ctx, label)
+	closedNumbers, truncated, totalCount, searchErr := client.SearchClosedIssues(ctx, label)
 	if searchErr != nil {
 		cmd.PrintErrf("[quarantine] WARNING: Cannot check issue status: %v. Quarantine state unchanged.\n", searchErr)
 		return nil
+	}
+	if truncated {
+		cmd.PrintErrf("[quarantine] WARNING: GitHub Search returned 1,000 closed issues but total_count is %d. Some issues may not be checked. Consider cleaning up old quarantine issues to stay within the 1,000 result limit.\n", totalCount)
 	}
 
 	closedSet := make(map[int]bool, len(closedNumbers))
@@ -399,9 +402,14 @@ func writeUpdatedQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *c
 	reQuarantined, writeErr := cas.WriteStateWithCAS(ctx, client, state, content, sha, branch, 3, removedTestIDs)
 	if writeErr != nil {
 		var apiErr *gh.APIError
-		if errors.As(writeErr, &apiErr) && apiErr.StatusCode == 403 {
+		switch {
+		case errors.As(writeErr, &apiErr) && apiErr.StatusCode == 403:
 			cmd.PrintErrf("[quarantine] WARNING: Branch '%s' is protected. Quarantine state saved to Actions cache. A workflow with write access must apply the update.\n", branch)
-		} else {
+		case errors.As(writeErr, &apiErr) && apiErr.StatusCode == 422:
+			cmd.PrintErrf("[quarantine] WARNING: quarantine.json exceeds the 1 MB GitHub Contents API limit. Review and close resolved quarantine issues to reduce size. Skipping state update.\n")
+		case errors.Is(writeErr, cas.ErrCASExhausted):
+			cmd.PrintErrf("[quarantine] WARNING: Failed to update quarantine.json after 3 attempts (concurrent write conflicts). The new flaky test will be re-detected on the next run.\n")
+		default:
 			cmd.PrintErrf("[quarantine] WARNING: Cannot write quarantine state: %v\n", writeErr)
 		}
 	}
