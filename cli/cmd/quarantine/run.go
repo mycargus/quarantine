@@ -206,8 +206,12 @@ func runRun(cmd *cobra.Command, args []string) error {
 		testResults = qstate.FilterQuarantinedFailures(testResults, qState)
 	}
 
-	// Retry failing tests individually (skip quarantined tests).
-	retryOutcomes := retryFailingTests(ctx, testResults, cfg)
+	// Collect exclude patterns: merge config and CLI flag values.
+	excludeFlag, _ := cmd.Flags().GetStringArray("exclude")
+	excludePatterns := mergeExcludePatterns(cfg.Exclude, excludeFlag)
+
+	// Retry failing tests individually (skip quarantined and excluded tests).
+	retryOutcomes := retryFailingTests(ctx, testResults, cfg, excludePatterns)
 
 	// Build results.
 	meta := buildMetadata(cfg)
@@ -216,8 +220,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 	// Add newly detected flaky tests to quarantine state and write via CAS.
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	if qState != nil && !dryRun {
-		addNewFlakyTests(qState, res)
+		addNewFlakyTests(qState, res, excludePatterns)
 		writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA, ghClient, removedTestIDs)
+	} else if dryRun && res.Summary.FlakyDetected > 0 {
+		printDryRunSummary(cmd, res)
 	}
 
 	// Write results.json.
@@ -330,11 +336,14 @@ func buildExclusionArgsFromState(fw runner.Framework, state *qstate.State) []str
 
 // addNewFlakyTests adds newly detected flaky tests from the run results to the
 // quarantine state. A test is newly flaky if it is not already in the state
-// and its result status is "flaky".
-func addNewFlakyTests(state *qstate.State, res result.Result) {
+// and its result status is "flaky". Tests matching excludePatterns are skipped.
+func addNewFlakyTests(state *qstate.State, res result.Result, excludePatterns []string) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, t := range res.Tests {
 		if t.Status != "flaky" {
+			continue
+		}
+		if runner.MatchesExcludePattern(t.TestID, excludePatterns) {
 			continue
 		}
 		if state.HasTest(t.TestID) {
@@ -399,11 +408,15 @@ func writeUpdatedQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *c
 // retryFailingTests reruns each failed test individually up to cfg.Retries times.
 // Returns a map of TestID -> RetryOutcome for tests that were retried.
 // Exits the retry loop early for each test on the first passing attempt.
-func retryFailingTests(ctx context.Context, tests []parser.TestResult, cfg *config.Config) map[string]result.RetryOutcome {
+// Tests whose TestID matches any excludePattern are skipped entirely.
+func retryFailingTests(ctx context.Context, tests []parser.TestResult, cfg *config.Config, excludePatterns []string) map[string]result.RetryOutcome {
 	outcomes := make(map[string]result.RetryOutcome)
 
 	for _, t := range tests {
 		if t.Status != "failed" && t.Status != "error" {
+			continue
+		}
+		if runner.MatchesExcludePattern(t.TestID, excludePatterns) {
 			continue
 		}
 
@@ -619,6 +632,27 @@ func repoString(owner, repo string) string {
 		return ""
 	}
 	return owner + "/" + repo
+}
+
+// mergeExcludePatterns combines exclude patterns from the config file and
+// CLI --exclude flags into a single slice.
+// This is a pure function — no I/O.
+func mergeExcludePatterns(fromConfig, fromFlags []string) []string {
+	merged := make([]string, 0, len(fromConfig)+len(fromFlags))
+	merged = append(merged, fromConfig...)
+	merged = append(merged, fromFlags...)
+	return merged
+}
+
+// printDryRunSummary prints the dry-run summary to stderr listing each test
+// that would have been quarantined.
+func printDryRunSummary(cmd *cobra.Command, res result.Result) {
+	cmd.PrintErrf("[quarantine] DRY RUN — no changes written.\n")
+	for _, t := range res.Tests {
+		if t.Status == "flaky" {
+			cmd.PrintErrf("  Would quarantine: %s\n", t.Name)
+		}
+	}
 }
 
 // writeResults writes the result JSON to the given path, creating directories
