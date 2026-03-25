@@ -125,6 +125,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	ctx := context.Background()
 
+	strict, _ := cmd.Flags().GetBool("strict")
+
 	// Create a single GitHub client shared across all quarantine state operations.
 	// Rate-limit warnings are forwarded to stderr via cmd.PrintErrln.
 	var ghClient *gh.Client
@@ -133,12 +135,29 @@ func runRun(cmd *cobra.Command, args []string) error {
 			c.SetRateLimitWarningFunc(func(msg string) { cmd.PrintErrln(msg) })
 			ghClient = c
 		} else {
-			cmd.PrintErrf("[quarantine] WARNING: Cannot initialize GitHub client: %v. Running in degraded mode.\n", clientErr)
+			// Detect missing token specifically for a clearer message.
+			reason := fmt.Sprintf("%v", clientErr)
+			if strings.Contains(reason, "no GitHub token") {
+				reason = "No GitHub token found. Running in degraded mode."
+			}
+			if strict {
+				cmd.PrintErrf("[quarantine] ERROR: infrastructure failure (--strict mode): %v\n", clientErr)
+				cmd.PrintErrf("[quarantine] ERROR: exiting with code 2. Remove --strict to run in degraded mode.\n")
+				return exitCodeError(2)
+			}
+			emitDegradedWarning(cmd, reason)
 		}
 	}
 
 	// Read quarantine state from the quarantine/state branch.
 	qState, qStateContent, qStateSHA := loadQuarantineState(ctx, cmd, cfg, ghClient)
+
+	// In --strict mode, a nil state from a non-nil client means the API was unreachable.
+	if strict && ghClient != nil && qState == nil {
+		cmd.PrintErrf("[quarantine] ERROR: infrastructure failure (--strict mode): unable to read quarantine state\n")
+		cmd.PrintErrf("[quarantine] ERROR: exiting with code 2. Remove --strict to run in degraded mode.\n")
+		return exitCodeError(2)
+	}
 
 	// Batch-check closed issues and remove unquarantined tests from in-memory state.
 	var removedTestIDs []string
@@ -244,7 +263,7 @@ func loadQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *config.Co
 	branch := cfg.Storage.Branch
 	content, sha, err := client.GetContents(ctx, "quarantine.json", branch)
 	if err != nil {
-		cmd.PrintErrf("[quarantine] WARNING: Cannot read quarantine state: %v. Continuing in degraded mode.\n", err)
+		emitDegradedWarning(cmd, fmt.Sprintf("Unable to reach GitHub API and no cached quarantine state available. Running without quarantine exclusions. (reason: %v)", err))
 		return nil, nil, ""
 	}
 
@@ -641,6 +660,15 @@ func configResolutionTrace(cfg *config.Config, retriesFlag, cfgRetries int, juni
 		fmt.Sprintf("[verbose]   framework = %s (source: config)", cfg.Framework),
 		fmt.Sprintf("[verbose]   retries   = %d (source: %s)", cfg.Retries, retriesSource),
 		fmt.Sprintf("[verbose]   junitxml  = %s (source: %s)", cfg.JUnitXML, junitxmlSource),
+	}
+}
+
+// emitDegradedWarning prints a [quarantine] WARNING to stderr and, when running
+// inside GitHub Actions (GITHUB_ACTIONS=true), also emits a GHA workflow annotation.
+func emitDegradedWarning(cmd *cobra.Command, reason string) {
+	cmd.PrintErrf("[quarantine] WARNING: %s\n", reason)
+	if os.Getenv("GITHUB_ACTIONS") != "" {
+		cmd.PrintErrf("::warning title=Quarantine Degraded Mode::%s\n", reason)
 	}
 }
 
