@@ -13,9 +13,10 @@ cli-lint:
 
 cli-mutate:
 	@echo "Running mutation tests on each package (gremlins requires per-package runs)..."
-	cd cli && for pkg in ./internal/config ./internal/git ./internal/github ./internal/parser ./internal/quarantine ./cmd/quarantine; do \
+	cd cli && GREMLINS=$$(which gremlins 2>/dev/null || echo "$$(asdf where golang 2>/dev/null)/bin/gremlins") && \
+	for pkg in ./internal/config ./internal/git ./internal/github ./internal/parser ./internal/quarantine ./cmd/quarantine; do \
 		echo "--- $$pkg ---"; \
-		gremlins unleash -S lctkvsr --invert-assignments $$pkg; \
+		$$GREMLINS unleash -S lctkvsr --invert-assignments $$pkg; \
 	done
 
 # --- Dashboard (TypeScript) ---

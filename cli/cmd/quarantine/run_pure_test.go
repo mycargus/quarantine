@@ -5,6 +5,8 @@ import (
 
 	"github.com/mycargus/quarantine/internal/config"
 	"github.com/mycargus/quarantine/internal/parser"
+	qstate "github.com/mycargus/quarantine/internal/quarantine"
+	"github.com/mycargus/quarantine/internal/result"
 	riteway "github.com/mycargus/riteway-golang"
 )
 
@@ -174,6 +176,46 @@ func TestRepoString(t *testing.T) {
 		Should:   "return empty string",
 		Actual:   repoString("", ""),
 		Expected: "",
+	})
+}
+
+func TestAddNewFlakyTestsUpdatesExistingEntry(t *testing.T) {
+	state := qstate.NewEmptyState()
+	state.AddTest(qstate.Entry{
+		TestID:     "src/payment.test.js::PaymentService::should process payment",
+		FlakyCount: 3,
+	})
+
+	res := result.Result{
+		Tests: []result.TestEntry{{
+			TestID: "src/payment.test.js::PaymentService::should process payment",
+			Status: "flaky",
+		}},
+	}
+
+	changed := addNewFlakyTests(state, res, nil)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a flaky test already present in quarantine state",
+		Should:   "return changed=true",
+		Actual:   changed,
+		Expected: true,
+	})
+
+	entry := state.Tests["src/payment.test.js::PaymentService::should process payment"]
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a flaky test already present in quarantine state",
+		Should:   "increment FlakyCount",
+		Actual:   entry.FlakyCount,
+		Expected: 4,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a flaky test already present in quarantine state",
+		Should:   "update LastFlakyAt to a non-empty timestamp",
+		Actual:   entry.LastFlakyAt != "",
+		Expected: true,
 	})
 }
 
