@@ -64,6 +64,11 @@ func (c *Client) SetRetryDelay(d time.Duration) {
 	c.retryDelay = d
 }
 
+// RetryDelay returns the current retry delay (used in tests to assert the default).
+func (c *Client) RetryDelay() time.Duration {
+	return c.retryDelay
+}
+
 // resolveToken checks QUARANTINE_GITHUB_TOKEN first, then GITHUB_TOKEN.
 func resolveToken() string {
 	if token := os.Getenv("QUARANTINE_GITHUB_TOKEN"); token != "" {

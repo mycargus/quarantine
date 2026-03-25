@@ -9,6 +9,11 @@ import (
 	"github.com/mycargus/quarantine/internal/config"
 )
 
+// errorContains reports whether err is non-nil and its message contains sub.
+func errorContains(err error, sub string) bool {
+	return err != nil && strings.Contains(err.Error(), sub)
+}
+
 // parseYAML is a test helper that calls Parse on a YAML string.
 func parseYAML(t *testing.T, yaml string) *config.Config {
 	t.Helper()
@@ -65,8 +70,8 @@ func TestLoadFileNotFound(t *testing.T) {
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a path that does not exist",
-		Should:   "return a non-nil error",
-		Actual:   err != nil,
+		Should:   "return an error wrapping 'could not open config file'",
+		Actual:   errorContains(err, "could not open config file"),
 		Expected: true,
 	})
 }

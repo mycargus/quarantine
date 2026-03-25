@@ -10,6 +10,23 @@ import (
 
 // --- ApplyDefaults does not overwrite already-set values ---
 
+func TestApplyDefaultsDoesNotOverwriteRetries(t *testing.T) {
+	cfg := parseYAML(t, `
+version: 1
+framework: jest
+retries: 5
+`)
+
+	cfg.ApplyDefaults()
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a config with retries already set to a non-zero value",
+		Should:   "not overwrite retries with the default (3)",
+		Actual:   cfg.Retries,
+		Expected: 5,
+	})
+}
+
 func TestApplyDefaultsUnknownFramework(t *testing.T) {
 	cfg := &config.Config{Framework: "pytest"}
 	cfg.ApplyDefaults()

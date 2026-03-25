@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	riteway "github.com/mycargus/riteway-golang"
 
@@ -26,6 +27,24 @@ func newTestClient(t *testing.T, serverURL string) *ghclient.Client {
 	}
 	c.SetRetryDelay(0)
 	return c
+}
+
+// --- Default field values from NewClient ---
+
+func TestNewClientHasDefaultRetryDelay(t *testing.T) {
+	t.Setenv("QUARANTINE_GITHUB_TOKEN", "ghp_test")
+
+	c, err := ghclient.NewClient("owner", "repo")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+
+	riteway.Assert(t, riteway.Case[time.Duration]{
+		Given:    "a freshly created client",
+		Should:   "have default retry delay of 2 seconds",
+		Actual:   c.RetryDelay(),
+		Expected: 2 * time.Second,
+	})
 }
 
 // --- Token resolution via NewClient ---
