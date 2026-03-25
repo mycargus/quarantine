@@ -13,6 +13,54 @@ import (
 	"github.com/mycargus/quarantine/internal/result"
 )
 
+// --- False positive guard: no quarantine state + empty results should NOT warn ---
+
+func TestRunEmptyResultsWithoutQuarantineStateDoesNotWarn(t *testing.T) {
+	dir := t.TempDir()
+
+	// Empty XML (0 tests) — but NO quarantine state loaded (no token).
+	emptyXML := `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="0" failures="0" errors="0" time="0">
+</testsuites>`
+
+	xmlPath := filepath.Join(dir, "junit.xml")
+	if err := os.WriteFile(xmlPath, []byte(emptyXML), 0644); err != nil {
+		t.Fatalf("write xml: %v", err)
+	}
+	scriptPath := writeTestScript(t, dir, "", "", 0)
+
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+`)
+
+	resultsPath := filepath.Join(dir, "results.json")
+	output, err := executeRunCmd(t, []string{
+		"--config", configPath,
+		"--junitxml", xmlPath,
+		"--output", resultsPath,
+		"--", scriptPath,
+	}, map[string]string{
+		// No GitHub token — forces degraded mode (nil quarantine state).
+		"QUARANTINE_GITHUB_TOKEN": "",
+		"GITHUB_TOKEN":            "",
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "run with no quarantine state (degraded mode) and 0 test results",
+		Should:   "exit with code 0",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "run with no quarantine state and 0 test results",
+		Should:   "NOT emit the all-tests-quarantined warning",
+		Actual:   strings.Contains(output, "All tests are quarantined"),
+		Expected: false,
+	})
+}
+
 // --- Scenario 57: ALL tests quarantined — Jest/Vitest ---
 
 func TestRunJestAllTestsQuarantinedEmitsWarning(t *testing.T) {

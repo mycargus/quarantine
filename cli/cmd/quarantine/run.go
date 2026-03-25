@@ -230,7 +230,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	// Warn when all tests are quarantined (nothing meaningful ran or all suppressed).
-	if allTestsQuarantined(res) {
+	// Only fire when quarantine state was loaded and had entries — otherwise
+	// Total==0 could just mean an empty test suite or degraded mode.
+	hadQuarantinedTests := qState != nil && len(qState.Tests) > 0
+	if hadQuarantinedTests && allTestsQuarantined(res) {
 		cmd.PrintErrln("[quarantine] WARNING: All tests are quarantined. The entire test suite was skipped. Review and close resolved quarantine issues.")
 	}
 
