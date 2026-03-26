@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -278,6 +279,11 @@ func createIssuesForNewFlakyTests(
 
 		issueNum, issueURL, createErr := client.CreateIssue(ctx, title, body, labels)
 		if createErr != nil {
+			var apiErr *gh.APIError
+			if errors.As(createErr, &apiErr) && apiErr.StatusCode == 410 {
+				cmd.PrintErrln("[quarantine] WARNING: GitHub Issues are disabled on this repository. Skipping issue creation for all flaky tests in this run.")
+				break
+			}
 			cmd.PrintErrf("[quarantine] WARNING: Could not create issue for %q: %v\n", t.Name, createErr)
 			continue
 		}
