@@ -13,7 +13,7 @@
  *   QUARANTINE_BIN           — path to quarantine binary (default: ../bin/quarantine)
  */
 
-import { describe, test, beforeAll, beforeEach, afterEach } from 'vitest'
+import { describe, test, beforeAll, beforeEach, afterEach, onTestFailed } from 'vitest'
 import { assert } from 'riteway/vitest'
 import {
   mkdtempSync,
@@ -199,12 +199,23 @@ function makeScript(dir, name, body) {
 }
 
 function runCLI(dir, args, extraEnv = {}) {
-  return spawnSync(binPath, args, {
+  const result = spawnSync(binPath, args, {
     cwd: dir,
     encoding: 'utf8',
     env: { ...process.env, QUARANTINE_GITHUB_TOKEN: token, ...extraEnv },
     timeout: 120_000,
   })
+  // Register a callback to surface CLI output if this test fails.
+  onTestFailed(() => {
+    console.error('\n--- quarantine CLI output (on failure) ---')
+    console.error('args:', ['run', ...args].join(' '))
+    if (result.stdout) console.error('stdout:\n' + result.stdout.trimEnd())
+    if (result.stderr) console.error('stderr:\n' + result.stderr.trimEnd())
+    if (result.error) console.error('spawn error:', result.error.message)
+    console.error('exit code:', result.status)
+    console.error('------------------------------------------\n')
+  })
+  return result
 }
 
 // ---

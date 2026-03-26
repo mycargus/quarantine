@@ -411,6 +411,13 @@ ensures compatibility when integrated.
   - `test_hash` is a deterministic identifier derived from `test_id`.
   - GitHub auto-creates labels on first use. No separate label creation call.
   - Race condition on dedup is accepted (duplicate issue closed by human).
+  - **Issue creation scope (ADR-022):** Issues are only created when the flaky
+    test's file already exists on the base branch. If `GITHUB_BASE_REF` is set
+    and `git diff --name-only --diff-filter=A origin/${GITHUB_BASE_REF}`
+    includes the test's `file_path`, the test file is new to the PR: skip
+    issue creation and skip updating `quarantine.json`. Post a PR comment
+    warning the developer instead. Fallback: if the diff check fails or
+    `GITHUB_BASE_REF` is unset, treat the file as pre-existing (create issue).
 - Posts or updates PR comments:
   - PR number auto-detected from `GITHUB_EVENT_PATH` (GitHub Actions). `--pr`
     flag overrides.
@@ -479,6 +486,10 @@ ensures compatibility when integrated.
    rendering with all conditional sections, dedup search query construction,
    `test_hash` generation, PR number detection from `GITHUB_EVENT_PATH`.
 10. E2E test: full end-to-end against a real GitHub repo and PR.
+11. Flaky test in a PR-only file: no issue created, PR comment warns developer
+    (Scenario 72).
+12. Flaky test in a pre-existing file, triggered from a PR: issue created and
+    PR comment links to it (Scenario 73).
 
 **Key implementation notes:**
 
@@ -658,6 +669,12 @@ hardens and documents the entire system.
 
 **Scope -- included:**
 
+- **Structured CLI logging:** Replace ad-hoc `[quarantine] WARNING:` stderr
+  prints with a proper leveled logging system (ERROR / INFO / DEBUG). The
+  `--verbose` flag promotes to INFO+DEBUG output; a `QUARANTINE_DEBUG` env
+  var (or similar) enables debug-level output without CLI flags. Current
+  warnings are already correct in content; this is a presentation/consistency
+  improvement. Deferred from M5 to keep scope focused.
 - Comprehensive error handling testing: all error paths from
   `docs/specs/error-handling.md` have corresponding tests (CLI and dashboard).
 - Degraded mode testing: simulate GitHub API failures and verify correct
