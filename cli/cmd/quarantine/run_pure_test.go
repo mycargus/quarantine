@@ -179,6 +179,58 @@ func TestRepoString(t *testing.T) {
 	})
 }
 
+func TestClassifyPRScope(t *testing.T) {
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "file appears in added-files list",
+		Should:   "return new_file_in_pr",
+		Actual:   classifyPRScope([]string{"src/payment-refund.test.js"}, "src/payment-refund.test.js", "should process refund", nil),
+		Expected: "new_file_in_pr",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "file not in added-files list and test name in added diff lines",
+		Should:   "return new_test_in_pr",
+		Actual: classifyPRScope(
+			[]string{"src/other.test.js"},
+			"src/payment.test.js",
+			"should process refund",
+			[]string{"+  it('should process refund', () => {", " existing line"},
+		),
+		Expected: "new_test_in_pr",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "file not in added-files list and test name not in added lines",
+		Should:   "return empty string (pre-existing test)",
+		Actual: classifyPRScope(
+			[]string{"src/other.test.js"},
+			"src/payment.test.js",
+			"should process refund",
+			[]string{" unchanged line", "-removed line"},
+		),
+		Expected: "",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "no base ref info available (empty newFiles, empty diffLines)",
+		Should:   "return empty string (fallback to pre-existing)",
+		Actual:   classifyPRScope(nil, "src/payment.test.js", "should process refund", nil),
+		Expected: "",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "test name appears only in a removed line (not added)",
+		Should:   "return empty string (test pre-existed, was not added)",
+		Actual: classifyPRScope(
+			nil,
+			"src/payment.test.js",
+			"should process refund",
+			[]string{"-  it('should process refund', () => {"},
+		),
+		Expected: "",
+	})
+}
+
 func TestAddNewFlakyTestsUpdatesExistingEntry(t *testing.T) {
 	state := qstate.NewEmptyState()
 	state.AddTest(qstate.Entry{
@@ -193,7 +245,7 @@ func TestAddNewFlakyTestsUpdatesExistingEntry(t *testing.T) {
 		}},
 	}
 
-	changed := addNewFlakyTests(state, res, nil)
+	changed := addNewFlakyTests(state, res, nil, nil)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a flaky test already present in quarantine state",

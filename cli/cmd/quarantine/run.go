@@ -221,10 +221,24 @@ func runRun(cmd *cobra.Command, args []string) error {
 	meta := buildMetadata(cfg)
 	res := result.BuildWithRetries(testResults, retryOutcomes, meta)
 
+	// Classify flaky tests by PR scope (ADR-022): detect new-to-PR tests so we
+	// can skip issue creation and quarantine state for them.
+	baseRef := os.Getenv("GITHUB_BASE_REF")
+	skipReasons := checkPRScopeForTests(baseRef, buildPRScopeInputs(res))
+
+	// Annotate results with issue_skipped_reason for new-to-PR tests.
+	for i, t := range res.Tests {
+		if reason := skipReasons[t.TestID]; reason != "" {
+			r := reason
+			res.Tests[i].IssueSkippedReason = &r
+		}
+	}
+
 	// Add newly detected flaky tests to quarantine state and write via CAS.
+	// New-to-PR flaky tests are excluded (no persistent quarantine without a GitHub Issue per ADR-017).
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	if qState != nil && !dryRun {
-		flakyAdded := addNewFlakyTests(qState, res, excludePatterns)
+		flakyAdded := addNewFlakyTests(qState, res, excludePatterns, skipReasons)
 		stateChanged := flakyAdded || len(removedTestIDs) > 0
 		if stateChanged {
 			writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA, ghClient, removedTestIDs)
@@ -242,11 +256,11 @@ func runRun(cmd *cobra.Command, args []string) error {
 		branch := meta.Branch
 		commitSHA := meta.CommitSHA
 
-		issueRefs := createIssuesForNewFlakyTests(ctx, cmd, ghClient, res, excludePatterns, branch, commitSHA, prNumber)
+		issueRefs := createIssuesForNewFlakyTests(ctx, cmd, ghClient, res, excludePatterns, branch, commitSHA, prNumber, skipReasons)
 
 		prCommentEnabled := cfg.Notifications.GitHubPRComment == nil || *cfg.Notifications.GitHubPRComment
 		if prCommentEnabled {
-			flakyEntries := buildFlakyEntries(res, issueRefs)
+			flakyWithIssue, flakyNewToPR := buildFlakyEntries(res, issueRefs, skipReasons)
 			commentData := PRCommentData{
 				Total:              res.Summary.Total,
 				Passed:             res.Summary.Passed,
@@ -255,7 +269,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 				Quarantined:        res.Summary.Quarantined,
 				Unquarantined:      len(removedTestIDs),
 				Version:            version,
-				NewlyFlaky:         flakyEntries,
+				NewlyFlaky:         flakyWithIssue,
+				NewToPRFlaky:       flakyNewToPR,
 				QuarantinedTests:   buildQuarantinedEntries(qState),
 				UnquarantinedTests: buildUnquarantinedEntries(removedEntries),
 				Failures:           buildFailureEntries(res),
@@ -387,8 +402,10 @@ func buildExclusionArgsFromState(fw runner.Framework, state *qstate.State) []str
 // addNewFlakyTests adds newly detected flaky tests from the run results to the
 // quarantine state. A test is newly flaky if it is not already in the state
 // and its result status is "flaky". Tests matching excludePatterns are skipped.
+// Tests in skipReasons are skipped (new-to-PR tests per ADR-022 — no persistent
+// quarantine without a GitHub Issue).
 // Returns true if the state was modified.
-func addNewFlakyTests(state *qstate.State, res result.Result, excludePatterns []string) bool {
+func addNewFlakyTests(state *qstate.State, res result.Result, excludePatterns []string, skipReasons map[string]string) bool {
 	changed := false
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, t := range res.Tests {
@@ -396,6 +413,9 @@ func addNewFlakyTests(state *qstate.State, res result.Result, excludePatterns []
 			continue
 		}
 		if runner.MatchesExcludePattern(t.TestID, excludePatterns) {
+			continue
+		}
+		if skipReasons[t.TestID] != "" {
 			continue
 		}
 		if state.HasTest(t.TestID) {

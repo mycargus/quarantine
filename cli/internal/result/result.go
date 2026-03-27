@@ -47,16 +47,17 @@ type RetryEntry struct {
 
 // TestEntry holds the result for a single test case.
 type TestEntry struct {
-	TestID         string       `json:"test_id"`
-	FilePath       string       `json:"file_path"`
-	Classname      string       `json:"classname"`
-	Name           string       `json:"name"`
-	Status         string       `json:"status"`
-	OriginalStatus *string      `json:"original_status"`
-	DurationMs     int          `json:"duration_ms"`
-	FailureMessage *string      `json:"failure_message"`
-	IssueNumber    *int         `json:"issue_number"`
-	Retries        []RetryEntry `json:"retries,omitempty"`
+	TestID              string       `json:"test_id"`
+	FilePath            string       `json:"file_path"`
+	Classname           string       `json:"classname"`
+	Name                string       `json:"name"`
+	Status              string       `json:"status"`
+	OriginalStatus      *string      `json:"original_status"`
+	DurationMs          int          `json:"duration_ms"`
+	FailureMessage      *string      `json:"failure_message"`
+	IssueNumber         *int         `json:"issue_number"`
+	IssueSkippedReason  *string      `json:"issue_skipped_reason,omitempty"`
+	Retries             []RetryEntry `json:"retries,omitempty"`
 }
 
 // Metadata holds run-level metadata used to build the result.

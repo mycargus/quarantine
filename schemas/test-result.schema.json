@@ -199,6 +199,11 @@
           "type": ["integer", "null"],
           "minimum": 1,
           "description": "GitHub Issue number if this test is quarantined or newly flaky. Null otherwise."
+        },
+        "issue_skipped_reason": {
+          "type": "string",
+          "enum": ["new_file_in_pr", "new_test_in_pr"],
+          "description": "Present only when GitHub Issue creation was skipped for a flaky test (ADR-022). 'new_file_in_pr': the test's file is new to this PR. 'new_test_in_pr': the test case was added to an existing file in this PR."
         }
       }
     },

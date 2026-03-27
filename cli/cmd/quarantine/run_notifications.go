@@ -119,17 +119,18 @@ type FailureEntry struct {
 
 // PRCommentData holds the data needed to render the PR comment.
 type PRCommentData struct {
-	Total             int
-	Passed            int
-	Failed            int
-	Flaky             int
-	Quarantined       int
-	Unquarantined     int
-	Version           string
-	NewlyFlaky        []FlakyEntry
-	QuarantinedTests  []QuarantinedEntry
+	Total              int
+	Passed             int
+	Failed             int
+	Flaky              int
+	Quarantined        int
+	Unquarantined      int
+	Version            string
+	NewlyFlaky         []FlakyEntry
+	NewToPRFlaky       []FlakyEntry
+	QuarantinedTests   []QuarantinedEntry
 	UnquarantinedTests []UnquarantinedEntry
-	Failures          []FailureEntry
+	Failures           []FailureEntry
 }
 
 // renderPRComment renders the PR comment body from the given data.
@@ -159,6 +160,18 @@ func renderPRComment(data PRCommentData) string {
 		}
 		sb.WriteString("\nThese tests failed initially but passed on retry. They have been quarantined\n")
 		sb.WriteString("and will be excluded from future runs until their issues are resolved.\n")
+	}
+
+	if len(data.NewToPRFlaky) > 0 {
+		sb.WriteString("\n### Flaky Tests in This PR (Not Quarantined)\n\n")
+		sb.WriteString("The following tests are flaky **in this PR** but were not quarantined because ")
+		sb.WriteString("they do not yet exist on the base branch. ")
+		sb.WriteString("Please fix the flakiness before merging.\n\n")
+		sb.WriteString("| Test |\n")
+		sb.WriteString("|------|\n")
+		for _, f := range data.NewToPRFlaky {
+			fmt.Fprintf(&sb, "| `%s` |\n", f.Name)
+		}
 	}
 
 	if len(data.QuarantinedTests) > 0 {
@@ -232,6 +245,8 @@ func postOrUpdatePRComment(ctx context.Context, cmd *cobra.Command, client *gh.C
 // tests, using dedup search to avoid duplicates.
 // Returns a map of testID -> (issueNumber, issueURL) for tests where an issue
 // was found or created.
+// skipReasons: testID -> skipReason for tests that should not get a GitHub Issue
+// (e.g. new-to-PR tests per ADR-022). Those tests are skipped entirely.
 // This is an I/O orchestrator — best-effort, never breaks the build.
 func createIssuesForNewFlakyTests(
 	ctx context.Context,
@@ -241,6 +256,7 @@ func createIssuesForNewFlakyTests(
 	excludePatterns []string,
 	branch, commitSHA string,
 	prNumber int,
+	skipReasons map[string]string,
 ) map[string]issueRef {
 	refs := make(map[string]issueRef)
 	if client == nil {
@@ -249,6 +265,9 @@ func createIssuesForNewFlakyTests(
 
 	for _, t := range res.Tests {
 		if t.Status != "flaky" {
+			continue
+		}
+		if skipReasons[t.TestID] != "" {
 			continue
 		}
 
@@ -300,21 +319,26 @@ type issueRef struct {
 }
 
 // buildFlakyEntries converts result tests + issue refs to PR comment flaky entries.
+// It splits into two lists: tests with issues (newly quarantined) and tests without
+// issues (new-to-PR per ADR-022, tracked in skipReasons).
 // This is a pure function — no I/O.
-func buildFlakyEntries(res result.Result, issueRefs map[string]issueRef) []FlakyEntry {
-	var entries []FlakyEntry
+func buildFlakyEntries(res result.Result, issueRefs map[string]issueRef, skipReasons map[string]string) (withIssue []FlakyEntry, newToPR []FlakyEntry) {
 	for _, t := range res.Tests {
 		if t.Status != "flaky" {
 			continue
 		}
+		if skipReasons[t.TestID] != "" {
+			newToPR = append(newToPR, FlakyEntry{Name: t.Name})
+			continue
+		}
 		ref := issueRefs[t.TestID]
-		entries = append(entries, FlakyEntry{
+		withIssue = append(withIssue, FlakyEntry{
 			Name:     t.Name,
 			IssueURL: ref.URL,
 			IssueNum: ref.Number,
 		})
 	}
-	return entries
+	return
 }
 
 // buildQuarantinedEntries converts quarantine state entries to PR comment quarantined entries.
