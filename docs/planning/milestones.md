@@ -412,12 +412,18 @@ ensures compatibility when integrated.
   - GitHub auto-creates labels on first use. No separate label creation call.
   - Race condition on dedup is accepted (duplicate issue closed by human).
   - **Issue creation scope (ADR-022):** Issues are only created when the flaky
-    test's file already exists on the base branch. If `GITHUB_BASE_REF` is set
-    and `git diff --name-only --diff-filter=A origin/${GITHUB_BASE_REF}`
-    includes the test's `file_path`, the test file is new to the PR: skip
-    issue creation and skip updating `quarantine.json`. Post a PR comment
-    warning the developer instead. Fallback: if the diff check fails or
-    `GITHUB_BASE_REF` is unset, treat the file as pre-existing (create issue).
+    test already exists on the base branch. Two-step detection:
+    (a) `git fetch origin ${GITHUB_BASE_REF} --depth=1` to ensure the base ref
+    is available (shallow clone protection).
+    (b) If the test file is new (`git diff --name-only --diff-filter=A`), all
+    tests in it are new → skip issue creation.
+    (c) If the file pre-exists, search `git diff origin/${GITHUB_BASE_REF} -- {file}`
+    added lines for the test name. If found → test case is new to PR → skip
+    issue creation.
+    In both skip cases, `quarantine.json` is not updated, no issue is created,
+    but a PR comment warns the developer. Fallback: if `GITHUB_BASE_REF` is
+    unset, `git fetch` fails, or the diff cannot be computed, treat the test as
+    pre-existing (create issue).
 - Posts or updates PR comments:
   - PR number auto-detected from `GITHUB_EVENT_PATH` (GitHub Actions). `--pr`
     flag overrides.
@@ -488,8 +494,10 @@ ensures compatibility when integrated.
 10. E2E test: full end-to-end against a real GitHub repo and PR.
 11. Flaky test in a PR-only file: no issue created, PR comment warns developer
     (Scenario 72).
-12. Flaky test in a pre-existing file, triggered from a PR: issue created and
-    PR comment links to it (Scenario 73).
+12. Flaky test in a pre-existing file, pre-existing test case, triggered from a
+    PR: issue created and PR comment links to it (Scenario 73).
+13. Flaky new test case added to a pre-existing file: no issue created, PR
+    comment warns developer (Scenario 74).
 
 **Key implementation notes:**
 
@@ -501,6 +509,13 @@ ensures compatibility when integrated.
   developer actionability.
 - The `410 Gone` response on issue creation means issues are disabled on the
   repo. Skip issue creation for all tests in this run.
+- **Shallow clone protection (ADR-022):** GitHub Actions defaults to
+  `fetch-depth: 1`, which does not include the base branch ref. The CLI must
+  run `git fetch origin ${GITHUB_BASE_REF} --depth=1` before the diff check.
+  If the fetch fails, fall back to creating the issue (safe default).
+- **Test name search in diff is heuristic:** Searches added `+` lines for the
+  test's `name` attribute from JUnit XML. Dynamic test names (e.g.,
+  `test.each`) may not match — falls through to "create issue" (safe default).
 
 ---
 

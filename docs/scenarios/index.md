@@ -9,7 +9,7 @@ Each v1 scenario is tagged with the milestone where it first becomes testable.
 |---------|------------|
 | [Initialization](v1/01-initialization.md) | M1 | 
 | [Configuration Validation](v1/02-configuration.md) | M1
-| [Core Flows](v1/03-core-flows.md) | M2–M4
+| [Core Flows](v1/03-core-flows.md) | M2–M5
 | [Concurrency](v1/04-concurrency.md) | M4–M5
 | [Degraded Mode](v1/05-degraded-mode.md) | M4, M6
 | [Dashboard](v1/06-dashboard.md) | M6–M7
@@ -22,4 +22,5 @@ Each v1 scenario is tagged with the milestone where it first becomes testable.
 ## v2+ Scenarios
 
 See [v2/01-v2-scenarios.md](v2/01-v2-scenarios.md) for post-v1 scenarios including:
-GitHub App, OAuth, Jira, Slack notifications, Jenkins CI, and adaptive polling.
+GitHub App, OAuth, Jira, Slack notifications, Jenkins CI, `--base-branch` for
+non-GHA CI (ADR-023), and adaptive polling.

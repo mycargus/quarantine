@@ -113,7 +113,63 @@ and the dashboard has accumulated flaky test data over the past week
 
 ---
 
-### Scenario 9: Dashboard handles stale or inactive repos [v2+]
+### Scenario 9: Non-GHA CI with --pr but no GITHUB_BASE_REF [v2+]
+
+**Risk:** A non-GitHub-Actions CI system passes `--pr` for comment posting but does not set `GITHUB_BASE_REF`. Without the base ref, the CLI cannot determine which tests are new to the PR, and might either silently skip issue creation (under-reporting) or create issues for every flaky test (over-reporting).
+
+**Given** the project uses Jenkins (or CircleCI, GitLab CI, etc.) for CI, the
+Quarantine CLI is installed, `quarantine.yml` is configured, and the CI pipeline
+passes `--pr 42` to `quarantine run`. The environment does NOT set
+`GITHUB_BASE_REF`. A flaky test is detected in a test file introduced by the PR.
+
+**When** CI executes
+`quarantine run --retries 3 --pr 42 -- jest --ci --reporters=default --reporters=jest-junit`
+and `PaymentService > should process refund` (in a new test file) fails on the
+first run but passes on retry
+
+**Then** the CLI:
+1. Identifies `should process refund` as flaky.
+2. Attempts to determine if the test is new to the PR: `GITHUB_BASE_REF` is
+   not set → diff check cannot run → falls back to safe default.
+3. Treats the test as pre-existing — adds it to `quarantine.json` and creates a
+   GitHub Issue (same as Scenario 73).
+4. Posts a PR comment on PR #42 referencing the issue.
+5. Exits with code 0.
+
+**Note:** This creates an issue even though the test only exists in the PR
+(false positive). This is the safe default per ADR-022: over-reporting is
+preferable to silently missing a codebase-level problem. v2 adds
+`--base-branch` (ADR-023) to enable new-test detection for non-GHA CI systems.
+
+---
+
+### Scenario 10: Non-GHA CI with --base-branch enables new-test detection [v2+]
+
+**Risk:** Non-GHA CI systems permanently miss the new-test detection feature because they cannot set `GITHUB_BASE_REF`, creating unnecessary GitHub Issues for PR-only tests.
+
+**Given** the project uses Jenkins for CI, `quarantine.yml` is configured, and
+the CI pipeline passes `--pr 42 --base-branch main` to `quarantine run`.
+`GITHUB_BASE_REF` is NOT set but `--base-branch main` provides the equivalent.
+A flaky test is detected in a test file introduced by the PR.
+
+**When** CI executes
+`quarantine run --retries 3 --pr 42 --base-branch main -- jest --ci --reporters=default --reporters=jest-junit`
+and `PaymentService > should process refund` (in a new test file) fails on the
+first run but passes on retry
+
+**Then** the CLI:
+1. Identifies `should process refund` as flaky.
+2. Uses `--base-branch main` as the base ref (since `GITHUB_BASE_REF` is
+   unset). Runs `git fetch origin main --depth=1` and
+   `git diff --name-only --diff-filter=A origin/main`.
+3. Detects the test file is new to the PR → skips issue creation and
+   `quarantine.json` update (same as Scenario 72).
+4. Posts a PR comment warning the developer.
+5. Exits with code 0.
+
+---
+
+### Scenario 11: Dashboard handles stale or inactive repos [v2+]
 
 **Risk:** Polling inactive repositories at the same frequency as active ones wastes GitHub API rate limit budget, reducing capacity for repos that need it (ADR-015).
 

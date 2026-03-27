@@ -298,3 +298,107 @@ and the test `CheckoutService > should apply discount` fails
 5. Exits with code 1 (test failure — not a quarantine error).
 
 ---
+
+### Scenario 72: Flaky test detected in a PR — test file is new to the PR [M5]
+
+**Risk:** A GitHub Issue is created for a flaky test that only exists in a PR branch and may never land in main, polluting the issue tracker with tests that have no codebase-level owner (ADR-022).
+
+**Given** the CLI is configured in CI, `quarantine.json` has no entry for
+`PaymentService > should process refund`, `GITHUB_BASE_REF` is set, and the
+test file `src/payment-refund.test.js` does not exist on the base branch (it
+appears in `git diff --name-only --diff-filter=A origin/${GITHUB_BASE_REF}`)
+
+**When** CI executes
+`quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit`
+and `should process refund` fails on the first run but passes on retry 1 of 3
+
+**Then** the CLI:
+1. Identifies `should process refund` as flaky (failed initially, passed on
+   retry).
+2. Detects that `src/payment-refund.test.js` is new to this PR via
+   `git diff --diff-filter=A`.
+3. Does NOT add an entry to `quarantine.json` (no persistent quarantine — the
+   test does not exist in the base branch, and without a GitHub Issue there is
+   no unquarantine mechanism per ADR-017).
+4. Does NOT create a GitHub Issue.
+5. Posts a PR comment warning the developer that `should process refund` is
+   flaky in this PR. The comment uses the `<!-- quarantine-bot -->` marker but
+   does not link to an issue. It advises the developer to fix the flakiness
+   before merging.
+6. Writes results to `.quarantine/results.json` with the test marked as
+   `status: "flaky"` and `issue_skipped_reason: "new_file_in_pr"`.
+7. Exits with code 0 (flaky is forgiven — the test passed on retry).
+
+---
+
+### Scenario 73: Flaky test detected in a PR — pre-existing test in pre-existing file [M5]
+
+**Risk:** A flaky test in an existing file is not tracked as a GitHub Issue because the CLI incorrectly treats it as PR-only, leaving the codebase problem unrecorded (ADR-022).
+
+**Given** the CLI is configured in CI, `quarantine.json` has no entry for
+`PaymentService > should handle charge timeout`, the test file
+`src/payment.test.js` already exists on the base branch
+(`git diff --name-only --diff-filter=A origin/${GITHUB_BASE_REF}` does NOT
+include `src/payment.test.js`), and the test name `should handle charge timeout`
+does NOT appear in added lines of
+`git diff origin/${GITHUB_BASE_REF} -- src/payment.test.js`
+
+**When** CI executes
+`quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit`
+and `should handle charge timeout` fails on the first run but passes on retry
+2 of 3
+
+**Then** the CLI:
+1. Identifies `should handle charge timeout` as flaky (failed initially, passed
+   on retry).
+2. Detects that `src/payment.test.js` is NOT new to this PR (it pre-exists on
+   the base branch).
+3. Searches the diff of `src/payment.test.js` for `should handle charge timeout`
+   in added lines — not found. The test pre-existed.
+4. Fetches `quarantine.json` from the `quarantine/state` branch and adds an
+   entry for the test via compare-and-swap (SHA-based CAS, per ADR-006).
+5. Creates a GitHub Issue titled `[Quarantine] PaymentService > should handle
+   charge timeout` with labels `["quarantine", "quarantine:{test_hash}"]`
+   (per ADR-009).
+6. Posts a PR comment summarizing the newly quarantined test and linking to the
+   created issue, identified by the `<!-- quarantine-bot -->` HTML marker.
+7. Writes results to `.quarantine/results.json` including retry details.
+8. Exits with code 0.
+
+---
+
+### Scenario 74: Flaky test detected in a PR — new test case in an existing file [M5]
+
+**Risk:** A new test case added to a pre-existing file is incorrectly treated as a codebase-level problem because the file-level check passes (the file pre-exists), causing a GitHub Issue to be created for a test that only exists in the PR (ADR-022).
+
+**Given** the CLI is configured in CI, `quarantine.json` has no entry for
+`PaymentService > should process refund`, the test file `src/payment.test.js`
+already exists on the base branch (it is NOT in `--diff-filter=A` output), but
+the test name `should process refund` DOES appear in added lines of
+`git diff origin/${GITHUB_BASE_REF} -- src/payment.test.js`
+(the developer added a new test case to an existing file in this PR)
+
+**When** CI executes
+`quarantine run --retries 3 -- jest --ci --reporters=default --reporters=jest-junit`
+and `should process refund` fails on the first run but passes on retry 1 of 3
+
+**Then** the CLI:
+1. Identifies `should process refund` as flaky (failed initially, passed on
+   retry).
+2. Detects that `src/payment.test.js` is NOT new to this PR (it pre-exists on
+   the base branch).
+3. Searches the diff of `src/payment.test.js` for `should process refund` in
+   added lines — found. The test case is new to this PR.
+4. Does NOT add an entry to `quarantine.json` (no persistent quarantine — the
+   test case is new to this PR, and without a GitHub Issue there is no
+   unquarantine mechanism per ADR-017).
+5. Does NOT create a GitHub Issue.
+6. Posts a PR comment warning the developer that `should process refund` is
+   flaky in this PR. The comment uses the `<!-- quarantine-bot -->` marker but
+   does not link to an issue. It advises the developer to fix the flakiness
+   before merging.
+7. Writes results to `.quarantine/results.json` with the test marked as
+   `status: "flaky"` and `issue_skipped_reason: "new_test_in_pr"`.
+8. Exits with code 0 (flaky is forgiven — the test passed on retry).
+
+---
