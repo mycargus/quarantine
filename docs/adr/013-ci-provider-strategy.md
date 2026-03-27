@@ -13,7 +13,7 @@ v1 targets GitHub Actions as the fully-featured CI provider. The CLI binary itse
 
 In non-Actions environments, the CLI still works for core functionality (run tests, detect flakiness, write results to disk, update quarantine.json via GitHub API, create issues, post PR comments). The dashboard will not have artifact-based data unless the CI provider's own artifact mechanism is configured to upload the CLI's result file.
 
-v2 adds: Jenkins artifact storage integration, GitLab CI integration, Bitbucket Pipelines integration. The CLI will auto-detect the CI environment and use the appropriate storage backend.
+v2 adds: Jenkins artifact storage integration, GitLab CI integration, Bitbucket Pipelines integration. The CLI will auto-detect the CI environment and use the appropriate storage backend. v2 also adds `--base-branch` (ADR-023) so non-GHA CI systems can use the new-test detection feature from ADR-022.
 
 ## Alternatives Considered
 
