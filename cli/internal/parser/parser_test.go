@@ -156,3 +156,31 @@ func TestParseEmptyTestSuite(t *testing.T) {
 		Expected: 0,
 	})
 }
+
+// TestParseDurationMilliseconds verifies that tc.Time is converted to milliseconds
+// by multiplying by 1000 (not 999 or another value).
+// Kills mutation on line 128: `tc.Time * 1000` → `tc.Time * 999`.
+func TestParseDurationMilliseconds(t *testing.T) {
+	xml := `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="0" errors="0" time="1.0">
+  <testsuite name="suite" tests="1" failures="0" time="1.0">
+    <testcase classname="Foo" name="bar" file="foo.test.js" time="1.000"/>
+  </testsuite>
+</testsuites>`
+
+	results, err := parser.Parse(strings.NewReader(xml))
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "a test case with time='1.000' (1 second)",
+		Should:   "parse without error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a test case with time='1.000' (1 second = 1000 milliseconds)",
+		Should:   "return DurationMs=1000 (not 999)",
+		Actual:   results[0].DurationMs,
+		Expected: 1000,
+	})
+}
