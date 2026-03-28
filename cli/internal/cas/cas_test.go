@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -350,5 +351,104 @@ func TestDetectReQuarantinedIsZeroWhenNoConflict(t *testing.T) {
 		Should:   "return zero re-quarantined tests",
 		Actual:   len(reQuarantined),
 		Expected: 0,
+	})
+}
+
+// --- Additional mutation-coverage tests ---
+
+// mockContentsClient is a minimal implementation of githubContentsClient for
+// fine-grained control in unit tests.
+type mockContentsClient struct {
+	updateFn func(ctx context.Context, path, branch, message string, content []byte, sha string) error
+	getFn    func(ctx context.Context, path, ref string) ([]byte, string, error)
+}
+
+func (m *mockContentsClient) UpdateContents(ctx context.Context, path, branch, message string, content []byte, sha string) error {
+	return m.updateFn(ctx, path, branch, message, content, sha)
+}
+
+func (m *mockContentsClient) GetContents(ctx context.Context, path, ref string) ([]byte, string, error) {
+	return m.getFn(ctx, path, ref)
+}
+
+// TestWriteStateWithCASNon409ErrorIsNonRetryable verifies that when UpdateContents
+// returns a non-APIError (e.g. a plain Go error), the call is NOT retried.
+// Kills mutation on line 62: `||` → `&&`.
+// With `&&`, !errors.As() = true → accesses nil apiErr.StatusCode → panic.
+func TestWriteStateWithCASNon409ErrorIsNonRetryable(t *testing.T) {
+	var callCount int32
+	nonAPIErr := fmt.Errorf("connection reset by peer")
+
+	client := &mockContentsClient{
+		updateFn: func(_ context.Context, _, _, _ string, _ []byte, _ string) error {
+			atomic.AddInt32(&callCount, 1)
+			return nonAPIErr
+		},
+		getFn: func(_ context.Context, _, _ string) ([]byte, string, error) {
+			return nil, "", nil
+		},
+	}
+
+	localState := quarantine.NewEmptyState()
+	content, _ := localState.Marshal()
+
+	_, err := cas.WriteStateWithCAS(context.Background(), client, localState, content, "sha", "branch", 3, nil)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "UpdateContents returns a non-APIError (connection reset by peer)",
+		Should:   "return an error immediately",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[int32]{
+		Given:    "UpdateContents returns a non-APIError",
+		Should:   "call UpdateContents exactly once (no retry for non-409 errors)",
+		Actual:   atomic.LoadInt32(&callCount),
+		Expected: 1,
+	})
+}
+
+// TestWriteStateWithCASExhaustsExactlyMaxRetriesPUTs verifies the loop runs
+// exactly maxRetries PUT attempts before giving up.
+// Kills mutations on line 55: `<= maxRetries` → `< maxRetries` (one fewer iter),
+// and `attempt := 1` → `0` or `2` (different iteration counts).
+func TestWriteStateWithCASExhaustsExactlyMaxRetriesPUTs(t *testing.T) {
+	var putCount int32
+
+	emptyStateBytes, _ := quarantine.NewEmptyState().Marshal()
+	emptyEncoded := base64.StdEncoding.EncodeToString(emptyStateBytes)
+
+	client := &mockContentsClient{
+		updateFn: func(_ context.Context, _, _, _ string, _ []byte, _ string) error {
+			atomic.AddInt32(&putCount, 1)
+			// Always return 409 so all maxRetries PUTs are made.
+			return &ghclient.APIError{StatusCode: 409, Message: "conflict"}
+		},
+		getFn: func(_ context.Context, _, _ string) ([]byte, string, error) {
+			// Return empty remote state so merge always succeeds.
+			decoded, _ := base64.StdEncoding.DecodeString(emptyEncoded)
+			return decoded, "new-sha", nil
+		},
+	}
+
+	localState := quarantine.NewEmptyState()
+	content, _ := localState.Marshal()
+
+	const maxRetries = 3
+	_, err := cas.WriteStateWithCAS(context.Background(), client, localState, content, "sha", "branch", maxRetries, nil)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "all UpdateContents calls return 409",
+		Should:   "return an error after exhausting retries",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[int32]{
+		Given:    fmt.Sprintf("maxRetries=%d with all 409s", maxRetries),
+		Should:   "attempt UpdateContents exactly maxRetries (3) times",
+		Actual:   atomic.LoadInt32(&putCount),
+		Expected: maxRetries,
 	})
 }
