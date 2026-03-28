@@ -429,3 +429,19 @@ func TestMergeConflictPreservesEarliestFirstFlakyAt(t *testing.T) {
 		Expected: 10,
 	})
 }
+
+// TestMergeAtResultHasVersion1 verifies the merged state has Version=1.
+// Kills mutation on line 112: `Version: 1` → `Version: 0`.
+func TestMergeAtResultHasVersion1(t *testing.T) {
+	local := quarantine.NewEmptyState()
+	remote := quarantine.NewEmptyState()
+
+	merged := quarantine.MergeAt(local, remote, "2026-03-28T00:00:00Z")
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "two empty states merged",
+		Should:   "produce a merged state with Version=1",
+		Actual:   merged.Version,
+		Expected: 1,
+	})
+}
