@@ -3,15 +3,13 @@ bin/
 cli/quarantine
 .quarantine/
 
+# pnpm
+.pnpm-store/
+node_modules/
+
 # Dashboard (TypeScript)
-dashboard/node_modules/
-dashboard/.pnpm-store/
 dashboard/build/
 dashboard/.react-router/
-
-# E2E tests
-e2e/node_modules/
-e2e/.pnpm-store/
 
 # OS / editors
 .DS_Store
