@@ -175,6 +175,50 @@ github:
 	})
 }
 
+// TestRunBranchCheckWarnMsgIsPrinted verifies that check.warnMsg (from
+// checkBranchExists) is printed at line 105. When the API is unreachable but
+// the token is valid, GetRef fails with an API error and sets warnMsg to
+// "Could not check branch '...'". This string only appears if line 105's guard
+// fires; it is distinct from the loadQuarantineState warning.
+// Kills mutation: `check.warnMsg != ""` → `check.warnMsg == ""`.
+func TestRunBranchCheckWarnMsgIsPrinted(t *testing.T) {
+	dir := t.TempDir()
+
+	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="0">
+  <testsuite name="suite" tests="1" failures="0">
+    <testcase classname="S" name="passes" time="0.1"/>
+  </testsuite>
+</testsuites>`
+
+	xmlPath := filepath.Join(dir, "junit.xml")
+	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+github:
+  owner: testowner
+  repo: testrepo
+`)
+
+	output, _ := executeRunCmd(t, []string{
+		"--config", configPath,
+		"--junitxml", xmlPath,
+		"--output", filepath.Join(dir, "results.json"),
+		"--", scriptPath,
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(),
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "valid token but API unreachable (GetRef fails with connection refused)",
+		Should:   "print the branch check warning 'Could not check branch'",
+		Actual:   strings.Contains(output, "Could not check branch"),
+		Expected: true,
+	})
+}
+
 func TestRunDegradedAPIUnreachableLogsWarning(t *testing.T) {
 	dir := t.TempDir()
 
