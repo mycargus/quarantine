@@ -42,7 +42,7 @@ describe("Dashboard: GitHub Artifacts API", () => {
   let firstEtag = null
   let artifacts = []
 
-  test("GET /actions/artifacts returns expected response shape", async (_t) => {
+  test("GET /actions/artifacts returns expected response shape with at least one artifact", async () => {
     const res = await ghRequest("GET", "/actions/artifacts?per_page=100")
 
     assert({
@@ -68,37 +68,42 @@ describe("Dashboard: GitHub Artifacts API", () => {
       expected: true,
     })
 
-    // Verify each artifact has the fields the dashboard relies on
-    if (data.artifacts.length > 0) {
-      const a = data.artifacts[0]
-      assert({
-        given: "the first artifact in the list",
-        should: "have an id (number)",
-        actual: typeof a.id,
-        expected: "number",
-      })
+    assert({
+      given: "the test repo (CLI E2E tests upload artifacts)",
+      should: "have at least one artifact",
+      actual: data.artifacts.length >= 1,
+      expected: true,
+    })
 
-      assert({
-        given: "the first artifact in the list",
-        should: "have a name (string)",
-        actual: typeof a.name,
-        expected: "string",
-      })
+    const a = data.artifacts[0]
 
-      assert({
-        given: "the first artifact in the list",
-        should: "have an archive_download_url (string)",
-        actual: typeof a.archive_download_url,
-        expected: "string",
-      })
+    assert({
+      given: "the first artifact in the list",
+      should: "have an id (number)",
+      actual: typeof a.id,
+      expected: "number",
+    })
 
-      assert({
-        given: "the first artifact in the list",
-        should: "have a created_at ISO timestamp (string)",
-        actual: typeof a.created_at,
-        expected: "string",
-      })
-    }
+    assert({
+      given: "the first artifact in the list",
+      should: "have a name (string)",
+      actual: typeof a.name,
+      expected: "string",
+    })
+
+    assert({
+      given: "the first artifact in the list",
+      should: "have an archive_download_url (string)",
+      actual: typeof a.archive_download_url,
+      expected: "string",
+    })
+
+    assert({
+      given: "the first artifact in the list",
+      should: "have a created_at ISO timestamp (string)",
+      actual: typeof a.created_at,
+      expected: "string",
+    })
 
     // Store for subsequent tests
     firstEtag = res.headers.get("etag")
@@ -112,11 +117,16 @@ describe("Dashboard: GitHub Artifacts API", () => {
     })
   })
 
-  test("GET /actions/artifacts with If-None-Match returns 304 when unchanged", async (t) => {
-    if (!firstEtag) {
-      t.skip("No ETag from previous request — cannot test conditional request")
-      return
-    }
+  test("GET /actions/artifacts with If-None-Match returns 304 when unchanged", async () => {
+    // firstEtag is set by the previous test. If it's null, the previous test
+    // failed — and that failure is already reported. This test will fail too
+    // (correctly) because the assertion will compare null against a string.
+    assert({
+      given: "an ETag captured from the previous artifacts response",
+      should: "be a non-null string (previous test must pass first)",
+      actual: typeof firstEtag === "string" && firstEtag.length > 0,
+      expected: true,
+    })
 
     const res = await ghRequest("GET", "/actions/artifacts?per_page=100", {
       "If-None-Match": firstEtag,
@@ -130,14 +140,16 @@ describe("Dashboard: GitHub Artifacts API", () => {
     })
   })
 
-  test("Artifact zip download returns a valid zip that can be extracted", async (t) => {
-    // Find a quarantine-results artifact, or any artifact if none match
+  test("Artifact zip download returns a valid zip that adm-zip can extract", async () => {
+    // Find a quarantine-results artifact, or fall back to any artifact
     const target = artifacts.find((a) => a.name.startsWith("quarantine-results")) ?? artifacts[0]
 
-    if (!target) {
-      t.skip("No artifacts available in the test repo — cannot test download")
-      return
-    }
+    assert({
+      given: "the test repo (CLI E2E tests upload artifacts)",
+      should: "have at least one artifact available for download",
+      actual: target !== undefined,
+      expected: true,
+    })
 
     // The archive_download_url returns a 302 redirect to blob storage.
     // Node fetch follows redirects by default — the final response should be
@@ -167,7 +179,6 @@ describe("Dashboard: GitHub Artifacts API", () => {
     })
 
     // Verify adm-zip (the dashboard's zip library) can parse it
-    // Import dynamically since adm-zip is a dashboard dependency
     const { default: AdmZip } = await import("adm-zip")
     const zip = new AdmZip(buffer)
     const entries = zip.getEntries()
@@ -196,15 +207,12 @@ describe("Dashboard: GitHub Artifacts API", () => {
         expected: true,
       })
 
-      // Verify it has the run_id field the dashboard keys on
-      if (parsed) {
-        assert({
-          given: "the parsed quarantine-results JSON",
-          should: "have a run_id string field (upsert key)",
-          actual: typeof parsed.run_id,
-          expected: "string",
-        })
-      }
+      assert({
+        given: "the parsed quarantine-results JSON",
+        should: "have a run_id string field (upsert key)",
+        actual: typeof parsed?.run_id,
+        expected: "string",
+      })
     }
   })
 })
