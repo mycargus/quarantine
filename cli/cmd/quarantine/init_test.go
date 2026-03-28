@@ -66,10 +66,16 @@ func newInitTestServer(t *testing.T, opts ...func(*initTestServer)) *initTestSer
 			}
 			return
 		}
-		// default branch SHA
+		// default branch SHA — reject empty branch name so that tests can verify
+		// the fallback to "main" fires when defaultBranch is "".
+		branchName := strings.TrimPrefix(r.URL.Path, "/repos/my-org/my-project/git/ref/heads/")
+		if branchName == "" {
+			http.NotFound(w, r)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"ref": "refs/heads/" + s.defaultBranch,
+			"ref": "refs/heads/" + branchName,
 			"object": map[string]interface{}{
 				"sha":  "basesha123",
 				"type": "commit",
@@ -81,6 +87,13 @@ func newInitTestServer(t *testing.T, opts ...func(*initTestServer)) *initTestSer
 	mux.HandleFunc("/repos/my-org/my-project/git/refs", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.NotFound(w, r)
+			return
+		}
+		// Validate that a non-empty SHA was provided, mirroring real GitHub API behavior.
+		var body map[string]interface{}
+		if decErr := json.NewDecoder(r.Body).Decode(&body); decErr != nil || body["sha"] == "" {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			_ = json.NewEncoder(w).Encode(map[string]string{"message": "sha is required"})
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
@@ -119,6 +132,12 @@ func newInitTestServer(t *testing.T, opts ...func(*initTestServer)) *initTestSer
 func withExistingBranch() func(*initTestServer) {
 	return func(s *initTestServer) {
 		s.existingBranch = true
+	}
+}
+
+func withEmptyDefaultBranch() func(*initTestServer) {
+	return func(s *initTestServer) {
+		s.defaultBranch = ""
 	}
 }
 
