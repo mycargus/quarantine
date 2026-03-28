@@ -81,34 +81,38 @@ Mark each scenario file as PASS (all scenarios covered) or PARTIAL (with count a
 
 ### 7. Check E2E coverage
 
-Determine whether the milestone's scenarios require E2E tests beyond what already exists. E2E tests exercise the compiled binary against real external dependencies (real GitHub API, real git repo). They catch issues that mocks cannot — API query format correctness, response shape drift, pagination behavior, and sequential-state flows.
+Determine whether the milestone's scenarios require E2E tests beyond what already exists. E2E tests verify that real external APIs behave as integration test mocks assume. They catch mock-fidelity drift: response shape changes, header behavior, redirect chains, pagination, auth edge cases, and eventual consistency.
 
 #### 7a. Inventory external API interactions
 
-Read the milestone's acceptance scenarios and the **production source code**. List every external API call the production code path exercises — not just what tests call. If a function accepts an injected dependency (e.g., `fetchFn`) for testing but uses real `fetch`/HTTP in production, that IS an external API interaction. Dependency injection makes unit testing possible; it does not eliminate mock-fidelity risk.
+Read the milestone's acceptance scenarios and the **production source code**. List every external API call the production code path exercises — not just what tests call. If a function accepts an injected dependency (e.g., `fetchFn`) for testing but uses real HTTP in production, that IS an external API interaction. Dependency injection makes unit testing possible; it does not eliminate mock-fidelity risk.
 
-For each interaction, note the HTTP method and endpoint (e.g., `POST /repos/.../issues`, `GET /repos/.../actions/artifacts`).
+For each interaction, note the HTTP method, endpoint, and provider (e.g., `GitHub: GET /repos/.../actions/artifacts`, `Jenkins: GET /job/.../api/json`).
 
 Classify each interaction as **high-risk** or **low-risk** for mock-vs-real divergence:
 
-**High-risk** (mock could be wrong about real behavior):
-- Search API queries — query string format must match what GitHub actually indexes
-- Pagination — real API may paginate differently from single-page mock responses
-- Sequential state — second run depends on state created by first run (e.g., issue exists for dedup, comment exists for update). Mocks simulate this; real API has propagation delays.
-- PATCH-after-GET chains — finding the right resource ID from a prior list call
+**High-risk** (always need E2E):
+- Response shapes the code destructures (e.g., `data.artifacts`, `response.headers.get("etag")`)
+- Conditional request round-trips (ETag/If-None-Match, Last-Modified/If-Modified-Since)
+- Redirect chains (302 → blob storage download)
+- Search/query API formats (query string must match what the provider indexes)
+- Pagination (code assumes single page with `per_page=100` or similar)
+- Sequential state (second call depends on state from first call)
+- Auth header formats (Bearer vs Basic vs token header — varies by provider)
 
 **Low-risk** (skip — mock fidelity is sufficient):
-- Simple POST with known request body (e.g., create issue) if already covered by an existing E2E happy-path test
-- Error code handling (e.g., 410 Gone) — code checks `resp.StatusCode`; no mock-vs-real divergence
+- Status code checks (`if (response.status === 401)`) — no shape to drift
 - Pure client-side logic (e.g., parsing `GITHUB_EVENT_PATH`) — no external API involved
 
 #### 7b. Check existing E2E tests
 
-Read the E2E test files in `e2e/`. List which high-risk API interactions they already exercise. E2E tests in `e2e/` can cover any component (CLI, dashboard, shared libraries) — not just the CLI binary. "No E2E infrastructure exists for this component" is NOT a valid reason to mark E2E as PASS.
+Read the E2E test files in `e2e/`. List which high-risk API interactions they already exercise.
+
+E2E tests in `e2e/` cover ANY component (CLI, dashboard, shared libraries) and ANY provider (GitHub, Jenkins, GitLab). "No E2E infrastructure exists for this component" and "this provider isn't set up yet" are NOT valid reasons to mark E2E as PASS.
 
 #### 7c. Identify gaps
 
-For each high-risk interaction from 7a that is NOT covered by an existing E2E test in 7b, report it as a gap. Group related gaps (e.g., "Scenarios 27 and 49 both need sequential-state E2E tests").
+For each high-risk interaction from 7a that is NOT covered by an existing E2E test in 7b, report it as a gap. Group related gaps (e.g., "Scenarios 27 and 49 both need sequential-state E2E tests"). For each gap, note which provider is involved.
 
 Mark as PASS if all high-risk interactions are covered, or FAIL with the list of uncovered interactions.
 
