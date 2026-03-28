@@ -475,3 +475,55 @@ func TestPutContentsWithValidSHASucceeds(t *testing.T) {
 		Expected: nil,
 	})
 }
+
+// --- Constant value tests ---
+
+// TestClientSendsCorrectUserAgentHeader verifies the userAgent constant is sent
+// in every request. Kills mutation: `userAgent = "quarantine-cli/0.1.0"` → `""`.
+func TestClientSendsCorrectUserAgentHeader(t *testing.T) {
+	var capturedUA string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedUA = r.Header.Get("User-Agent")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"id":1,"full_name":"my-org/my-project","default_branch":"main","private":false}`)
+	}))
+	t.Cleanup(server.Close)
+
+	c := newTestClient(t, server.URL)
+	_, _ = c.GetRepo(context.Background())
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "any API request",
+		Should:   "set User-Agent to 'quarantine-cli/0.1.0'",
+		Actual:   capturedUA,
+		Expected: "quarantine-cli/0.1.0",
+	})
+}
+
+// TestClientUsesDefaultBaseURLWhenNoOverride verifies the defaultBaseURL constant
+// is "https://api.github.com". When QUARANTINE_GITHUB_API_BASE_URL is unset,
+// requests should target api.github.com.
+// Kills mutation: `defaultBaseURL = "https://api.github.com"` → `""`.
+func TestClientUsesDefaultBaseURLWhenNoOverride(t *testing.T) {
+	t.Setenv("QUARANTINE_GITHUB_TOKEN", "ghp_test")
+	t.Setenv("QUARANTINE_GITHUB_API_BASE_URL", "") // explicitly clear override
+
+	c, err := ghclient.NewClient("my-org", "my-project")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+
+	// Make an API call — it will fail (no real GitHub), but the error must NOT
+	// be "unsupported protocol scheme", which is what Go returns when the URL
+	// has no scheme (i.e. when defaultBaseURL = "").
+	// With correct defaultBaseURL, the request goes to https://api.github.com
+	// and fails with an auth or connection error (not a scheme error).
+	_, err = c.GetRepo(context.Background())
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "QUARANTINE_GITHUB_API_BASE_URL is unset and defaultBaseURL = 'https://api.github.com'",
+		Should:   "NOT get 'unsupported protocol scheme' error (proving a valid base URL was used)",
+		Actual:   err != nil && !strings.Contains(err.Error(), "unsupported protocol scheme"),
+		Expected: true,
+	})
+}
