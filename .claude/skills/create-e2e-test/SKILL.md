@@ -1,6 +1,6 @@
 ---
 name: create-e2e-test
-description: Create an E2E test in e2e/ that verifies real GitHub API behavior matches what integration test mocks assume. Use when a scenario introduces external API interactions.
+description: Create an E2E test in e2e/ that verifies real external API behavior matches what integration test mocks assume. Use when a scenario introduces external API interactions (GitHub, Jenkins, GitLab, etc.).
 argument-hint: "<description of what to test>"
 disable-model-invocation: false
 user-invocable: true
@@ -35,11 +35,12 @@ If the answer to the third question is "yes" for any call, that call needs E2E c
 
 **High-risk interactions** (always need E2E):
 - Response shapes the code destructures (e.g., `data.artifacts`, `response.headers.get("etag")`)
-- ETag/conditional request round-trips (If-None-Match → 304)
+- Conditional request round-trips (ETag/If-None-Match, Last-Modified/If-Modified-Since)
 - Redirect chains (302 → blob storage download)
-- Search API query format (query string must match what GitHub indexes)
-- Pagination (code assumes single page with `per_page=100`)
+- Search/query API formats (query string must match what the provider actually indexes)
+- Pagination (code assumes single page with `per_page=100` or similar)
 - Sequential state (second call depends on state from first call)
+- Auth header formats (Bearer vs token vs Basic — varies by provider)
 
 **Low-risk interactions** (skip E2E):
 - Status code checks (`if (response.status === 401)`) — no shape to drift
@@ -53,11 +54,29 @@ e2e/*.test.js
 
 Check whether any existing test already exercises the same API interaction. Don't duplicate coverage.
 
-## Step 3 — Write the test
+## Step 3 — Determine the provider and credentials
+
+Read `e2e/.env.example` for the currently supported env vars. Each external provider needs its own credentials and test fixture target.
+
+### Currently supported
+
+| Provider | Token env var | Target env vars | API base |
+|----------|---------------|-----------------|----------|
+| GitHub | `QUARANTINE_GITHUB_TOKEN` | `QUARANTINE_TEST_OWNER`, `QUARANTINE_TEST_REPO` | `https://api.github.com` |
+
+### Adding a new provider
+
+When the test targets a provider not yet in `e2e/.env.example`:
+
+1. Add the new env vars to `e2e/.env.example` with comments explaining what they are
+2. Guard your test in `beforeAll` — fail with a clear message if the required vars are missing
+3. Keep provider-specific helpers (API request wrappers) local to the test file — don't force all tests to import every provider's helpers
+
+## Step 4 — Write the test
 
 ### Location and framework
 
-- File: `e2e/<component>-<feature>.test.js` (e.g., `dashboard-artifacts.test.js`)
+- File: `e2e/<provider>-<feature>.test.js` (e.g., `github-artifacts.test.js`, `jenkins-builds.test.js`)
 - Framework: `vitest` + `riteway/vitest`
 - Imports:
   ```js
@@ -65,22 +84,25 @@ Check whether any existing test already exercises the same API interaction. Don'
   import { beforeAll, describe, test } from "vitest"
   ```
 
-### Environment variables
+### Credential guard
 
-All E2E tests use these env vars (loaded from `e2e/.env` by `vitest.config.js`):
+Fail immediately if required env vars are missing:
 
 ```js
-const token = process.env.QUARANTINE_GITHUB_TOKEN
-const owner = process.env.QUARANTINE_TEST_OWNER
-const repo = process.env.QUARANTINE_TEST_REPO
+beforeAll(() => {
+  if (!token || !baseUrl) {
+    throw new Error(
+      "E2E tests require <LIST_REQUIRED_VARS>. See e2e/.env.example."
+    )
+  }
+})
 ```
 
-Fail in `beforeAll` if any are missing — don't let tests run without credentials.
+### API request helper
 
-### GitHub API helper
+Create a provider-specific helper local to the test file. Match the provider's auth and header conventions:
 
-Use the standard pattern from existing tests:
-
+**GitHub:**
 ```js
 async function ghRequest(method, path, headers = {}) {
   return fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, {
@@ -94,6 +116,36 @@ async function ghRequest(method, path, headers = {}) {
   })
 }
 ```
+
+**Jenkins (example pattern):**
+```js
+async function jenkinsRequest(method, path, headers = {}) {
+  return fetch(`${jenkinsUrl}${path}`, {
+    method,
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${user}:${apiToken}`).toString("base64")}`,
+      Accept: "application/json",
+      ...headers,
+    },
+  })
+}
+```
+
+**GitLab (example pattern):**
+```js
+async function gitlabRequest(method, path, headers = {}) {
+  return fetch(`${gitlabUrl}/api/v4${path}`, {
+    method,
+    headers: {
+      "PRIVATE-TOKEN": token,
+      Accept: "application/json",
+      ...headers,
+    },
+  })
+}
+```
+
+These are starting patterns — read the provider's actual API docs before writing. Don't assume the example is correct.
 
 ### Assertion style
 
@@ -110,7 +162,7 @@ assert({
 
 ### Retry pattern for eventual consistency
 
-When verifying state created by a prior step (search index propagation, CDN caching):
+When verifying state created by a prior step (search index propagation, CDN caching, Jenkins build queue):
 
 ```js
 for (let attempt = 0; attempt < 3; attempt++) {
@@ -124,20 +176,19 @@ for (let attempt = 0; attempt < 3; attempt++) {
 
 ```js
 afterEach(async () => {
-  await closeIssue(issueNumber)
-  // ... clean up any created resources
+  // Close/delete any resources created during the test
 })
 ```
 
-## Step 4 — Run and verify
+## Step 5 — Run and verify
 
 ```bash
 make e2e-test
 ```
 
-E2E tests require real network access and valid credentials. They run sequentially (`fileParallelism: false` in vitest config) because all tests share the same GitHub repo state.
+E2E tests require real network access and valid credentials. They run sequentially (`fileParallelism: false` in vitest config) because tests may share external state.
 
-## Step 5 — Lint
+## Step 6 — Lint
 
 ```bash
 cd e2e && pnpm run lint
@@ -152,6 +203,8 @@ Fix any issues before committing.
 | `t.skip("no data")` | Silently stops verifying | Assert the precondition instead |
 | `if (arr.length > 0) { assert(...) }` | Silently passes when empty | Assert `arr.length >= 1` first |
 | "Mocks cover this" | Mocks verify YOUR assumptions, not reality | E2E verifies the API's actual behavior |
-| "No E2E infra for dashboard" | `e2e/` serves all components | Write the test in `e2e/` |
-| Importing production code | Creates coupling between test and implementation | Use `fetch` directly, same as `ghRequest` pattern |
+| "No E2E infra for this component" | `e2e/` serves all components | Write the test in `e2e/` |
+| "This provider isn't set up yet" | Add the env vars and write the test | See Step 3: Adding a new provider |
+| Importing production code | Creates coupling between test and implementation | Use `fetch` directly with a provider-specific helper |
 | Testing implementation details | E2E should verify observable API contracts | Test response shapes, not internal function calls |
+| Hardcoding a provider's base URL | Breaks when targeting different instances | Use env vars for base URLs (especially Jenkins/GitLab which are self-hosted) |
