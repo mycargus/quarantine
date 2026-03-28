@@ -55,6 +55,8 @@ Work through remaining scenarios ONE AT A TIME. For each scenario, execute these
 
 Invoke `/mikey:tdd --validate <scenario-file>#<scenario-number>`.
 
+**CRITICAL:** When the `/mikey:tdd` skill expands, it will instruct you to spawn a `tdd-agent` using the Agent tool (`subagent_type: "mikey:tdd-agent"`). You MUST do this. Do NOT write tests, write implementation code, or run test commands yourself. All Red-Green-Refactor work MUST be delegated to the `tdd-agent`. If you find yourself reading source files, editing test files, or running `go test` directly, STOP — you are bypassing the agent.
+
 Rules:
 - ONE scenario per `/mikey:tdd` invocation. Do NOT batch.
 - Start with integration or e2e tests — they catch real issues faster than unit tests and drive better design.
