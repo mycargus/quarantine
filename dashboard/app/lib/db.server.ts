@@ -6,6 +6,7 @@
 
 import BetterSqlite3 from "better-sqlite3"
 import type { Database } from "better-sqlite3"
+import type { RepoConfig } from "./config.server.js"
 
 export type { Database }
 
@@ -15,6 +16,13 @@ export interface Project {
   repo: string
   lastSynced: string | null
   testRunCount: number
+}
+
+export interface ProjectSummary {
+  owner: string
+  repo: string
+  testRunCount: number
+  lastSynced: string | null
 }
 
 export interface TestRun {
@@ -67,10 +75,28 @@ export function initDb(dbPath: string): Database {
 }
 
 /**
- * Query all projects with aggregated test run counts.
+ * I/O: for each configured repo, returns its test run count and last sync
+ * timestamp from SQLite. If a repo has never been ingested, returns
+ * testRunCount: 0 and lastSynced: null.
  */
-export function getProjects(): Project[] {
-  return []
+export function getProjects(db: Database, repos: RepoConfig[]): ProjectSummary[] {
+  const stmt = db.prepare<[string, string], { last_synced: string | null; run_count: number }>(`
+    SELECT p.last_synced, COUNT(tr.id) AS run_count
+    FROM projects p
+    LEFT JOIN test_runs tr ON tr.project_id = p.id
+    WHERE p.owner = ? AND p.repo = ?
+    GROUP BY p.id
+  `)
+
+  return repos.map((r) => {
+    const row = stmt.get(r.owner, r.repo)
+    return {
+      owner: r.owner,
+      repo: r.repo,
+      testRunCount: row ? row.run_count : 0,
+      lastSynced: row ? row.last_synced : null,
+    }
+  })
 }
 
 /**
