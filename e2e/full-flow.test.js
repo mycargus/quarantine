@@ -405,3 +405,343 @@ exit 1`,
     })
   })
 })
+
+// =========================================================================
+// Scenario 27: Issue dedup — second run does NOT create a duplicate issue
+//
+// High-risk API interaction: GET /search/issues?q=label:quarantine:{hash}+is:open
+// The Search API query format must match what GitHub actually indexes.
+// A mock always returns what you tell it; the real API may not find the issue
+// if the query string is wrong.
+// =========================================================================
+
+describe('quarantine run — Scenario 27: issue dedup via Search API', () => {
+  let dir
+  let proxyIssueNumber = null
+  let quarantineIssueNumber = null
+
+  beforeAll(async () => {
+    if (!(await branchExists())) {
+      await createBranchWithEmptyState()
+    }
+    await ensureQuarantineLabelExists()
+  })
+
+  beforeEach(async () => {
+    dir = createWorkDir()
+    proxyIssueNumber = await createProxyIssue('[e2e test proxy] PR stand-in for Scenario 27')
+  })
+
+  afterEach(async () => {
+    await closeIssue(proxyIssueNumber)
+    proxyIssueNumber = null
+    await closeIssue(quarantineIssueNumber)
+    quarantineIssueNumber = null
+    lastKnownStateSHA = null
+    await resetQuarantineState()
+    if (dir) {
+      rmSync(dir, { recursive: true, force: true })
+      dir = null
+    }
+  })
+
+  describe('second run with same flaky test', () => {
+    test('finds the existing issue via Search API and does NOT create a duplicate', async () => {
+      const xmlPath = join(dir, 'junit.xml')
+
+      // Main run: write failing JUnit XML and exit 1.
+      makeScript(
+        dir,
+        'fake-jest-main',
+        `cat > "${xmlPath}" << 'XMLEOF'
+<?xml version="1.0"?>
+<testsuites tests="1" failures="1">
+  <testsuite name="src/dedup.test.js" tests="1" failures="1">
+    <testcase classname="DedupService" name="should not duplicate" file="src/dedup.test.js" time="0.01">
+      <failure message="intermittent">intermittent</failure>
+    </testcase>
+  </testsuite>
+</testsuites>
+XMLEOF
+exit 1`,
+      )
+
+      // Fake `jest` binary on PATH: always exits 0 (successful retry).
+      const binDir = join(dir, 'bin')
+      mkdirSync(binDir)
+      makeScript(binDir, 'jest', 'exit 0')
+
+      writeConfig(dir, 'version: 1\nframework: jest\n')
+      const mainScriptPath = join(dir, 'fake-jest-main')
+      const pathEnv = { PATH: `${binDir}:${process.env.PATH}` }
+
+      // --- First run: creates the issue ---
+      const run1 = runCLI(dir, [
+        'run',
+        '--retries', '3',
+        '--junitxml', xmlPath,
+        '--pr', String(proxyIssueNumber),
+        '--', mainScriptPath,
+      ], pathEnv)
+
+      assert({
+        given: 'first run detecting a flaky test',
+        should: 'exit 0',
+        actual: run1.status,
+        expected: 0,
+      })
+
+      // Find the issue created by the first run.
+      const issueTitle = '[Quarantine] should not duplicate'
+      const createdIssue = await findOpenIssueByTitle(issueTitle)
+      if (createdIssue) {
+        quarantineIssueNumber = createdIssue.number
+      }
+
+      assert({
+        given: 'first run with a new flaky test',
+        should: 'create a GitHub issue',
+        actual: createdIssue !== null,
+        expected: true,
+      })
+
+      // Wait for GitHub Search API to index the new issue.
+      // The CLI uses label-based search (label:quarantine:{hash}) for dedup.
+      // Search index lag is typically 1-5s.
+      await new Promise(r => setTimeout(r, 5000))
+
+      // --- Second run: same flaky test, same repo ---
+      // Recreate workdir to avoid stale local state, but keep same test.
+      const dir2 = createWorkDir()
+      const xmlPath2 = join(dir2, 'junit.xml')
+
+      makeScript(
+        dir2,
+        'fake-jest-main',
+        `cat > "${xmlPath2}" << 'XMLEOF'
+<?xml version="1.0"?>
+<testsuites tests="1" failures="1">
+  <testsuite name="src/dedup.test.js" tests="1" failures="1">
+    <testcase classname="DedupService" name="should not duplicate" file="src/dedup.test.js" time="0.01">
+      <failure message="intermittent">intermittent</failure>
+    </testcase>
+  </testsuite>
+</testsuites>
+XMLEOF
+exit 1`,
+      )
+
+      const binDir2 = join(dir2, 'bin')
+      mkdirSync(binDir2)
+      makeScript(binDir2, 'jest', 'exit 0')
+      writeConfig(dir2, 'version: 1\nframework: jest\n')
+
+      const run2 = runCLI(dir2, [
+        'run',
+        '--retries', '3',
+        '--junitxml', xmlPath2,
+        '--pr', String(proxyIssueNumber),
+        '--', join(dir2, 'fake-jest-main'),
+      ], { PATH: `${binDir2}:${process.env.PATH}` })
+
+      assert({
+        given: 'second run detecting the same flaky test',
+        should: 'exit 0',
+        actual: run2.status,
+        expected: 0,
+      })
+
+      // Verify only ONE issue exists with this title.
+      // List open issues and count matches.
+      const res = await ghRequest('GET', '/issues?state=open&per_page=100')
+      const allIssues = await res.json()
+      const matchingIssues = allIssues.filter(i => i.title === issueTitle)
+
+      assert({
+        given: 'two consecutive runs with the same flaky test',
+        should: 'have exactly 1 open issue (dedup prevented duplicate)',
+        actual: matchingIssues.length,
+        expected: 1,
+      })
+
+      // Clean up the second workdir.
+      rmSync(dir2, { recursive: true, force: true })
+    })
+  })
+})
+
+// =========================================================================
+// Scenario 49: PR comment update — second run PATCHes the existing comment
+//
+// High-risk API interaction: GET /repos/.../issues/{pr}/comments?per_page=100
+// followed by PATCH /repos/.../issues/comments/{id}
+// The list-then-patch flow depends on real pagination and comment ID semantics.
+// =========================================================================
+
+describe('quarantine run — Scenario 49: second run updates existing PR comment', () => {
+  let dir
+  let proxyIssueNumber = null
+  let quarantineIssueNumber = null
+
+  beforeAll(async () => {
+    if (!(await branchExists())) {
+      await createBranchWithEmptyState()
+    }
+    await ensureQuarantineLabelExists()
+  })
+
+  beforeEach(async () => {
+    dir = createWorkDir()
+    proxyIssueNumber = await createProxyIssue('[e2e test proxy] PR stand-in for Scenario 49')
+  })
+
+  afterEach(async () => {
+    await closeIssue(proxyIssueNumber)
+    proxyIssueNumber = null
+    await closeIssue(quarantineIssueNumber)
+    quarantineIssueNumber = null
+    lastKnownStateSHA = null
+    await resetQuarantineState()
+    if (dir) {
+      rmSync(dir, { recursive: true, force: true })
+      dir = null
+    }
+  })
+
+  describe('second run on same PR', () => {
+    test('PATCHes the existing quarantine-bot comment instead of creating a second one', async () => {
+      const xmlPath = join(dir, 'junit.xml')
+
+      makeScript(
+        dir,
+        'fake-jest-main',
+        `cat > "${xmlPath}" << 'XMLEOF'
+<?xml version="1.0"?>
+<testsuites tests="1" failures="1">
+  <testsuite name="src/comment.test.js" tests="1" failures="1">
+    <testcase classname="CommentService" name="should update comment" file="src/comment.test.js" time="0.01">
+      <failure message="flaky timeout">flaky timeout</failure>
+    </testcase>
+  </testsuite>
+</testsuites>
+XMLEOF
+exit 1`,
+      )
+
+      const binDir = join(dir, 'bin')
+      mkdirSync(binDir)
+      makeScript(binDir, 'jest', 'exit 0')
+
+      writeConfig(dir, 'version: 1\nframework: jest\n')
+      const mainScriptPath = join(dir, 'fake-jest-main')
+      const pathEnv = { PATH: `${binDir}:${process.env.PATH}` }
+
+      // --- First run: creates the PR comment ---
+      const run1 = runCLI(dir, [
+        'run',
+        '--retries', '3',
+        '--junitxml', xmlPath,
+        '--pr', String(proxyIssueNumber),
+        '--', mainScriptPath,
+      ], pathEnv)
+
+      assert({
+        given: 'first run detecting a flaky test',
+        should: 'exit 0',
+        actual: run1.status,
+        expected: 0,
+      })
+
+      // Track the quarantine issue for cleanup.
+      const createdIssue = await findOpenIssueByTitle('[Quarantine] should update comment')
+      if (createdIssue) {
+        quarantineIssueNumber = createdIssue.number
+      }
+
+      // Verify first comment was created.
+      const firstComment = await findQuarantineBotComment(proxyIssueNumber)
+
+      assert({
+        given: 'first run with --pr flag',
+        should: 'create a quarantine-bot PR comment',
+        actual: firstComment !== null,
+        expected: true,
+      })
+
+      const firstCommentId = firstComment?.id
+
+      // --- Second run: same test, same PR ---
+      // Recreate workdir for clean local state.
+      const dir2 = createWorkDir()
+      const xmlPath2 = join(dir2, 'junit.xml')
+
+      makeScript(
+        dir2,
+        'fake-jest-main',
+        `cat > "${xmlPath2}" << 'XMLEOF'
+<?xml version="1.0"?>
+<testsuites tests="1" failures="1">
+  <testsuite name="src/comment.test.js" tests="1" failures="1">
+    <testcase classname="CommentService" name="should update comment" file="src/comment.test.js" time="0.01">
+      <failure message="flaky timeout">flaky timeout</failure>
+    </testcase>
+  </testsuite>
+</testsuites>
+XMLEOF
+exit 1`,
+      )
+
+      const binDir2 = join(dir2, 'bin')
+      mkdirSync(binDir2)
+      makeScript(binDir2, 'jest', 'exit 0')
+      writeConfig(dir2, 'version: 1\nframework: jest\n')
+
+      const run2 = runCLI(dir2, [
+        'run',
+        '--retries', '3',
+        '--junitxml', xmlPath2,
+        '--pr', String(proxyIssueNumber),
+        '--', join(dir2, 'fake-jest-main'),
+      ], { PATH: `${binDir2}:${process.env.PATH}` })
+
+      assert({
+        given: 'second run detecting the same flaky test on the same PR',
+        should: 'exit 0',
+        actual: run2.status,
+        expected: 0,
+      })
+
+      // Verify: still exactly one quarantine-bot comment (PATCH, not POST).
+      // Retry to allow for CDN propagation.
+      const updatedComment = await findQuarantineBotComment(proxyIssueNumber)
+
+      assert({
+        given: 'second run on the same PR',
+        should: 'still have a quarantine-bot comment',
+        actual: updatedComment !== null,
+        expected: true,
+      })
+
+      assert({
+        given: 'second run PATCHing the existing comment',
+        should: 'keep the same comment ID (updated in place)',
+        actual: updatedComment?.id,
+        expected: firstCommentId,
+      })
+
+      // Count all quarantine-bot comments — should be exactly 1.
+      const allCommentsRes = await ghRequest('GET', `/issues/${proxyIssueNumber}/comments`)
+      const allComments = await allCommentsRes.json()
+      const botComments = allComments.filter(c => c.body.startsWith('<!-- quarantine-bot -->'))
+
+      assert({
+        given: 'two consecutive runs on the same PR',
+        should: 'have exactly 1 quarantine-bot comment (no duplicates)',
+        actual: botComments.length,
+        expected: 1,
+      })
+
+      rmSync(dir2, { recursive: true, force: true })
+    })
+  })
+})
