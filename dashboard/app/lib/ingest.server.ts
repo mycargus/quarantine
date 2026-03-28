@@ -164,8 +164,46 @@ export function upsertTestRun(db: Database, projectId: number, result: TestResul
 }
 
 /**
- * Placeholder: ingest a test result artifact into the database.
+ * I/O Orchestrator: parses and validates a JSON string, then upserts into SQLite.
+ * If parsing or validation fails, logs a warning and returns 'skipped'.
+ * Never throws — callers can process remaining artifacts safely.
+ *
+ * @param warn - injectable logger, defaults to console.warn (inject in tests)
  */
-export async function ingestResult(_result: TestResult): Promise<void> {
-  // TODO: orchestrate validation + upsert
+export function ingestArtifact(
+  db: Database,
+  owner: string,
+  repo: string,
+  artifactName: string,
+  jsonString: string,
+  projectId: number,
+  warn: (msg: string) => void = console.warn,
+): "ingested" | "skipped" {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(jsonString)
+  } catch {
+    warn(
+      `[ingest] WARNING: skipping artifact ${artifactName} for ${owner}/${repo}: validation failed`,
+    )
+    return "skipped"
+  }
+
+  const { valid } = validateTestResult(parsed)
+  if (!valid) {
+    warn(
+      `[ingest] WARNING: skipping artifact ${artifactName} for ${owner}/${repo}: validation failed`,
+    )
+    return "skipped"
+  }
+
+  try {
+    upsertTestRun(db, projectId, parsed as TestResult)
+  } catch {
+    warn(
+      `[ingest] WARNING: skipping artifact ${artifactName} for ${owner}/${repo}: validation failed`,
+    )
+    return "skipped"
+  }
+  return "ingested"
 }
