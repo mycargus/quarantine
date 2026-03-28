@@ -70,12 +70,10 @@ jobs:
         working-directory: e2e
 
       - name: Lint E2E
-        run: pnpm lint
-        working-directory: e2e
+        run: make e2e-lint
 
       - name: E2E Tests
-        run: pnpm test
-        working-directory: e2e
+        run: make e2e-test
         env:
           QUARANTINE_GITHUB_TOKEN: ${{ secrets.QUARANTINE_GITHUB_TOKEN }}
           QUARANTINE_TEST_OWNER: ${{ vars.QUARANTINE_TEST_OWNER }}
