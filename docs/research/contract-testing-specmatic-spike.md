@@ -30,7 +30,9 @@ docker run -d -p 9000:9000 -v ./schemas:/specs \
 
 Output: `API Paths: 2, API Operations: 2, Schema components: 2`
 
-The full 12MB GitHub spec (1107 operations) caused a `java.lang.Integer cannot be cast to java.lang.String` error and returned `400 No valid API specifications loaded`. The subset approach is necessary.
+The full 12MB GitHub spec (1107 operations) caused a `java.lang.Integer cannot be cast to java.lang.String` error. Specmatic loaded the metadata (740 paths, 1107 operations, 918 schemas) but could not serve requests (`400 No valid API specifications loaded`).
+
+**Root cause analysis:** The error is NOT a size limitation. GitHub's spec contains 78 schemas with nullable enums — arrays mixing strings with `null` values (e.g., `enum: ["resolved", "off-topic", "spam", null]`). This is valid OpenAPI 3.0 (nullable enums), but Specmatic's Kotlin parser casts enum values to `String` and throws a `ClassCastException` on the `null` entries. The 12KB subset spec works because the Artifacts endpoints don't use nullable enums. A targeted fix — either in Specmatic's parser or by stripping `null` from enum arrays in the vendored spec — could potentially make the full spec loadable. This is a reportable bug, not a fundamental architectural constraint.
 
 ### Example-driven responses
 
@@ -144,6 +146,27 @@ Compared the extracted artifact schema against the full GitHub spec:
 | ETag/304 conditional requests | **Does not work** |
 | 302 redirect → binary download | **Does not work** |
 | Auth header validation | Does not work (spec limitation) |
-| Full GitHub spec (12MB) | Does not work (parse error) |
+| Full GitHub spec (12MB) | Does not work (nullable enum parser bug) |
 
-**Verdict:** Specmatic is valuable for schema conformance testing (are my requests and responses the right shape?) but cannot simulate the stateful HTTP behaviors that represent the highest mock-fidelity risks in this project. It would need to be supplemented by either real API tests or a custom stateful layer.
+## Full spec failure: root cause
+
+The `java.lang.Integer cannot be cast to java.lang.String` error is caused by 78
+schemas in GitHub's spec that use nullable enums:
+
+```json
+"active_lock_reason": {
+  "type": "string",
+  "enum": ["resolved", "off-topic", "too heated", "spam", null]
+}
+```
+
+This is valid OpenAPI 3.0 but Specmatic's Kotlin parser cannot handle `null` in enum
+arrays. The affected schemas are mostly webhook and issue types — not the Artifacts,
+Contents, or Search endpoints this project uses. The subset spec avoids the bug entirely.
+
+**Possible mitigations:**
+- Report the bug to `znsio/specmatic` — nullable enums are common in real-world specs
+- Strip `null` from enum arrays in a preprocessing step when vendoring the full spec
+- Continue using subset specs (which don't hit the bug)
+
+**Verdict:** Specmatic is valuable for schema conformance testing (are my requests and responses the right shape?) but cannot simulate the stateful HTTP behaviors that represent the highest mock-fidelity risks in this project. It would need to be supplemented by either real API tests or a custom stateful layer. The full-spec loading issue is a specific parser bug (not a scalability limitation) that could be resolved.
