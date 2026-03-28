@@ -11,6 +11,9 @@ importers:
       '@biomejs/biome':
         specifier: 1.9.0
         version: 1.9.0
+      adm-zip:
+        specifier: ^0.5.16
+        version: 0.5.16
       riteway:
         specifier: ^9.2.0
         version: 9.2.0(@types/node@25.5.0)(react@19.2.4)
@@ -445,6 +448,10 @@ packages:
 
   '@vitest/utils@3.2.4':
     resolution: {integrity: sha512-fB2V0JFrQSMsCo9HiSq3Ezpdv4iYaXRG1Sx8edX3MwxfyNn83mKiGzOcH+Fkxt4MHxr3y42fQi1oeAInqgX2QA==}
+
+  adm-zip@0.5.16:
+    resolution: {integrity: sha512-TGw5yVi4saajsSEgz25grObGHEUaDrniwvA2qwSC060KfqGPdglhvPMA2lPIoxs3PQIItj2iag35fONcQqgUaQ==}
+    engines: {node: '>=12.0'}
 
   array-buffer-byte-length@1.0.2:
     resolution: {integrity: sha512-LHE+8BuR7RYGDKvnrmcuSq3tDcKv9OFEXQt/HpbZhY7V6h0zlUXutnAD82GiFx9rdieCMjkvtcsPqBwgUl1Iiw==}
@@ -1694,6 +1701,8 @@ snapshots:
       '@vitest/pretty-format': 3.2.4
       loupe: 3.2.1
       tinyrainbow: 2.0.0
+
+  adm-zip@0.5.16: {}
 
   array-buffer-byte-length@1.0.2:
     dependencies:

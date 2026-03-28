@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.0",
+    "adm-zip": "^0.5.16",
     "riteway": "^9.2.0",
     "vitest": "^2.0.0"
   }
