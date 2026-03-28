@@ -179,6 +179,68 @@ func TestRepoString(t *testing.T) {
 	})
 }
 
+func TestBuildPRScopeInputs(t *testing.T) {
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a result with no tests",
+		Should:   "return empty inputs",
+		Actual:   len(buildPRScopeInputs(result.Result{})),
+		Expected: 0,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a result with only passing tests",
+		Should:   "return empty inputs (only flaky tests are classified)",
+		Actual: len(buildPRScopeInputs(result.Result{
+			Tests: []result.TestEntry{
+				{TestID: "a", Status: "passed"},
+				{TestID: "b", Status: "failed"},
+				{TestID: "c", Status: "skipped"},
+			},
+		})),
+		Expected: 0,
+	})
+
+	inputs := buildPRScopeInputs(result.Result{
+		Tests: []result.TestEntry{
+			{TestID: "a", FilePath: "src/a.test.js", Name: "test A", Status: "passed"},
+			{TestID: "b", FilePath: "src/b.test.js", Name: "test B", Status: "flaky"},
+			{TestID: "c", FilePath: "src/c.test.js", Name: "test C", Status: "flaky"},
+		},
+	})
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a result with mixed statuses",
+		Should:   "return only flaky test inputs",
+		Actual:   len(inputs),
+		Expected: 2,
+	})
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a flaky test entry",
+		Should:   "preserve TestID, FilePath, and Name in the input",
+		Actual:   inputs[0].TestID + "|" + inputs[0].FilePath + "|" + inputs[0].Name,
+		Expected: "b|src/b.test.js|test B",
+	})
+}
+
+func TestDefaultCheckPRScopeForTestsFallback(t *testing.T) {
+	flakyInputs := []prScopeInput{
+		{TestID: "t1", FilePath: "src/a.test.js", Name: "test A"},
+	}
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "GITHUB_BASE_REF is not set (empty baseRef)",
+		Should:   "return empty map without running git (treat all as pre-existing)",
+		Actual:   len(defaultCheckPRScopeForTests("", flakyInputs)),
+		Expected: 0,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "no flaky test inputs",
+		Should:   "return empty map without running git",
+		Actual:   len(defaultCheckPRScopeForTests("main", nil)),
+		Expected: 0,
+	})
+}
+
 func TestClassifyPRScope(t *testing.T) {
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "file appears in added-files list",
