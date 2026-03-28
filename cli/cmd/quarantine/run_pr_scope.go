@@ -32,7 +32,7 @@ func classifyPRScope(newFiles []string, filePath, testName string, diffLines []s
 		}
 	}
 	for _, line := range diffLines {
-		if strings.HasPrefix(line, "+") && strings.Contains(line, testName) {
+		if testName != "" && strings.HasPrefix(line, "+") && strings.Contains(line, testName) {
 			return "new_test_in_pr"
 		}
 	}
