@@ -182,3 +182,91 @@ func TestJestRecommendationForVitest(t *testing.T) {
 		Expected: "",
 	})
 }
+
+// --- frameworkWorkflowSnippet unit tests ---
+// Kills mutations on lines 307 (jest constant) and 309 (rspec constant).
+
+func TestFrameworkWorkflowSnippetJest(t *testing.T) {
+	snippet := frameworkWorkflowSnippet("jest", "junit.xml")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "framework jest",
+		Should:   "contain full jest CI command with jest-junit reporters",
+		Actual:   strings.Contains(snippet, "jest --ci --reporters=default --reporters=jest-junit"),
+		Expected: true,
+	})
+}
+
+func TestFrameworkWorkflowSnippetRSpec(t *testing.T) {
+	snippet := frameworkWorkflowSnippet("rspec", "results/rspec.xml")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "framework rspec with custom junitxml path",
+		Should:   "contain rspec command with RspecJunitFormatter and the junitxml path",
+		Actual:   strings.Contains(snippet, "rspec --format RspecJunitFormatter --out results/rspec.xml"),
+		Expected: true,
+	})
+}
+
+func TestFrameworkWorkflowSnippetVitest(t *testing.T) {
+	snippet := frameworkWorkflowSnippet("vitest", "junit.xml")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "framework vitest",
+		Should:   "contain vitest run command with junit reporter",
+		Actual:   strings.Contains(snippet, "vitest run --reporter=junit"),
+		Expected: true,
+	})
+}
+
+// --- extractURLFromError unit tests ---
+// Kills mutation on line 261: `idx == -1` → `idx != -1`.
+
+func TestExtractURLFromErrorWithPrefix(t *testing.T) {
+	errMsg := "remote 'origin' is not a GitHub URL: https://gitlab.com/foo/bar.git"
+	url := extractURLFromError(errMsg)
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "error message containing 'not a GitHub URL: <url>'",
+		Should:   "return only the URL portion after the prefix",
+		Actual:   url,
+		Expected: "https://gitlab.com/foo/bar.git",
+	})
+}
+
+func TestExtractURLFromErrorWithoutPrefix(t *testing.T) {
+	errMsg := "some unrelated error message"
+	url := extractURLFromError(errMsg)
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "error message not containing the expected prefix",
+		Should:   "return the full error message unchanged",
+		Actual:   url,
+		Expected: errMsg,
+	})
+}
+
+// --- classifyGitHubError network error variants ---
+// Kills mutation on line 221: `||` → `&&`.
+
+func TestClassifyGitHubErrorTimeoutOnly(t *testing.T) {
+	msg := classifyGitHubError(fmt.Errorf("request timeout exceeded"), "my-org", "my-repo")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a timeout error (without 'failed' keyword)",
+		Should:   "return message about unable to reach GitHub API",
+		Actual:   strings.Contains(msg, "Unable to reach GitHub API"),
+		Expected: true,
+	})
+}
+
+func TestClassifyGitHubErrorFailedOnly(t *testing.T) {
+	msg := classifyGitHubError(fmt.Errorf("dial failed: no route to host"), "my-org", "my-repo")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a 'failed' error (without 'timeout' keyword)",
+		Should:   "return message about unable to reach GitHub API",
+		Actual:   strings.Contains(msg, "Unable to reach GitHub API"),
+		Expected: true,
+	})
+}
