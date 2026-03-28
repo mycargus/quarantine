@@ -230,3 +230,48 @@ func TestEscapeJestPattern(t *testing.T) {
 		Expected: "should do something",
 	})
 }
+
+// TestRunSuccessReturnsZeroExitCode verifies that a command exiting 0 returns
+// exit code 0 and no error.
+// Kills mutations:
+//   - Line 57: `err != nil` → `err == nil` (enters error path on success)
+//   - Line 64: `return 0` → `return 1` (returns wrong exit code on success)
+func TestRunSuccessReturnsZeroExitCode(t *testing.T) {
+	exitCode, err := runner.Run(context.Background(), "true", nil, io.Discard, io.Discard)
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "command 'true' exits with code 0",
+		Should:   "return no error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "command 'true' exits with code 0",
+		Should:   "return exit code 0",
+		Actual:   exitCode,
+		Expected: 0,
+	})
+}
+
+// TestRunNonZeroExitCodeIsPreserved verifies that a command exiting with a
+// specific non-zero code returns that exact code.
+// Kills mutation on line 58: `ok` → `!ok` (skips ExitError extraction).
+func TestRunNonZeroExitCodeIsPreserved(t *testing.T) {
+	// 'sh -c "exit 42"' exits with code 42.
+	exitCode, err := runner.Run(context.Background(), "sh", []string{"-c", "exit 42"}, io.Discard, io.Discard)
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "command exits with code 42",
+		Should:   "return no error (non-zero exit is not a runner error)",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "command exits with code 42",
+		Should:   "return exit code 42",
+		Actual:   exitCode,
+		Expected: 42,
+	})
+}
