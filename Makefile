@@ -6,7 +6,7 @@ cli-build:
 	cd cli && go build -o ../bin/quarantine ./cmd/quarantine
 
 cli-test:
-	cd cli && go clean -testcache && go test ./...
+	cd cli && go test ./...
 
 cli-lint:
 	cd cli && golangci-lint run
