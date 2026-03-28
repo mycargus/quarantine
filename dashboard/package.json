@@ -17,8 +17,12 @@
   "dependencies": {
     "@react-router/node": "^7.0.0",
     "@react-router/serve": "^7.0.0",
+    "adm-zip": "^0.5.16",
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1",
     "better-sqlite3": "^11.0.0",
     "isbot": "^5.1.0",
+    "js-yaml": "^4.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router": "^7.0.0"
@@ -26,7 +30,9 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
     "@react-router/dev": "^7.0.0",
+    "@types/adm-zip": "^0.5.8",
     "@types/better-sqlite3": "^7.6.0",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
