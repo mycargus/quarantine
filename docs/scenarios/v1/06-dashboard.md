@@ -136,3 +136,24 @@ artifacts: `quarantine-results-100` (valid JSON), `quarantine-results-101`
 4. Does not crash or stop processing remaining artifacts.
 
 ---
+
+### Scenario 76: On-demand pull is debounced per-repo (max 1 per 5 minutes) [M6]
+
+**Risk:** Without debounce, every page load hammers the GitHub API, burning through the
+1,000 req/hr budget in minutes for a team that keeps a dashboard tab open (NFR-2.3.4).
+
+**Given** the dashboard has two repos configured:
+- `mycargus/my-app` last pulled at `2026-03-28T10:00:00Z` (stale)
+- `acme/payments-service` last pulled at `2026-03-28T10:04:00Z` (fresh)
+
+**When** the debounce check runs at `2026-03-28T10:06:00Z`
+
+**Then:**
+1. `shouldPull` returns `true` for `mycargus/my-app` (6 min > 5 min threshold).
+2. `shouldPull` returns `false` for `acme/payments-service` (2 min < 5 min threshold).
+3. If `last_pulled_at` is `null` (first view ever), `shouldPull` returns `true`.
+4. After a successful pull, `last_pulled_at` is updated to the current time.
+5. At exactly 5 minutes since last pull, `shouldPull` returns `false`
+   (strict greater-than — not yet stale).
+
+---
