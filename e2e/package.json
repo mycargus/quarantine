@@ -8,9 +8,10 @@
   },
   "scripts": {
     "test": "vitest run",
-    "lint": "biome lint .",
-    "format": "biome format --write .",
-    "check": "biome check --write ."
+    "lint": "biome check",
+    "lint:ci": "biome ci --error-on-warnings",
+    "lint:fix": "biome check --write",
+    "lint:fix:unsafe": "biome check --write --unsafe"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.0",
