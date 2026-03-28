@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	riteway "github.com/mycargus/riteway-golang"
+
+	"github.com/mycargus/quarantine/internal/result"
 )
 
 // --- Unit tests for pure functions: testHash, detectPRNumber, renderIssueBody, renderPRComment ---
@@ -158,6 +160,11 @@ func TestRenderIssueBody(t *testing.T) {
 		Branch:    "main",
 		CommitSHA: "abc1234",
 		PRNumber:  99,
+		FailureMessage: "Timeout after 5000ms",
+		Retries: []result.RetryEntry{
+			{Attempt: 1, Status: "failed", DurationMs: 0},
+			{Attempt: 2, Status: "passed", DurationMs: 0},
+		},
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
@@ -185,6 +192,66 @@ func TestRenderIssueBody(t *testing.T) {
 		Given:    "issue body rendered",
 		Should:   "mention that closing the issue will unquarantine the test",
 		Actual:   strings.Contains(body, "Close this issue to unquarantine"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "issue body rendered with retry results",
+		Should:   "contain the Retry Results section heading",
+		Actual:   strings.Contains(body, "### Retry Results"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "issue body rendered with retry results",
+		Should:   "contain the first retry row (attempt 1, failed)",
+		Actual:   strings.Contains(body, "| 1 | failed | 0ms |"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "issue body rendered with retry results",
+		Should:   "contain the second retry row (attempt 2, passed)",
+		Actual:   strings.Contains(body, "| 2 | passed | 0ms |"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "issue body rendered with failure message",
+		Should:   "contain the Failure Message section heading",
+		Actual:   strings.Contains(body, "### Failure Message"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "issue body rendered with failure message",
+		Should:   "contain the failure message text",
+		Actual:   strings.Contains(body, "Timeout after 5000ms"),
+		Expected: true,
+	})
+}
+
+func TestRenderIssueBodyWithNoRetryOrFailure(t *testing.T) {
+	body := renderIssueBody(IssueBodyData{
+		TestID:    "src/payment.test.js::PaymentService::should charge",
+		Suite:     "src/payment.test.js",
+		Name:      "should charge",
+		Timestamp: "2026-03-25T12:00:00Z",
+		Branch:    "main",
+		CommitSHA: "abc1234",
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "issue body rendered with no retry results",
+		Should:   "not contain Retry Results section",
+		Actual:   !strings.Contains(body, "### Retry Results"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "issue body rendered with no failure message",
+		Should:   "not contain Failure Message section",
+		Actual:   !strings.Contains(body, "### Failure Message"),
 		Expected: true,
 	})
 }

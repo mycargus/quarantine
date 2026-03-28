@@ -62,13 +62,15 @@ func parsePRNumberFromEvent(data []byte) int {
 
 // IssueBodyData holds the data needed to render a GitHub issue body.
 type IssueBodyData struct {
-	TestID    string
-	Suite     string
-	Name      string
-	Timestamp string
-	Branch    string
-	CommitSHA string
-	PRNumber  int
+	TestID         string
+	Suite          string
+	Name           string
+	Timestamp      string
+	Branch         string
+	CommitSHA      string
+	PRNumber       int
+	FailureMessage string
+	Retries        []result.RetryEntry
 }
 
 // renderIssueBody renders the body of a GitHub issue for a flaky test.
@@ -83,6 +85,19 @@ func renderIssueBody(data IssueBodyData) string {
 	fmt.Fprintf(&sb, "**Detected in:** %s @ %s\n", data.Branch, data.CommitSHA)
 	if data.PRNumber > 0 {
 		fmt.Fprintf(&sb, "**PR:** #%d\n", data.PRNumber)
+	}
+	if len(data.Retries) > 0 {
+		sb.WriteString("\n### Retry Results\n\n")
+		sb.WriteString("| Attempt | Result | Duration |\n")
+		sb.WriteString("|---|---|---|\n")
+		for _, r := range data.Retries {
+			fmt.Fprintf(&sb, "| %d | %s | %dms |\n", r.Attempt, r.Status, r.DurationMs)
+		}
+	}
+	if data.FailureMessage != "" {
+		tick := "`"
+		sb.WriteString("\n### Failure Message\n\n")
+		fmt.Fprintf(&sb, "%s%s%s\n%s\n%s%s%s\n", tick, tick, tick, data.FailureMessage, tick, tick, tick)
 	}
 	sb.WriteString("\n---\n\n")
 	sb.WriteString("*This issue was automatically created by [Quarantine](https://github.com/mycargus/quarantine). Close this issue to unquarantine the test.*")
@@ -285,14 +300,20 @@ func createIssuesForNewFlakyTests(
 
 		// Create a new issue.
 		title := fmt.Sprintf("[Quarantine] %s", t.Name)
+		fm := ""
+		if t.FailureMessage != nil {
+			fm = *t.FailureMessage
+		}
 		body := renderIssueBody(IssueBodyData{
-			TestID:    t.TestID,
-			Suite:     t.FilePath,
-			Name:      t.Name,
-			Timestamp: res.Timestamp,
-			Branch:    branch,
-			CommitSHA: commitSHA,
-			PRNumber:  prNumber,
+			TestID:         t.TestID,
+			Suite:          t.FilePath,
+			Name:           t.Name,
+			Timestamp:      res.Timestamp,
+			Branch:         branch,
+			CommitSHA:      commitSHA,
+			PRNumber:       prNumber,
+			FailureMessage: fm,
+			Retries:        t.Retries,
 		})
 		labels := []string{"quarantine", fmt.Sprintf("quarantine:%s", hash)}
 
