@@ -90,3 +90,49 @@ the pause, the dashboard resumes polling. On the first successful poll, the
 circuit breaker resets. Per ADR-015.
 
 ---
+
+### Scenario 71: Project listing page shows repo names, run counts, and last sync time [M6]
+
+**Risk:** Users have no way to see which repositories are configured or whether data ingestion is working, making the dashboard appear empty or broken.
+
+**Given** the dashboard is running with `dashboard.yml` configured as:
+```yaml
+source: manual
+repos:
+  - owner: mycargus
+    repo: my-app
+  - owner: acme
+    repo: payments-service
+```
+and SQLite contains 5 ingested test runs for `mycargus/my-app` (last synced
+2025-01-15T10:30:00Z) and 0 test runs for `acme/payments-service` (never synced)
+
+**When** the user navigates to the project listing page (`/`)
+
+**Then** the dashboard displays a list of all configured repositories showing:
+1. Repository name (`mycargus/my-app`, `acme/payments-service`).
+2. Test run count (5 for `mycargus/my-app`, 0 for `acme/payments-service`).
+3. Last sync timestamp (`2025-01-15T10:30:00Z` for `mycargus/my-app`, "Never"
+   for `acme/payments-service`).
+
+---
+
+### Scenario 72: Malformed artifact JSON is skipped with a warning [M6]
+
+**Risk:** A single malformed artifact crashes the ingestion pipeline, preventing all subsequent valid artifacts from being processed.
+
+**Given** the dashboard is polling `mycargus/my-app` and discovers 3 new
+artifacts: `quarantine-results-100` (valid JSON), `quarantine-results-101`
+(malformed JSON — missing required `run_id` field), and
+`quarantine-results-102` (valid JSON)
+
+**When** the ingestion pipeline processes the 3 artifacts
+
+**Then** the dashboard:
+1. Successfully ingests artifact 100 into SQLite.
+2. Skips artifact 101 and logs a warning:
+   `[ingest] WARNING: skipping artifact quarantine-results-101 for mycargus/my-app: validation failed`.
+3. Successfully ingests artifact 102 into SQLite.
+4. Does not crash or stop processing remaining artifacts.
+
+---
