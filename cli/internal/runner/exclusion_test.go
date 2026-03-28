@@ -184,3 +184,46 @@ func argAfter(args []string, flag string) string {
 	}
 	return ""
 }
+
+// TestBuildExclusionArgsJestPatternUsesExactlySinglePipe verifies the regex
+// uses exactly "|" (not "||") as separator between test names.
+// Kills mutation: `"|"` → `"||"` in strings.Join.
+func TestBuildExclusionArgsJestPatternUsesExactlySinglePipe(t *testing.T) {
+	entries := []quarantine.Entry{
+		{Name: "test one", FilePath: "src/foo.test.js"},
+		{Name: "test two", FilePath: "src/foo.test.js"},
+	}
+
+	args := runner.BuildExclusionArgs(runner.Jest, entries)
+	pattern := argAfter(args, "--testNamePattern")
+
+	// Exact format: the two names should be joined with a single | (not ||).
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "Jest with two quarantined test names",
+		Should:   "join names with exactly single '|', not '||'",
+		Actual:   strings.Contains(pattern, "test one|test two") && !strings.Contains(pattern, "test one||test two"),
+		Expected: true,
+	})
+}
+
+// TestBuildExclusionArgsJestMultipleEntriesNoTrailingPipe verifies that the
+// escaped slice has exactly len(entries) elements (not len(entries)+1).
+// Kills mutation: `make([]string, len(entries))` → `len(entries)+1`.
+func TestBuildExclusionArgsJestMultipleEntriesNoTrailingPipe(t *testing.T) {
+	entries := []quarantine.Entry{
+		{Name: "test one", FilePath: "src/foo.test.js"},
+		{Name: "test two", FilePath: "src/foo.test.js"},
+	}
+
+	args := runner.BuildExclusionArgs(runner.Jest, entries)
+	pattern := argAfter(args, "--testNamePattern")
+
+	// With len(entries)+1, strings.Join would produce "test one|test two|"
+	// (trailing pipe from the extra empty string element).
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "Jest with two entries",
+		Should:   "produce pattern ending with '.*$' not a trailing pipe before ')'",
+		Actual:   strings.HasSuffix(pattern, ")).*$") && !strings.Contains(pattern, "|)"),
+		Expected: true,
+	})
+}
