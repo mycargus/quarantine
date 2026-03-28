@@ -79,7 +79,38 @@ For each scenario file listed in the manifest's Acceptance Scenarios section:
 
 Mark each scenario file as PASS (all scenarios covered) or PARTIAL (with count and list of missing scenarios).
 
-### 7. Generate report
+### 7. Check E2E coverage
+
+Determine whether the milestone's scenarios require E2E tests beyond what already exists. E2E tests exercise the compiled binary against real external dependencies (real GitHub API, real git repo). They catch issues that mocks cannot — API query format correctness, response shape drift, pagination behavior, and sequential-state flows.
+
+#### 7a. Inventory external API interactions
+
+Read the milestone's acceptance scenarios. For each scenario, list the external API calls it exercises (e.g., `POST /repos/.../issues`, `GET /search/issues?q=...`, `PATCH /repos/.../issues/comments/{id}`).
+
+Classify each interaction as **high-risk** or **low-risk** for mock-vs-real divergence:
+
+**High-risk** (mock could be wrong about real behavior):
+- Search API queries — query string format must match what GitHub actually indexes
+- Pagination — real API may paginate differently from single-page mock responses
+- Sequential state — second run depends on state created by first run (e.g., issue exists for dedup, comment exists for update). Mocks simulate this; real API has propagation delays.
+- PATCH-after-GET chains — finding the right resource ID from a prior list call
+
+**Low-risk** (skip — mock fidelity is sufficient):
+- Simple POST with known request body (e.g., create issue) if already covered by an existing E2E happy-path test
+- Error code handling (e.g., 410 Gone) — code checks `resp.StatusCode`; no mock-vs-real divergence
+- Pure client-side logic (e.g., parsing `GITHUB_EVENT_PATH`) — no external API involved
+
+#### 7b. Check existing E2E tests
+
+Read the E2E test files in `e2e/`. List which high-risk API interactions they already exercise.
+
+#### 7c. Identify gaps
+
+For each high-risk interaction from 7a that is NOT covered by an existing E2E test in 7b, report it as a gap. Group related gaps (e.g., "Scenarios 27 and 49 both need sequential-state E2E tests").
+
+Mark as PASS if all high-risk interactions are covered, or FAIL with the list of uncovered interactions.
+
+### 8. Generate report
 
 Print a structured report in this exact format:
 
@@ -103,6 +134,10 @@ Print a structured report in this exact format:
 - [x] Scenarios N–M (filename.md) — X/X covered
 - [ ] Scenarios N–M (filename.md) — X/Y covered, missing: Scenario Z (title)
 
+### E2E Coverage
+- [x] All high-risk API interactions covered by e2e/ tests
+- [ ] Missing E2E coverage — <list of uncovered high-risk interactions>
+
 ### Summary
 X/Y checks passed. Z issues found.
 ```
@@ -110,11 +145,11 @@ X/Y checks passed. Z issues found.
 Rules for the report:
 - Use `[x]` for PASS, `[ ]` for FAIL
 - Every FAIL line MUST include a reason after an em dash
-- The Summary line MUST count ALL checks across all sections (build + criteria + invariants + scenario files)
+- The Summary line MUST count ALL checks across all sections (build + criteria + invariants + scenario files + e2e coverage)
 - If all checks pass, end with: "Milestone M$1 is verified."
 - If any checks fail, end with: "Milestone M$1 has Z unresolved issues."
 
-### 8. Mark milestone as verified
+### 9. Mark milestone as verified
 
 If ALL checks passed (no failures in any section), update the manifest's frontmatter status from `planned` to `verified`:
 
