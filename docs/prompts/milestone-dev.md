@@ -24,8 +24,10 @@ Then work through the manifest ONE SCENARIO AT A TIME:
    - Start with integration or e2e tests. They catch real issues faster
      than unit tests and drive better design. Add unit tests for pure
      functions extracted during the Refactor step.
-2. Validate. `/mikey:testify <path> --with-design` — you MUST fix all issues before moving on.
-3. Commit. Every chunk of work MUST be committed with a passing build:
+2. Validate. `/mikey:testify <path> --with-design` — you MUST fix ALL issues
+   (HIGH, MEDIUM, and LOW) before proceeding to step 3.
+3. Commit. DO NOT commit until step 2 reports zero open issues. Every chunk
+   of work MUST be committed with a passing build:
    - `make cli-build && make cli-test && make cli-lint` (CLI milestones)
    - `make dash-build && make dash-test && make dash-lint` (dashboard milestones)
    - Commit message: `milestone {N}: <description of what changed>`
