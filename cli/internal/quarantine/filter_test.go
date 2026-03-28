@@ -181,3 +181,27 @@ func TestFilterQuarantinedFailuresQuarantinedPassTreatedNormally(t *testing.T) {
 		Expected: "passed",
 	})
 }
+
+// TestFilterQuarantinedFailuresErrorStatusReclassified verifies that a quarantined
+// test with status "error" (not just "failed") is reclassified to "quarantined".
+// Kills mutation: `t.Status == "error"` → `"MUTATED"` (strips error case).
+func TestFilterQuarantinedFailuresErrorStatusReclassified(t *testing.T) {
+	state := quarantine.NewEmptyState()
+	state.AddTest(quarantine.Entry{
+		TestID: "spec/models/user_spec.rb::User::handles error",
+		Name:   "handles error",
+	})
+
+	tests := []parser.TestResult{
+		{TestID: "spec/models/user_spec.rb::User::handles error", Status: "error"},
+	}
+
+	result := quarantine.FilterQuarantinedFailures(tests, state)
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a quarantined test with status 'error'",
+		Should:   "reclassify status to 'quarantined' (errors are suppressed like failures)",
+		Actual:   result[0].Status,
+		Expected: "quarantined",
+	})
+}
