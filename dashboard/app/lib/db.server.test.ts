@@ -2,7 +2,7 @@ import { unlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe } from "riteway/esm"
-import { getLastSynced, initDb, updateLastSynced, upsertProject } from "./db.server.js"
+import { getLastSynced, getProjects, initDb, updateLastSynced, upsertProject } from "./db.server.js"
 
 const throwsSync = (fn: () => unknown): string | null => {
   try {
@@ -118,6 +118,151 @@ describe("getLastSynced()", async (assert) => {
     should: "return null",
     actual: getLastSynced(db, 99999),
     expected: null,
+  })
+})
+
+describe("getProjects()", async (assert) => {
+  assert({
+    given: "an empty repos config",
+    should: "return an empty array",
+    actual: getProjects(initDb(":memory:"), []),
+    expected: [],
+  })
+
+  const dbNeverSynced = initDb(":memory:")
+
+  assert({
+    given: "a config with 1 repo that has never been ingested (not in projects table)",
+    should: "return testRunCount 0 and lastSynced null",
+    actual: getProjects(dbNeverSynced, [{ owner: "acme", repo: "payments-service" }]),
+    expected: [{ owner: "acme", repo: "payments-service", testRunCount: 0, lastSynced: null }],
+  })
+
+  const dbWithRuns = initDb(":memory:")
+  const projectId = upsertProject(dbWithRuns, "mycargus", "my-app")
+  updateLastSynced(dbWithRuns, projectId, "2025-01-15T10:30:00Z")
+  for (let i = 0; i < 3; i++) {
+    dbWithRuns
+      .prepare(
+        "INSERT INTO test_runs (project_id, run_id, branch, commit_sha, timestamp, total_tests, passed_tests, failed_tests, flaky_tests) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(projectId, `run-${i}`, "main", `sha-${i}`, "2025-01-15T10:00:00Z", 10, 9, 0, 1)
+  }
+
+  assert({
+    given: "a config with 1 repo that has 3 test runs and a last_synced timestamp",
+    should: "return testRunCount 3 and the correct lastSynced value",
+    actual: getProjects(dbWithRuns, [{ owner: "mycargus", repo: "my-app" }]),
+    expected: [
+      { owner: "mycargus", repo: "my-app", testRunCount: 3, lastSynced: "2025-01-15T10:30:00Z" },
+    ],
+  })
+
+  const dbMixed = initDb(":memory:")
+  const syncedId = upsertProject(dbMixed, "mycargus", "my-app")
+  updateLastSynced(dbMixed, syncedId, "2025-01-15T10:30:00Z")
+  for (let i = 0; i < 5; i++) {
+    dbMixed
+      .prepare(
+        "INSERT INTO test_runs (project_id, run_id, branch, commit_sha, timestamp, total_tests, passed_tests, failed_tests, flaky_tests) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(syncedId, `run-${i}`, "main", `sha-${i}`, "2025-01-15T10:00:00Z", 10, 9, 0, 1)
+  }
+
+  assert({
+    given: "a config with 2 repos (one synced with 5 runs, one never synced)",
+    should: "return both repos in config order with correct counts",
+    actual: getProjects(dbMixed, [
+      { owner: "mycargus", repo: "my-app" },
+      { owner: "acme", repo: "payments-service" },
+    ]),
+    expected: [
+      {
+        owner: "mycargus",
+        repo: "my-app",
+        testRunCount: 5,
+        lastSynced: "2025-01-15T10:30:00Z",
+      },
+      { owner: "acme", repo: "payments-service", testRunCount: 0, lastSynced: null },
+    ],
+  })
+
+  // D1: config order preserved when both repos exist in DB
+  const dbBoth = initDb(":memory:")
+  const idA = upsertProject(dbBoth, "acme", "alpha")
+  const idB = upsertProject(dbBoth, "acme", "beta")
+  updateLastSynced(dbBoth, idA, "2025-01-01T00:00:00Z")
+  updateLastSynced(dbBoth, idB, "2025-01-02T00:00:00Z")
+  dbBoth
+    .prepare(
+      "INSERT INTO test_runs (project_id, run_id, branch, commit_sha, timestamp, total_tests, passed_tests, failed_tests, flaky_tests) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .run(idA, "run-a", "main", "sha-a", "2025-01-01T00:00:00Z", 1, 1, 0, 0)
+  dbBoth
+    .prepare(
+      "INSERT INTO test_runs (project_id, run_id, branch, commit_sha, timestamp, total_tests, passed_tests, failed_tests, flaky_tests) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .run(idB, "run-b1", "main", "sha-b1", "2025-01-02T00:00:00Z", 2, 2, 0, 0)
+  dbBoth
+    .prepare(
+      "INSERT INTO test_runs (project_id, run_id, branch, commit_sha, timestamp, total_tests, passed_tests, failed_tests, flaky_tests) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .run(idB, "run-b2", "main", "sha-b2", "2025-01-02T01:00:00Z", 2, 2, 0, 0)
+
+  assert({
+    given:
+      "2 repos both present in DB with distinct run counts, queried in reverse DB insertion order",
+    should: "return results matching config order, not DB insertion order",
+    actual: getProjects(dbBoth, [
+      { owner: "acme", repo: "beta" },
+      { owner: "acme", repo: "alpha" },
+    ]),
+    expected: [
+      { owner: "acme", repo: "beta", testRunCount: 2, lastSynced: "2025-01-02T00:00:00Z" },
+      { owner: "acme", repo: "alpha", testRunCount: 1, lastSynced: "2025-01-01T00:00:00Z" },
+    ],
+  })
+
+  // D2: project in DB with last_synced but zero test runs
+  const dbZeroRuns = initDb(":memory:")
+  const zeroId = upsertProject(dbZeroRuns, "acme", "empty-repo")
+  updateLastSynced(dbZeroRuns, zeroId, "2025-06-01T00:00:00Z")
+
+  assert({
+    given: "a repo in projects table with last_synced set but no test_runs",
+    should: "return testRunCount 0 and lastSynced with the actual timestamp",
+    actual: getProjects(dbZeroRuns, [{ owner: "acme", repo: "empty-repo" }]),
+    expected: [
+      { owner: "acme", repo: "empty-repo", testRunCount: 0, lastSynced: "2025-06-01T00:00:00Z" },
+    ],
+  })
+
+  // D3: duplicate repos in config
+  const dbDup = initDb(":memory:")
+  upsertProject(dbDup, "acme", "dup-repo")
+
+  assert({
+    given: "a config array containing the same owner/repo twice",
+    should: "return two entries for that repo (map preserves duplicates)",
+    actual: getProjects(dbDup, [
+      { owner: "acme", repo: "dup-repo" },
+      { owner: "acme", repo: "dup-repo" },
+    ]),
+    expected: [
+      { owner: "acme", repo: "dup-repo", testRunCount: 0, lastSynced: null },
+      { owner: "acme", repo: "dup-repo", testRunCount: 0, lastSynced: null },
+    ],
+  })
+
+  // D4: case sensitivity — owner/repo match is case-sensitive
+  const dbCase = initDb(":memory:")
+  upsertProject(dbCase, "acme", "my-repo")
+
+  assert({
+    given: "a repo stored as lowercase in DB but queried with different case in config",
+    should: "return testRunCount 0 and lastSynced null (case-sensitive match)",
+    actual: getProjects(dbCase, [{ owner: "ACME", repo: "my-repo" }]),
+    expected: [{ owner: "ACME", repo: "my-repo", testRunCount: 0, lastSynced: null }],
   })
 })
 

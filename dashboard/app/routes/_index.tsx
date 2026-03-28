@@ -5,20 +5,45 @@
  * sync timestamps. This is the dashboard entry point.
  */
 
+import type { LoaderFunctionArgs } from "react-router"
+import { useLoaderData } from "react-router"
+import { loadConfig } from "../lib/config.server.js"
+import { getProjects, initDb } from "../lib/db.server.js"
+import type { ProjectSummary } from "../lib/db.server.js"
+
+export async function loader(_: LoaderFunctionArgs) {
+  const configPath = process.env.DASHBOARD_CONFIG ?? "./dashboard.yml"
+  const dbPath = process.env.DATABASE_URL ?? "./quarantine.db"
+  const config = loadConfig(configPath)
+  const db = initDb(dbPath)
+  const projects = getProjects(db, config.repos)
+  return { projects }
+}
+
 export default function Index() {
+  const { projects } = useLoaderData<typeof loader>()
+
   return (
     <main style={{ fontFamily: "system-ui, sans-serif", padding: "2rem" }}>
-      <h1>Quarantine Dashboard</h1>
-      <p>Flaky test analytics across your repositories.</p>
-
-      <section>
-        <h2>Projects</h2>
-        <p style={{ color: "#666" }}>
-          No projects configured yet. Add repositories to <code>dashboard.yml</code> to get started.
-        </p>
-        {/* TODO: M6 — Load projects from SQLite via loader, render table with
-            repo name, test run count, last sync timestamp. */}
-      </section>
+      <h1>Projects</h1>
+      <table>
+        <thead>
+          <tr>
+            <th>Repository</th>
+            <th>Test Runs</th>
+            <th>Last Synced</th>
+          </tr>
+        </thead>
+        <tbody>
+          {projects.map((p: ProjectSummary) => (
+            <tr key={`${p.owner}/${p.repo}`}>
+              <td>{`${p.owner}/${p.repo}`}</td>
+              <td>{p.testRunCount}</td>
+              <td>{p.lastSynced ?? "Never"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </main>
   )
 }
