@@ -455,3 +455,102 @@ framework: jest
 		Expected: 0,
 	})
 }
+
+// --- resolveOwnerRepo: git detection fallback ---
+// These tests verify that git remote detection fires when owner or repo is
+// absent from config. They kill mutations on line 552 (|| → &&).
+//
+// Tests run from cli/ inside the quarantine git repo (origin: mycargus/quarantine),
+// so git.ParseRemote returns "mycargus"/"quarantine" as the detected values.
+
+// TestRunGitDetectionFillsMissingRepo: config has owner but no repo.
+// The || condition means detection fires to supply the repo.
+// Kills mutation: `owner == "" || repo == ""` → `owner == "" || repo != ""`.
+func TestRunGitDetectionFillsMissingRepo(t *testing.T) {
+	dir := t.TempDir()
+
+	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="0">
+  <testsuite name="suite" tests="1" failures="0">
+    <testcase classname="S" name="passes" time="0.1"/>
+  </testsuite>
+</testsuites>`
+
+	xmlPath := filepath.Join(dir, "junit.xml")
+	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
+
+	// Config has owner but no repo — detection must supply "quarantine".
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+github:
+  owner: mycargus
+`)
+
+	// Branch-check mock returns 200 for quarantine/state.
+	server := fakeGitHubAPI(t, true)
+	defer server.Close()
+
+	_, err := executeRunCmd(t, []string{
+		"--config", configPath,
+		"--junitxml", xmlPath,
+		"--output", filepath.Join(dir, "results.json"),
+		"--", scriptPath,
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config has owner but no repo, running inside a git repo",
+		Should:   "auto-detect the repo from git remote and succeed",
+		Actual:   err == nil,
+		Expected: true,
+	})
+}
+
+// TestRunGitDetectionFillsMissingOwner: config has repo but no owner.
+// The || condition means detection fires to supply the owner.
+// Kills mutation: `owner == "" || repo == ""` → `owner != "" || repo == ""`.
+func TestRunGitDetectionFillsMissingOwner(t *testing.T) {
+	dir := t.TempDir()
+
+	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="0">
+  <testsuite name="suite" tests="1" failures="0">
+    <testcase classname="S" name="passes" time="0.1"/>
+  </testsuite>
+</testsuites>`
+
+	xmlPath := filepath.Join(dir, "junit.xml")
+	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
+
+	// Config has repo but no owner — detection must supply "mycargus".
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+github:
+  repo: quarantine
+`)
+
+	// Branch-check mock returns 200 for quarantine/state.
+	server := fakeGitHubAPI(t, true)
+	defer server.Close()
+
+	_, err := executeRunCmd(t, []string{
+		"--config", configPath,
+		"--junitxml", xmlPath,
+		"--output", filepath.Join(dir, "results.json"),
+		"--", scriptPath,
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config has repo but no owner, running inside a git repo",
+		Should:   "auto-detect the owner from git remote and succeed",
+		Actual:   err == nil,
+		Expected: true,
+	})
+}
