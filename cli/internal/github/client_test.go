@@ -527,3 +527,62 @@ func TestClientUsesDefaultBaseURLWhenNoOverride(t *testing.T) {
 		Expected: true,
 	})
 }
+
+// --- PutContents SHA conditional ---
+
+// TestPutContentsSHAIncludedWhenNonEmpty verifies that SHA is included in the
+// request body when non-empty (line 140: sha != "").
+// Kills mutation: `sha != ""` → `sha == ""`.
+func TestPutContentsSHAIncludedWhenNonEmpty(t *testing.T) {
+	var capturedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&capturedBody)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	c := newTestClient(t, server.URL)
+	err := c.PutContents(context.Background(), "quarantine.json", "init", []byte("{}"), "existing-sha")
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "PutContents called with a non-empty SHA",
+		Should:   "return no error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[interface{}]{
+		Given:    "PutContents called with sha='existing-sha'",
+		Should:   "include 'sha' field in request body",
+		Actual:   capturedBody["sha"],
+		Expected: "existing-sha",
+	})
+}
+
+// TestPutContentsSHAOmittedWhenEmpty verifies that SHA is omitted when empty.
+func TestPutContentsSHAOmittedWhenEmpty(t *testing.T) {
+	var capturedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&capturedBody)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(server.Close)
+
+	c := newTestClient(t, server.URL)
+	err := c.PutContents(context.Background(), "quarantine.json", "init", []byte("{}"), "")
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "PutContents called with empty SHA (new file creation)",
+		Should:   "return no error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	_, hasSHA := capturedBody["sha"]
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "PutContents called with empty SHA",
+		Should:   "NOT include 'sha' field in request body",
+		Actual:   hasSHA,
+		Expected: false,
+	})
+}
