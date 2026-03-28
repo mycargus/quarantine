@@ -2,7 +2,15 @@ import { unlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe } from "riteway/esm"
-import { getLastSynced, getProjects, initDb, updateLastSynced, upsertProject } from "./db.server.js"
+import {
+  getLastPulledAt,
+  getLastSynced,
+  getProjects,
+  initDb,
+  updateLastPulledAt,
+  updateLastSynced,
+  upsertProject,
+} from "./db.server.js"
 
 const throwsSync = (fn: () => unknown): string | null => {
   try {
@@ -264,6 +272,62 @@ describe("getProjects()", async (assert) => {
     actual: getProjects(dbCase, [{ owner: "ACME", repo: "my-repo" }]),
     expected: [{ owner: "ACME", repo: "my-repo", testRunCount: 0, lastSynced: null }],
   })
+})
+
+describe("getLastPulledAt() and updateLastPulledAt()", async (assert) => {
+  const db = initDb(":memory:")
+  const projectId = upsertProject(db, "acme", "widget-pull")
+
+  assert({
+    given: "a new project that has never been pulled",
+    should: "return null",
+    actual: getLastPulledAt(db, projectId),
+    expected: null,
+  })
+
+  updateLastPulledAt(db, projectId, "2026-03-28T10:06:00Z")
+
+  assert({
+    given: "after calling updateLastPulledAt with a timestamp",
+    should: "return that timestamp via getLastPulledAt",
+    actual: getLastPulledAt(db, projectId),
+    expected: "2026-03-28T10:06:00Z",
+  })
+
+  updateLastPulledAt(db, projectId, "2026-03-28T11:00:00Z")
+
+  assert({
+    given: "after calling updateLastPulledAt a second time with a newer timestamp",
+    should: "last call wins — return the newer timestamp",
+    actual: getLastPulledAt(db, projectId),
+    expected: "2026-03-28T11:00:00Z",
+  })
+})
+
+describe("initDb() last_pulled_at migration idempotency", async (assert) => {
+  const tmpPath = join(tmpdir(), `quarantine-debounce-test-${Date.now()}.db`)
+  try {
+    const db1 = initDb(tmpPath)
+    db1.close()
+    // Second call should not throw even though last_pulled_at column already exists
+    let errorMsg: string | null = null
+    try {
+      const db2 = initDb(tmpPath)
+      db2.close()
+    } catch (e) {
+      errorMsg = e instanceof Error ? e.message : String(e)
+    }
+
+    assert({
+      given:
+        "initDb called twice on the same file-based DB (last_pulled_at column already present)",
+      should: "not throw an error",
+      actual: errorMsg,
+      expected: null,
+    })
+  } finally {
+    unlinkSync(tmpPath)
+  }
 })
 
 describe("updateLastSynced()", async (assert) => {

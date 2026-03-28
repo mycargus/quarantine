@@ -71,6 +71,12 @@ export function initDb(dbPath: string): Database {
     );
   `)
 
+  try {
+    db.exec("ALTER TABLE projects ADD COLUMN last_pulled_at TEXT")
+  } catch {
+    // Column already exists — ignore
+  }
+
   return db
 }
 
@@ -125,6 +131,23 @@ export function getLastSynced(db: Database, projectId: number): string | null {
  */
 export function updateLastSynced(db: Database, projectId: number, timestamp: string): void {
   db.prepare("UPDATE projects SET last_synced = ? WHERE id = ?").run(timestamp, projectId)
+}
+
+/**
+ * I/O: returns the last_pulled_at timestamp for a project, or null if never pulled.
+ */
+export function getLastPulledAt(db: Database, projectId: number): string | null {
+  const row = db.prepare("SELECT last_pulled_at FROM projects WHERE id = ?").get(projectId) as
+    | { last_pulled_at: string | null }
+    | undefined
+  return row?.last_pulled_at ?? null
+}
+
+/**
+ * I/O: updates the last_pulled_at timestamp for a project.
+ */
+export function updateLastPulledAt(db: Database, projectId: number, timestamp: string): void {
+  db.prepare("UPDATE projects SET last_pulled_at = ? WHERE id = ?").run(timestamp, projectId)
 }
 
 /**
