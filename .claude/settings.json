@@ -23,5 +23,10 @@
   },
   "enabledPlugins": {
     "mikey@mikey-claude-plugins": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git commit:*)"
+    ]
   }
 }
