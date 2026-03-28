@@ -357,3 +357,74 @@ func TestDetectPRNumberFromEventFileInvalidJSON(t *testing.T) {
 	})
 }
 
+
+// TestDetectPRNumberPullRequestZeroFallsBack verifies that when the event file
+// has pull_request.number == 0, the code falls through to evt.Number.
+// Kills mutation on line 57: `evt.PullRequest.Number > 0` → `>= 0`.
+func TestDetectPRNumberPullRequestZeroFallsBack(t *testing.T) {
+	// Event JSON: pull_request exists but number is 0; outer number is 7.
+	eventJSON := `{"pull_request":{"number":0},"number":7}`
+	eventPath := filepath.Join(t.TempDir(), "event.json")
+	if err := os.WriteFile(eventPath, []byte(eventJSON), 0644); err != nil {
+		t.Fatalf("write event: %v", err)
+	}
+
+	n, err := detectPRNumber(0, eventPath)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "pull_request.number is 0 in event JSON",
+		Should:   "return no error",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "pull_request.number is 0 (not a valid PR number)",
+		Should:   "fall through to evt.Number (7), not return 0",
+		Actual:   n,
+		Expected: 7,
+	})
+}
+
+// TestRenderIssueBodyPRNumberZeroOmitsPRLine verifies that when PRNumber is 0
+// the "**PR:**" line is NOT rendered in the issue body.
+// Kills mutation on line 86: `data.PRNumber > 0` → `data.PRNumber >= 0`.
+func TestRenderIssueBodyPRNumberZeroOmitsPRLine(t *testing.T) {
+	body := renderIssueBody(IssueBodyData{
+		TestID:    "src/foo.test.js::Foo::bar",
+		Suite:     "src/foo.test.js",
+		Name:      "bar",
+		Timestamp: "2026-03-28T00:00:00Z",
+		Branch:    "main",
+		CommitSHA: "abc1234",
+		PRNumber:  0, // zero — should not appear in body
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "PRNumber is 0",
+		Should:   "NOT include '**PR:**' line in issue body",
+		Actual:   !strings.Contains(body, "**PR:**"),
+		Expected: true,
+	})
+}
+
+// TestRenderIssueBodyPositivePRNumberShowsPRLine verifies that a non-zero PR
+// number IS rendered, providing the counterpart assertion.
+func TestRenderIssueBodyPositivePRNumberShowsPRLine(t *testing.T) {
+	body := renderIssueBody(IssueBodyData{
+		TestID:    "src/foo.test.js::Foo::bar",
+		Suite:     "src/foo.test.js",
+		Name:      "bar",
+		Timestamp: "2026-03-28T00:00:00Z",
+		Branch:    "main",
+		CommitSHA: "abc1234",
+		PRNumber:  42,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "PRNumber is 42",
+		Should:   "include '**PR:** #42' line in issue body",
+		Actual:   strings.Contains(body, "**PR:** #42"),
+		Expected: true,
+	})
+}
