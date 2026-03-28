@@ -216,3 +216,124 @@ func TestInitInvalidFrameworkRePrompts(t *testing.T) {
 		Expected: true,
 	})
 }
+
+// --- Custom junitxml path ---
+// Kills mutation on line 65: `junitInput != ""` → `junitInput == ""`.
+
+func TestInitCustomJUnitXMLPath(t *testing.T) {
+	dir := t.TempDir()
+	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+
+	mockServer := newInitTestServer(t)
+
+	stdout, err := executeInitCmd(t,
+		"jest\n3\nmy-custom-results.xml\n", // framework=jest, retries=3, junitxml=my-custom-results.xml
+		dir,
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": mockServer.server.URL,
+		},
+	)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "user provides a custom junitxml path",
+		Should:   "exit without error",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	// The custom junitxml differs from the jest default (junit.xml), so it must
+	// appear in quarantine.yml.
+	content, _ := os.ReadFile(dir + "/quarantine.yml")
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "user provides 'my-custom-results.xml' as junitxml",
+		Should:   "write junitxml: my-custom-results.xml to quarantine.yml",
+		Actual:   strings.Contains(string(content), "my-custom-results.xml"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "user provides a custom junitxml",
+		Should:   "print the custom path in the init summary",
+		Actual:   strings.Contains(stdout, "my-custom-results.xml"),
+		Expected: true,
+	})
+}
+
+// --- Empty defaultBranch fallback ---
+// Kills mutation on line 133: `defaultBranch == ""` → `defaultBranch != ""`.
+
+func TestInitEmptyDefaultBranchFallsBackToMain(t *testing.T) {
+	dir := t.TempDir()
+	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+
+	// Mock server returns empty default_branch; code should fall back to "main".
+	mockServer := newInitTestServer(t, withEmptyDefaultBranch())
+
+	_, err := executeInitCmd(t,
+		"jest\n\n\n",
+		dir,
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": mockServer.server.URL,
+		},
+	)
+
+	// If defaultBranch fallback is broken (mutation: != "" instead of == ""),
+	// the code would try to fetch a ref for an empty branch name and fail.
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "GitHub API returns empty default_branch field",
+		Should:   "fall back to 'main' and initialize successfully",
+		Actual:   err == nil,
+		Expected: true,
+	})
+}
+
+// --- Jest recommendation is printed in init output ---
+// Kills mutation on line 166: `rec != ""` → `rec == ""`.
+
+func TestInitJestRecommendationAppearsInOutput(t *testing.T) {
+	dir := t.TempDir()
+	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+
+	mockServer := newInitTestServer(t)
+
+	stdout, err := executeInitCmd(t,
+		"jest\n\n\n",
+		dir,
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": mockServer.server.URL,
+		},
+	)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "jest framework selected during init",
+		Should:   "print the jest-junit recommendation block",
+		Actual:   err == nil && strings.Contains(stdout, "classNameTemplate"),
+		Expected: true,
+	})
+}
+
+func TestInitRSpecNoJestRecommendation(t *testing.T) {
+	dir := t.TempDir()
+	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+
+	mockServer := newInitTestServer(t)
+
+	stdout, err := executeInitCmd(t,
+		"rspec\n\n\n",
+		dir,
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": mockServer.server.URL,
+		},
+	)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "rspec framework selected during init",
+		Should:   "NOT print the jest-junit recommendation block",
+		Actual:   err == nil && !strings.Contains(stdout, "classNameTemplate"),
+		Expected: true,
+	})
+}
