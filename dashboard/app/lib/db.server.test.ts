@@ -2,7 +2,7 @@ import { unlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe } from "riteway/esm"
-import { initDb, upsertProject } from "./db.server.js"
+import { getLastSynced, initDb, updateLastSynced, upsertProject } from "./db.server.js"
 
 const throwsSync = (fn: () => unknown): string | null => {
   try {
@@ -90,5 +90,75 @@ describe("upsertProject()", async (assert) => {
     should: "return distinct positive integer IDs",
     actual: otherId !== firstId && otherId > 0,
     expected: true,
+  })
+})
+
+describe("getLastSynced()", async (assert) => {
+  const db = initDb(":memory:")
+  const projectId = upsertProject(db, "acme", "widget")
+
+  assert({
+    given: "a project that has never been synced",
+    should: "return null",
+    actual: getLastSynced(db, projectId),
+    expected: null,
+  })
+
+  updateLastSynced(db, projectId, "2026-03-15T14:00:00Z")
+
+  assert({
+    given: "a project after updateLastSynced sets a timestamp",
+    should: "return that timestamp",
+    actual: getLastSynced(db, projectId),
+    expected: "2026-03-15T14:00:00Z",
+  })
+
+  assert({
+    given: "a projectId that does not exist in the database",
+    should: "return null",
+    actual: getLastSynced(db, 99999),
+    expected: null,
+  })
+})
+
+describe("updateLastSynced()", async (assert) => {
+  const db = initDb(":memory:")
+  const projectId = upsertProject(db, "acme", "payments")
+
+  updateLastSynced(db, projectId, "2026-03-15T10:00:00Z")
+
+  assert({
+    given: "a first call to updateLastSynced",
+    should: "set the last_synced timestamp",
+    actual: getLastSynced(db, projectId),
+    expected: "2026-03-15T10:00:00Z",
+  })
+
+  updateLastSynced(db, projectId, "2026-03-15T16:00:00Z")
+
+  assert({
+    given: "a second call to updateLastSynced with a newer timestamp",
+    should: "update last_synced to the newer timestamp",
+    actual: getLastSynced(db, projectId),
+    expected: "2026-03-15T16:00:00Z",
+  })
+
+  updateLastSynced(db, projectId, "2026-03-15T08:00:00Z")
+
+  assert({
+    given: "a call to updateLastSynced with an older timestamp",
+    should: "overwrite last_synced with the older value (no guard at DB layer)",
+    actual: getLastSynced(db, projectId),
+    expected: "2026-03-15T08:00:00Z",
+  })
+
+  const otherProjectId = upsertProject(db, "acme", "other")
+  updateLastSynced(db, 99999, "2026-01-01T00:00:00Z")
+
+  assert({
+    given: "a non-existent projectId",
+    should: "not throw and not affect any existing project",
+    actual: getLastSynced(db, otherProjectId),
+    expected: null,
   })
 })

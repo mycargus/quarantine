@@ -3,6 +3,8 @@ import { initDb } from "./db.server.js"
 import {
   buildTestRunRecord,
   filterArtifactsByPrefix,
+  filterArtifactsSince,
+  sortArtifactsChronologically,
   upsertTestRun,
   validateTestResult,
 } from "./ingest.server.js"
@@ -198,6 +200,154 @@ describe("buildTestRunRecord()", async (assert) => {
     should: "map prNumber as null",
     actual: buildTestRunRecord({ ...validFixture, pr_number: null }, 1).prNumber,
     expected: null,
+  })
+})
+
+describe("filterArtifactsSince()", async (assert) => {
+  const artifacts: Artifact[] = [
+    {
+      id: 1,
+      name: "quarantine-results-run-1",
+      archive_download_url: "https://example.com/1",
+      created_at: "2026-03-15T10:00:00Z",
+      expires_at: "2026-04-15T10:00:00Z",
+    },
+    {
+      id: 2,
+      name: "quarantine-results-run-2",
+      archive_download_url: "https://example.com/2",
+      created_at: "2026-03-15T12:00:00Z",
+      expires_at: "2026-04-15T12:00:00Z",
+    },
+    {
+      id: 3,
+      name: "quarantine-results-run-3",
+      archive_download_url: "https://example.com/3",
+      created_at: "2026-03-15T14:00:00Z",
+      expires_at: "2026-04-15T14:00:00Z",
+    },
+  ]
+
+  assert({
+    given: "lastSynced is null",
+    should: "return all artifacts (first sync)",
+    actual: filterArtifactsSince(artifacts, null).map((a) => a.id),
+    expected: [1, 2, 3],
+  })
+
+  assert({
+    given: "lastSynced filters to newer artifacts",
+    should: "return only artifacts created after lastSynced",
+    actual: filterArtifactsSince(artifacts, "2026-03-15T11:00:00Z").map((a) => a.id),
+    expected: [2, 3],
+  })
+
+  assert({
+    given: "an artifact with created_at exactly equal to lastSynced",
+    should: "exclude that artifact (strict greater-than)",
+    actual: filterArtifactsSince(artifacts, "2026-03-15T12:00:00Z").map((a) => a.id),
+    expected: [3],
+  })
+
+  assert({
+    given: "an empty artifact array",
+    should: "return an empty array",
+    actual: filterArtifactsSince([], "2026-03-15T12:00:00Z"),
+    expected: [],
+  })
+
+  assert({
+    given: "lastSynced after all artifact timestamps",
+    should: "return an empty array",
+    actual: filterArtifactsSince(artifacts, "2026-03-15T15:00:00Z").map((a) => a.id),
+    expected: [],
+  })
+})
+
+describe("sortArtifactsChronologically()", async (assert) => {
+  const artifactA: Artifact = {
+    id: 1,
+    name: "run-1",
+    archive_download_url: "https://example.com/1",
+    created_at: "2026-03-15T10:00:00Z",
+    expires_at: "2026-04-15T10:00:00Z",
+  }
+  const artifactB: Artifact = {
+    id: 2,
+    name: "run-2",
+    archive_download_url: "https://example.com/2",
+    created_at: "2026-03-15T12:00:00Z",
+    expires_at: "2026-04-15T12:00:00Z",
+  }
+  const artifactC: Artifact = {
+    id: 3,
+    name: "run-3",
+    archive_download_url: "https://example.com/3",
+    created_at: "2026-03-15T14:00:00Z",
+    expires_at: "2026-04-15T14:00:00Z",
+  }
+
+  assert({
+    given: "artifacts in reverse chronological order",
+    should: "sort them oldest-first",
+    actual: sortArtifactsChronologically([artifactC, artifactA, artifactB]).map((a) => a.id),
+    expected: [1, 2, 3],
+  })
+
+  assert({
+    given: "artifacts already in chronological order",
+    should: "return them in the same order",
+    actual: sortArtifactsChronologically([artifactA, artifactB, artifactC]).map((a) => a.id),
+    expected: [1, 2, 3],
+  })
+
+  assert({
+    given: "a single artifact",
+    should: "return it unchanged",
+    actual: sortArtifactsChronologically([artifactB]).map((a) => a.id),
+    expected: [2],
+  })
+
+  assert({
+    given: "the original array",
+    should: "not be mutated by sorting",
+    actual: (() => {
+      const input = [artifactC, artifactA, artifactB]
+      sortArtifactsChronologically(input)
+      return input.map((a) => a.id)
+    })(),
+    expected: [3, 1, 2],
+  })
+
+  assert({
+    given: "an empty artifact array",
+    should: "return an empty array",
+    actual: sortArtifactsChronologically([]),
+    expected: [],
+  })
+
+  assert({
+    given: "two artifacts with identical created_at",
+    should: "preserve their relative input order (stable sort)",
+    actual: (() => {
+      const same = "2026-03-15T12:00:00Z"
+      const first: Artifact = {
+        id: 10,
+        name: "first",
+        archive_download_url: "u",
+        created_at: same,
+        expires_at: "t",
+      }
+      const second: Artifact = {
+        id: 11,
+        name: "second",
+        archive_download_url: "u",
+        created_at: same,
+        expires_at: "t",
+      }
+      return sortArtifactsChronologically([first, second]).map((a) => a.id)
+    })(),
+    expected: [10, 11],
   })
 })
 

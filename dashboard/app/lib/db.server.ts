@@ -85,6 +85,23 @@ export function upsertProject(db: Database, owner: string, repo: string): number
 }
 
 /**
+ * I/O: returns the last_synced timestamp for a project, or null if never synced.
+ */
+export function getLastSynced(db: Database, projectId: number): string | null {
+  const row = db.prepare("SELECT last_synced FROM projects WHERE id = ?").get(projectId) as
+    | { last_synced: string | null }
+    | undefined
+  return row?.last_synced ?? null
+}
+
+/**
+ * I/O: updates the last_synced timestamp for a project to the given ISO 8601 string.
+ */
+export function updateLastSynced(db: Database, projectId: number, timestamp: string): void {
+  db.prepare("UPDATE projects SET last_synced = ? WHERE id = ?").run(timestamp, projectId)
+}
+
+/**
  * Get test runs for a project.
  */
 export function getTestRuns(_projectId: number): TestRun[] {

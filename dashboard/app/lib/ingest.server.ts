@@ -81,6 +81,24 @@ addFormats(ajv)
 const validate = ajv.compile(schema)
 
 /**
+ * Pure: filters artifacts to only those created after lastSynced.
+ * If lastSynced is null, returns all artifacts (first sync).
+ */
+export function filterArtifactsSince(artifacts: Artifact[], lastSynced: string | null): Artifact[] {
+  if (lastSynced === null) return artifacts
+  return artifacts.filter((a) => a.created_at > lastSynced)
+}
+
+/**
+ * Pure: sorts artifacts by created_at in ascending order (oldest first).
+ */
+export function sortArtifactsChronologically(artifacts: Artifact[]): Artifact[] {
+  return [...artifacts].sort((a, b) =>
+    a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0,
+  )
+}
+
+/**
  * Pure: filters artifacts by name prefix.
  */
 export function filterArtifactsByPrefix(artifacts: Artifact[], prefix: string): Artifact[] {
