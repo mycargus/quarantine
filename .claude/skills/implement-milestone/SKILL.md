@@ -83,14 +83,43 @@ GATE: Do NOT commit until step 2 reports zero open issues.
 
 ### Step 4 — E2E (conditional)
 
-Read `docs/specs/test-strategy.md` to understand the E2E test layer: E2E tests exercise the compiled binary against real external dependencies (real GitHub API, real git repo). They catch issues that mocks cannot — API behavior changes, response format drift, auth edge cases.
+E2E tests exercise the compiled binary against real external dependencies (real GitHub API, real git repo). They catch issues that mocks cannot: API query format correctness, response shape drift, pagination behavior, auth edge cases, and eventual consistency.
 
-After each scenario, evaluate whether it warrants an E2E test:
-- Does the scenario exercise a new external integration (GitHub API endpoint, git operation, file I/O)?
-- Does it cover a flow where mock fidelity is a concern (e.g., API response shapes, auth, rate limits)?
-- Is there already an E2E test covering this flow?
+After completing each scenario's commit, determine whether it needs E2E coverage.
 
-If yes to the first two and no to the third, add or extend an E2E test in `e2e/`. Run `make e2e-test` to verify. Do NOT wait until all scenarios are done — run E2E tests incrementally as they become relevant.
+#### 4a. Inventory the scenario's external API interactions
+
+List every external API call the scenario exercises. For each call, note:
+- The HTTP method and endpoint pattern (e.g., `GET /search/issues?q=...`)
+- What the integration test mocks for this call (canned response)
+- Whether the real API could behave differently from the mock in ways that matter
+
+**Examples of high mock-fidelity-risk interactions:**
+- Search API queries — the query string format (`label:X is:open repo:O/R`) must match what GitHub actually indexes. A mock always returns what you tell it; the real API may not find the issue if the query is wrong.
+- Pagination — `per_page=100` and link-header pagination. Mocks typically return one page; real API may paginate differently.
+- PATCH to update a comment — depends on finding the correct `comment_id` from a prior GET. Mocks hardcode IDs; real API returns dynamic IDs.
+- Sequential state — second run depends on state created by first run (e.g., issue exists, comment exists). Mocks simulate this; real API has propagation delays.
+
+**Examples of low mock-fidelity-risk interactions (skip E2E):**
+- Simple POST with a known request body (e.g., create issue) — already covered by existing E2E happy path.
+- Error handling for status codes (e.g., 410 Gone) — the code checks `resp.StatusCode`; there is no mock-vs-real divergence risk.
+- Pure client-side logic (e.g., PR number detection from `GITHUB_EVENT_PATH`) — no external API involved.
+
+#### 4b. Check existing E2E coverage
+
+Read the existing E2E test files in `e2e/` and list which API interactions they already exercise. A scenario does NOT need a new E2E test if every high-risk interaction is already covered by an existing test.
+
+#### 4c. Decision
+
+Add or extend an E2E test if the scenario introduces a **new high-risk API interaction** not covered by existing E2E tests. When multiple scenarios share the same new interaction, group them into a single E2E test.
+
+If adding an E2E test, follow the patterns in the existing `e2e/` tests:
+- Use retry loops with delays for GitHub API propagation (search index, CDN)
+- Clean up created resources (issues, comments) in `afterEach`
+- Use the `riteway` assertion style
+- Commit the E2E test in the same commit as the scenario, or as a separate commit if it covers multiple scenarios
+
+Run `make e2e-test` to verify. Do NOT wait until all scenarios are done — add E2E tests incrementally as high-risk interactions are introduced.
 
 ### Loop
 
