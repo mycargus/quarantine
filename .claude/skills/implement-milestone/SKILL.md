@@ -66,6 +66,8 @@ Rules:
 
 Invoke `/mikey:testify <test-file-path> --with-design`.
 
+**Note:** `/mikey:tdd --validate` causes the tdd-agent to run testify internally, but that is its own internal check. You MUST still invoke `/mikey:testify` here as an independent gate — the tdd-agent's internal run may have missed issues or used a narrower scope.
+
 GATE: You MUST fix ALL issues (HIGH, MEDIUM, and LOW) before proceeding to step 3. If testify reports issues, fix them and re-run testify until the report is clean. Do NOT commit with open issues.
 
 ### Step 3 — Commit

@@ -239,6 +239,13 @@ func TestDefaultCheckPRScopeForTestsFallback(t *testing.T) {
 		Actual:   len(defaultCheckPRScopeForTests("main", nil)),
 		Expected: 0,
 	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "git commands fail (invalid base ref that does not exist on the remote)",
+		Should:   "return empty map (fallback to pre-existing — do not break the build)",
+		Actual:   len(defaultCheckPRScopeForTests("__nonexistent_branch__", flakyInputs)),
+		Expected: 0,
+	})
 }
 
 func TestClassifyPRScope(t *testing.T) {
@@ -290,6 +297,30 @@ func TestClassifyPRScope(t *testing.T) {
 			[]string{"-  it('should process refund', () => {"},
 		),
 		Expected: "",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "empty test name with added diff lines present",
+		Should:   "return empty string (empty name must not match every added line)",
+		Actual: classifyPRScope(
+			nil,
+			"src/payment.test.js",
+			"",
+			[]string{"+  it('some test', () => {"},
+		),
+		Expected: "",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "file appears in added-files list at second position (not first)",
+		Should:   "return new_file_in_pr",
+		Actual: classifyPRScope(
+			[]string{"src/other.test.js", "src/payment.test.js"},
+			"src/payment.test.js",
+			"should process refund",
+			nil,
+		),
+		Expected: "new_file_in_pr",
 	})
 }
 
