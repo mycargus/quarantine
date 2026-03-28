@@ -95,7 +95,7 @@ Coverage tells you which lines are executed; mutation testing tells you whether 
 
 ### Tool — `/test-mutation`
 
-Mutation testing uses the `/claude-swe-workflows:test-mutation` skill, part of the [`claude-swe-workflows`](https://github.com/mycargus/claude-swe-workflows) Claude Code plugin. Unlike traditional mutation tools (gremlins, Stryker) that only report survivors, this skill finds survivors **and writes new tests to kill them**.
+Mutation testing uses the `/claude-swe-workflows:test-mutation` skill, part of the [`claude-swe-workflows`](https://github.com/chrisallenlane/claude-swe-workflows) Claude Code plugin. Unlike traditional mutation tools (gremlins, Stryker) that only report survivors, this skill finds survivors **and writes new tests to kill them**.
 
 ```bash
 make cli-mutate    # run /test-mutation scoped to the CLI
@@ -139,8 +139,8 @@ Mutation testing validates that existing tests are meaningful. It does not repla
 
 **`/mikey:testify`** — Test quality auditor. Reviews code for design issues (mixed I/O and logic), excessive mocking, implementation detail testing, and missing error-path coverage. Use after implementing scenarios to validate alignment with this strategy.
 
-**`/claude-swe-workflows:test-mutation`** — Mutation testing workflow. Finds surviving mutations across all source modules and writes targeted tests to kill them. Multi-session with progress tracking. From the [`claude-swe-workflows`](https://github.com/mycargus/claude-swe-workflows) plugin. Use after implementing a milestone.
+**`/claude-swe-workflows:test-mutation`** — Mutation testing workflow. Finds surviving mutations across all source modules and writes targeted tests to kill them. Multi-session with progress tracking. From the [`claude-swe-workflows`](https://github.com/chrisallenlane/claude-swe-workflows) plugin. Use after implementing a milestone.
 
 ---
 
-*References: [architecture.md](../planning/architecture.md), scenario files in `docs/scenarios/`, Claude Code skills: [`/mikey:tdd`, `/mikey:testify`](https://github.com/mycargus/mikey-claude-plugins), [`/test-mutation`](https://github.com/mycargus/claude-swe-workflows).*
+*References: [architecture.md](../planning/architecture.md), scenario files in `docs/scenarios/`, Claude Code skills: [`/mikey:tdd`, `/mikey:testify`](https://github.com/mycargus/mikey-claude-plugins), [`/test-mutation`](https://github.com/chrisallenlane/claude-swe-workflows).*
