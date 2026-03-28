@@ -131,3 +131,46 @@ func TestMatchesExcludePatternDoubleStarMatchesAcrossSeparators(t *testing.T) {
 		Expected: true,
 	})
 }
+
+// TestMatchesExcludePatternEmptyPatternMatchesEmptyString verifies that an
+// empty pattern matches only the empty string (line 33: s == "").
+// Kills mutation: `s == ""` → `s != ""`.
+func TestMatchesExcludePatternEmptyPatternMatchesEmptyString(t *testing.T) {
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "empty pattern and empty test ID",
+		Should:   "match (empty pattern == empty string)",
+		Actual:   runner.MatchesExcludePattern("", []string{""}),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "empty pattern and non-empty test ID",
+		Should:   "not match (empty pattern only matches empty string)",
+		Actual:   runner.MatchesExcludePattern("foo::bar::baz", []string{""}),
+		Expected: false,
+	})
+}
+
+// TestMatchesExcludePatternStarDoesNotMatchColonSeparator verifies that *
+// stops matching at ':' (colon separator used in test IDs).
+// Kills mutations on line 62: removing ':' from `ch == '/' || ch == ':'`.
+func TestMatchesExcludePatternStarDoesNotMatchColonSeparator(t *testing.T) {
+	// Pattern "foo*baz" should NOT match "foo::baz" because * cannot cross '::'.
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "pattern 'foo*baz' and test ID 'foo::baz'",
+		Should:   "not match (* cannot cross :: separator)",
+		Actual:   runner.MatchesExcludePattern("foo::baz", []string{"foo*baz"}),
+		Expected: false,
+	})
+}
+
+// TestMatchesExcludePatternDoubleStarCanMatchColonSeparator verifies that **
+// CAN cross :: (unlike *).
+func TestMatchesExcludePatternDoubleStarCanMatchColonSeparator(t *testing.T) {
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "pattern 'foo**baz' and test ID 'foo::baz'",
+		Should:   "match (** can cross :: separator)",
+		Actual:   runner.MatchesExcludePattern("foo::baz", []string{"foo**baz"}),
+		Expected: true,
+	})
+}
