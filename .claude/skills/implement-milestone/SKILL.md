@@ -89,7 +89,9 @@ After completing each scenario's commit, determine whether it needs E2E coverage
 
 #### 4a. Inventory the scenario's external API interactions
 
-List every external API call the scenario exercises. For each call, note:
+List every external API call the **production code path** exercises — not just what the test calls. If a function accepts an injected `fetchFn` for testing but uses real `fetch` in production, the production path IS an external API interaction and MUST be evaluated for E2E coverage. Dependency injection makes unit testing possible; it does not eliminate mock-fidelity risk.
+
+For each call, note:
 - The HTTP method and endpoint pattern (e.g., `GET /search/issues?q=...`)
 - What the integration test mocks for this call (canned response)
 - Whether the real API could behave differently from the mock in ways that matter
@@ -108,6 +110,8 @@ List every external API call the scenario exercises. For each call, note:
 #### 4b. Check existing E2E coverage
 
 Read the existing E2E test files in `e2e/` and list which API interactions they already exercise. A scenario does NOT need a new E2E test if every high-risk interaction is already covered by an existing test.
+
+**Important:** E2E tests in `e2e/` can verify API interactions for ANY component (CLI, dashboard, or shared libraries) — not just the CLI binary. "No E2E infrastructure exists for this component" is NOT a valid reason to skip E2E. If a dashboard function calls the GitHub API in production, write an E2E test in `e2e/` that exercises that function with real credentials.
 
 #### 4c. Decision
 

@@ -85,7 +85,9 @@ Determine whether the milestone's scenarios require E2E tests beyond what alread
 
 #### 7a. Inventory external API interactions
 
-Read the milestone's acceptance scenarios. For each scenario, list the external API calls it exercises (e.g., `POST /repos/.../issues`, `GET /search/issues?q=...`, `PATCH /repos/.../issues/comments/{id}`).
+Read the milestone's acceptance scenarios and the **production source code**. List every external API call the production code path exercises — not just what tests call. If a function accepts an injected dependency (e.g., `fetchFn`) for testing but uses real `fetch`/HTTP in production, that IS an external API interaction. Dependency injection makes unit testing possible; it does not eliminate mock-fidelity risk.
+
+For each interaction, note the HTTP method and endpoint (e.g., `POST /repos/.../issues`, `GET /repos/.../actions/artifacts`).
 
 Classify each interaction as **high-risk** or **low-risk** for mock-vs-real divergence:
 
@@ -102,7 +104,7 @@ Classify each interaction as **high-risk** or **low-risk** for mock-vs-real dive
 
 #### 7b. Check existing E2E tests
 
-Read the E2E test files in `e2e/`. List which high-risk API interactions they already exercise.
+Read the E2E test files in `e2e/`. List which high-risk API interactions they already exercise. E2E tests in `e2e/` can cover any component (CLI, dashboard, shared libraries) — not just the CLI binary. "No E2E infrastructure exists for this component" is NOT a valid reason to mark E2E as PASS.
 
 #### 7c. Identify gaps
 
