@@ -56,8 +56,8 @@ dev: _check-prereqs install-hooks
 	cd test && pnpm install
 
 _check-prereqs:
-	@command -v go >/dev/null 2>&1 || { echo "Error: go is not installed. Run 'asdf install' in cli/."; exit 1; }
-	@command -v node >/dev/null 2>&1 || { echo "Error: node is not installed. Run 'asdf install' in dashboard/."; exit 1; }
+	@command -v go >/dev/null 2>&1 || { echo "Error: go is not installed. Run 'asdf install' in the repo root."; exit 1; }
+	@command -v node >/dev/null 2>&1 || { echo "Error: node is not installed. Run 'asdf install' in the repo root."; exit 1; }
 	@command -v pnpm >/dev/null 2>&1 || { echo "Error: pnpm is not installed. Run 'npm install -g pnpm'."; exit 1; }
 
 install-hooks:
