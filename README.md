@@ -139,6 +139,8 @@ make dev
 
 `make dev` verifies prerequisites, installs git hooks, and downloads dependencies for all subdirectories.
 
+> **Note:** `better-sqlite3` compiles a native binary against your Node.js version. After upgrading Node.js, run `pnpm rebuild better-sqlite3` in `dashboard/` to recompile it.
+
 ### Reusable Prompts
 
 Prompts for common development tasks are in [`docs/prompts/`](docs/prompts/):
