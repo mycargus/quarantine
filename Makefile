@@ -1,4 +1,4 @@
-.PHONY: cli-build cli-test cli-lint cli-mutate dash-build dash-test dash-lint e2e-build e2e-test e2e-lint schemas-validate lint-all test-all
+.PHONY: cli-build cli-test cli-lint cli-mutate dash-build dash-test dash-lint dash-typecheck test-build e2e-test contract-test test-lint schemas-validate lint-all test-all
 
 # --- CLI (Go) ---
 
@@ -25,16 +25,22 @@ dash-test:
 dash-lint:
 	cd dashboard && pnpm run lint
 
-# --- End-to-End ---
+dash-typecheck:
+	cd dashboard && pnpm run typecheck
 
-e2e-build:
-	cd e2e && pnpm install
+# --- Test Infrastructure (contract + e2e) ---
+
+test-build:
+	cd test && pnpm install
+
+contract-test:
+	cd test && pnpm run test:contract
 
 e2e-test:
-	cd e2e && pnpm test
+	cd test && pnpm run test:e2e
 
-e2e-lint:
-	cd e2e && pnpm run lint
+test-lint:
+	cd test && pnpm run lint
 
 # --- Schemas ---
 
@@ -44,6 +50,6 @@ schemas-validate:
 
 # --- Aggregate ---
 
-lint-all: cli-lint dash-lint e2e-lint
+lint-all: cli-lint dash-lint test-lint
 
-test-all: cli-test dash-test e2e-test schemas-validate
+test-all: cli-test dash-test contract-test e2e-test schemas-validate

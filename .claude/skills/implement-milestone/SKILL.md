@@ -81,47 +81,55 @@ GATE: Do NOT commit until step 2 reports zero open issues.
 3. Stage and commit with message: `milestone $1: <description of what changed>`
 4. Each commit is a safe rollback point. Never accumulate uncommitted work across scenarios.
 
-### Step 4 — E2E (conditional)
+### Step 4 — Contract tests (conditional)
 
-E2E tests verify that real external APIs behave as integration test mocks assume. They catch mock-fidelity drift: response shape changes, header behavior, redirect chains, pagination, auth edge cases, and eventual consistency.
+Contract tests verify that production code sends correctly-shaped requests and handles response shapes from vendored OpenAPI specs — without network access or credentials. They use Prism as a local mock server (ADR-024).
 
-After completing each scenario's commit, determine whether it needs E2E coverage.
+After completing each scenario's commit, determine whether it needs contract test coverage.
 
 #### 4a. Inventory the scenario's external API interactions
 
-List every external API call the **production code path** exercises — not just what the test calls. If a function accepts an injected dependency (e.g., `fetchFn`) for testing but uses real HTTP in production, the production path IS an external API interaction and MUST be evaluated for E2E coverage. Dependency injection makes unit testing possible; it does not eliminate mock-fidelity risk.
+List every external API call the **production code path** exercises — not just what the test calls. If a function accepts an injected dependency (e.g., `fetchFn`) for testing but uses real HTTP in production, the production path IS an external API interaction and MUST be evaluated. Dependency injection makes unit testing possible; it does not eliminate mock-fidelity risk.
 
 For each call, note:
 - The HTTP method and endpoint pattern (e.g., `GET /search/issues?q=...`)
-- What the integration test mock returns (canned response shape, headers, status codes)
-- Whether the real API could diverge from this mock in ways that matter
+- What response shape the code assumes (fields it destructures, headers it reads, status codes it checks)
+- What request shape the code sends (method, headers, body)
 
-**High mock-fidelity-risk** (always need E2E):
-- Response shapes the code destructures (e.g., `data.artifacts`, `response.headers.get("etag")`)
-- Conditional request round-trips (ETag/If-None-Match, Last-Modified/If-Modified-Since)
+#### 4b. Classify each interaction
+
+**Needs contract test** (shape conformance, testable offline):
+- Response shapes the code destructures (e.g., `data.artifacts`, `issue.number`)
+- Request headers the API requires (e.g., `Accept`, `X-GitHub-Api-Version`)
+- Error response shapes the code handles (410 Gone, 404, 422)
+
+**Needs E2E test instead** (real API behavior, requires credentials):
+- Conditional request round-trips (ETag/If-None-Match, Last-Modified/If-Modified-Since, 304)
 - Redirect chains (302 → blob storage download)
 - Search/query API formats (query string must match what the provider indexes)
-- Pagination (code assumes single page with `per_page=100` or similar)
+- Pagination across multiple pages
 - Sequential state (second call depends on state from first call)
 - Auth header formats (Bearer vs Basic vs token header — varies by provider)
 
-**Low mock-fidelity-risk** (skip E2E):
+**Skip both** (low risk):
 - Status code checks (`if (response.status === 401)`) — no shape to drift
 - Pure client-side logic (e.g., PR number detection from `GITHUB_EVENT_PATH`) — no external API involved
 
-#### 4b. Check existing E2E coverage
+#### 4c. Check existing coverage
 
-Read the existing E2E test files in `e2e/` and list which API interactions they already exercise. A scenario does NOT need a new E2E test if every high-risk interaction is already covered by an existing test.
+Read existing test files:
+- Contract tests: `test/contract/*.test.js`
+- E2E tests: `test/e2e/*.test.js`
 
-E2E tests in `e2e/` cover ANY component (CLI, dashboard, shared libraries) and ANY provider (GitHub, Jenkins, GitLab). "No E2E infrastructure exists for this component" and "this provider isn't set up yet" are NOT valid reasons to skip E2E.
+A scenario does NOT need a new test if every interaction is already covered.
 
-#### 4c. Decision
+#### 4d. Add tests
 
-Add or extend an E2E test if the scenario introduces a **new high-risk API interaction** not covered by existing E2E tests. When multiple scenarios share the same new interaction, group them into a single E2E test.
+For **contract test** gaps, invoke `/create-contract-test <description>` to follow the project's contract test conventions (Prism setup, vendored specs, shape assertions).
 
-If adding an E2E test, invoke `/create-e2e-test <description>` to follow the project's E2E conventions (provider-specific helpers, credential guards, assertion style, cleanup).
+For **E2E test** gaps, invoke `/create-e2e-test <description>` to follow the project's E2E conventions (provider-specific helpers, credential guards, assertion style, cleanup).
 
-Run `make e2e-test` to verify. Do NOT wait until all scenarios are done — add E2E tests incrementally as high-risk interactions are introduced.
+Run `make contract-test` and/or `make e2e-test` as appropriate. Do NOT wait until all scenarios are done — add tests incrementally as interactions are introduced.
 
 ### Loop
 

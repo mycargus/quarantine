@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { defineConfig } from "vitest/config"
 
-// Load e2e/.env when present. CI env vars always take precedence.
-const envFile = join(import.meta.dirname, ".env")
+// Load test/e2e/.env when present. CI env vars always take precedence.
+const envFile = join(import.meta.dirname, "e2e/.env")
 if (existsSync(envFile)) {
   for (const line of readFileSync(envFile, "utf8").split("\n")) {
     const trimmed = line.trim()
@@ -22,9 +22,24 @@ if (existsSync(envFile)) {
 
 export default defineConfig({
   test: {
-    testTimeout: 120_000,
-    // Run test files sequentially — all e2e suites share the same GitHub
-    // repo state and would race if run in parallel.
-    fileParallelism: false,
+    projects: [
+      {
+        test: {
+          name: "contract",
+          include: ["contract/**/*.{test,spec}.?(c|m)[jt]s?(x)"],
+          testTimeout: 30_000,
+        },
+      },
+      {
+        test: {
+          name: "e2e",
+          include: ["e2e/**/*.{test,spec}.?(c|m)[jt]s?(x)"],
+          testTimeout: 120_000,
+          // Run test files sequentially — all e2e suites share the same GitHub
+          // repo state and would race if run in parallel.
+          fileParallelism: false,
+        },
+      },
+    ],
   },
 })

@@ -73,9 +73,9 @@ Exercise full component flows end-to-end within the component boundary. A mock H
 
 ### E2E Tests
 
-Exercise the full system — compiled binary + real GitHub API — against a dedicated test repository. Written in JavaScript (Vitest + [`riteway`](https://github.com/paralleldrive/riteway) assertions) and located in `e2e/` at the repository root. These catch issues that mocks cannot: API behavior changes, response format drift, auth edge cases, and real-world integration bugs.
+Exercise the full system — compiled binary + real GitHub API — against a dedicated test repository. Written in JavaScript (Vitest + [`riteway`](https://github.com/paralleldrive/riteway) assertions) and located in `test/e2e/` at the repository root. These catch issues that mocks cannot: API behavior changes, response format drift, auth edge cases, and real-world integration bugs.
 
-Run on the main branch and on PRs from within the repository (not forks, which cannot access secrets). See `e2e/README.md` for setup instructions.
+Run on the main branch and on PRs from within the repository (not forks, which cannot access secrets). See `test/e2e/README.md` for setup instructions.
 
 ### Contract Tests
 
@@ -85,7 +85,7 @@ Validate that shared data formats (JSON schemas) are respected by both producers
 
 - **Go:** Build tags separate test layers. `go test ./...` runs units only. `-tags=integration` adds integration tests.
 - **TypeScript (Dashboard):** Standard test runner. Integration tests in a separate `test/integration/` directory.
-- **JavaScript (E2E):** Vitest in `e2e/`. Uses RITEway-style `assert` helper. Run with `cd e2e && pnpm test`.
+- **JavaScript (E2E):** Vitest in `test/e2e/`. Uses RITEway-style `assert` helper. Run with `make e2e-test`.
 - **Test data:** Fixtures live in `testdata/` directories adjacent to the code they test.
 - **Coverage threshold:** Not specified. Revisit once there is enough code to establish a meaningful baseline.
 
