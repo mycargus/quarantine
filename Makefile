@@ -1,4 +1,4 @@
-.PHONY: dev cli-build cli-test cli-lint cli-mutate dash-build dash-test dash-lint dash-typecheck test-build e2e-test e2e-lint contract-test contract-lint test-lint schemas-validate lint-all test-all check install-hooks
+.PHONY: dev cli-build cli-test cli-lint cli-mutate dash-build dash-test dash-lint dash-lint-ci dash-typecheck test-build e2e-test e2e-lint e2e-lint-ci contract-test contract-lint contract-lint-ci test-lint schemas-validate lint-all test-all check install-hooks
 
 # --- CLI (Go) ---
 
@@ -25,6 +25,9 @@ dash-test:
 dash-lint:
 	cd dashboard && pnpm run lint
 
+dash-lint-ci:
+	cd dashboard && pnpm run lint:ci
+
 dash-typecheck:
 	cd dashboard && pnpm run typecheck
 
@@ -39,11 +42,17 @@ contract-test:
 contract-lint:
 	cd test && pnpm run lint:contract
 
+contract-lint-ci:
+	cd test && pnpm run lint:ci:contract
+
 e2e-test:
 	cd test && pnpm run test:e2e
 
 e2e-lint:
 	cd test && pnpm run lint:e2e
+
+e2e-lint-ci:
+	cd test && pnpm run lint:ci:e2e
 
 test-lint:
 	cd test && pnpm run lint
