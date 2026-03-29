@@ -5,18 +5,22 @@ Flaky test detection and quarantine for CI pipelines. Go CLI + React dashboard.
 ## Commands
 
 ```bash
+make dev               # One-time setup: install hooks + all dependencies
 make test-all          # Run all tests (CLI + dashboard + contract + e2e)
+make lint-all          # Run all linters (CLI + dashboard + test)
 make cli-build         # Build CLI binary to bin/quarantine
 make cli-test          # Go tests
 make cli-lint          # golangci-lint
 make dash-build        # Dashboard production build
 make dash-test         # Dashboard tests
 make dash-lint         # Biome lint
-make test-build        # Install test dependencies (contract + e2e)
+make dash-typecheck    # TypeScript type checking
 make contract-test     # Contract tests (Prism, offline, no credentials)
 make e2e-test          # E2E tests (requires test/e2e/.env with GitHub credentials)
 make test-lint         # Lint all test code
 ```
+
+The pre-commit hook runs `make lint-all && make dash-typecheck` automatically.
 
 ## Architecture
 
@@ -42,6 +46,18 @@ See `docs/planning/architecture.md` for full design. See `cli/CLAUDE.md` and `da
 - **JUnit XML:** No official schema. Jest needs `jest-junit`, RSpec needs `rspec_junit_formatter`, Vitest has built-in support.
 - **Test fixtures:** `testdata/` at repo root (shared across packages).
 
+## Skills
+
+Project skills (invoke with `/skill-name`):
+
+- `/implement-milestone` -- Implement a milestone using TDD and atomic commits
+- `/verify-milestone` -- Verify implementation against a milestone manifest
+- `/create-manifest` -- Generate a milestone manifest routing document
+- `/create-contract-test` -- Create a Prism-based contract test (offline, no credentials)
+- `/create-e2e-test` -- Create an E2E test verifying real API behavior matches mocks
+- `/review-adr` -- Check if a change contradicts an existing ADR
+- `/sync-docs` -- Scan for inconsistencies between code and documentation
+
 ## Documentation
 
 - `docs/specs/` -- Implementation references (cli-spec, config-schema, error-handling, test-strategy, etc.)
@@ -49,7 +65,7 @@ See `docs/planning/architecture.md` for full design. See `cli/CLAUDE.md` and `da
 - `docs/research/` -- Decision inputs (junit-xml, ci-artifacts, competitive landscape)
 - `docs/scenarios/` -- Given/when/then user scenarios
 - `docs/milestones/` -- Milestone manifests (agent entry points)
-- `docs/prompts/` -- Reusable prompts
+- `docs/prompts/` -- Reusable prompts (scenario-authoring, adr-proposal)
 - `docs/adr/` -- Architecture Decision Records
 
 ## Boundaries

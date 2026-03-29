@@ -1,4 +1,4 @@
-.PHONY: cli-build cli-test cli-lint cli-mutate dash-build dash-test dash-lint dash-typecheck test-build e2e-test contract-test test-lint schemas-validate lint-all test-all
+.PHONY: dev cli-build cli-test cli-lint cli-mutate dash-build dash-test dash-lint dash-typecheck test-build e2e-test contract-test test-lint schemas-validate lint-all test-all install-hooks
 
 # --- CLI (Go) ---
 
@@ -47,6 +47,21 @@ test-lint:
 schemas-validate:
 	@echo "Validating golden fixtures against JSON schemas..."
 	@echo "TODO: Wire up schema validation (Go: santhosh-tekuri/jsonschema, TS: ajv)"
+
+# --- Dev Setup ---
+
+dev: _check-prereqs install-hooks
+	cd cli && go mod download
+	cd dashboard && pnpm install
+	cd test && pnpm install
+
+_check-prereqs:
+	@command -v go >/dev/null 2>&1 || { echo "Error: go is not installed. Run 'asdf install' in cli/."; exit 1; }
+	@command -v node >/dev/null 2>&1 || { echo "Error: node is not installed. Run 'asdf install' in dashboard/."; exit 1; }
+	@command -v pnpm >/dev/null 2>&1 || { echo "Error: pnpm is not installed. Run 'npm install -g pnpm'."; exit 1; }
+
+install-hooks:
+	git config core.hooksPath .githooks
 
 # --- Aggregate ---
 

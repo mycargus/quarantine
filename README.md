@@ -128,13 +128,39 @@ The focus of v1 is zero-friction adoption for teams already on GitHub Actions. E
 
 ## Development
 
-Reusable prompts for common development tasks are in [`docs/prompts/`](docs/prompts/):
+### Setup
+
+Prerequisites: [asdf](https://asdf-vm.com/) (manages Go and Node.js versions via `.tool-versions`), [pnpm](https://pnpm.io/)
+
+```sh
+asdf install        # in cli/, dashboard/, and test/
+make dev
+```
+
+`make dev` verifies prerequisites, installs git hooks, and downloads dependencies for all subdirectories.
+
+### Reusable Prompts
+
+Prompts for common development tasks are in [`docs/prompts/`](docs/prompts/):
 
 | Prompt | Use when |
 |--------|----------|
-| [`milestone-dev.md`](docs/prompts/milestone-dev.md) | Implementing a milestone |
 | [`scenario-authoring.md`](docs/prompts/scenario-authoring.md) | Writing new Given/When/Then scenarios |
 | [`adr-proposal.md`](docs/prompts/adr-proposal.md) | Proposing a new Architecture Decision Record |
+
+### Claude Code Skills
+
+This project includes skills (invoke with `/skill-name` in Claude Code):
+
+| Skill | Use when |
+|-------|----------|
+| `/implement-milestone` | Implementing a predefined milestone using TDD and atomic commits |
+| `/verify-milestone` | Verifying a milestone's implementation against its manifest |
+| `/create-manifest` | Generating a milestone manifest that points agents to source docs |
+| `/create-contract-test` | Creating a Prism-based contract test against vendored OpenAPI specs |
+| `/create-e2e-test` | Creating an E2E test that verifies real API behavior matches mocks |
+| `/review-adr` | Checking if a proposed change contradicts an existing ADR |
+| `/sync-docs` | Scanning for inconsistencies between code and documentation |
 
 ## Credit
 
