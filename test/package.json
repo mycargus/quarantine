@@ -11,6 +11,8 @@
     "test:contract": "vitest run --project contract --passWithNoTests",
     "test:e2e": "vitest run --project e2e",
     "lint": "biome check",
+    "lint:contract": "biome ci --error-on-warnings ./contract",
+    "lint:e2e": "biome ci --error-on-warnings ./e2e",
     "lint:ci": "biome ci --error-on-warnings",
     "lint:fix": "biome check --write",
     "lint:fix:unsafe": "biome check --write --unsafe"
