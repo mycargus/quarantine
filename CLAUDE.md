@@ -6,6 +6,7 @@ Flaky test detection and quarantine for CI pipelines. Go CLI + React dashboard.
 
 ```bash
 make dev               # One-time setup: install hooks + all dependencies
+make check             # Lint + typecheck (runs on pre-commit)
 make test-all          # Run all tests (CLI + dashboard + contract + e2e)
 make lint-all          # Run all linters (CLI + dashboard + test)
 make cli-build         # Build CLI binary to bin/quarantine
@@ -20,7 +21,7 @@ make e2e-test          # E2E tests (requires test/e2e/.env with GitHub credentia
 make test-lint         # Lint all test code
 ```
 
-The pre-commit hook runs `make lint-all && make dash-typecheck` automatically.
+The pre-commit hook runs `make check` automatically.
 
 ## Architecture
 
