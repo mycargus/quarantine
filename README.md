@@ -130,10 +130,12 @@ The focus of v1 is zero-friction adoption for teams already on GitHub Actions. E
 
 ### Setup
 
-Prerequisites: [asdf](https://asdf-vm.com/) (manages Go and Node.js versions via `.tool-versions`), [corepack](https://nodejs.org/api/corepack.html) (manages pnpm version via `packageManager` in `package.json`)
+Prerequisites: 
+- [asdf](https://asdf-vm.com/) (manages Go and Node.js versions via `.tool-versions`)
+- [corepack](https://nodejs.org/api/corepack.html) (manages pnpm version via `packageManager` in `package.json`)
 
 ```sh
-asdf install        # in cli/, dashboard/, and test/
+asdf install
 make dev
 ```
 
