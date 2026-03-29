@@ -63,7 +63,7 @@ jobs:
         working-directory: test
 
       - name: Lint
-        run: make contract-lint
+        run: make contract-lint-ci
 
       - name: Contract Tests
         run: make contract-test
@@ -101,7 +101,7 @@ jobs:
         working-directory: test
 
       - name: Lint
-        run: make e2e-lint
+        run: make e2e-lint-ci
 
       - name: E2E Tests
         run: make e2e-test
@@ -134,7 +134,7 @@ jobs:
         working-directory: dashboard
 
       - name: Lint
-        run: make dash-lint
+        run: make dash-lint-ci
 
       - name: Typecheck
         run: make dash-typecheck
