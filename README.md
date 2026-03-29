@@ -18,7 +18,7 @@ Quarantining flaky tests manually is tedious and error-prone, especially as a te
 ```mermaid
 flowchart TD
     A["A test fails and passes on the same build. ಠ_ಠ"]
-    B["The build still passes. The test is quarantined.<br/>The team is notified. ヾ(＾∇＾)"]
+    B["The build still passes. The test is quarantined.<br/>The team is notified. 🎉"]
     C["A GitHub Issue is created for the flaky test."]
     D["When the issue is closed, the test is released from quarantine.<br/>It will run in builds again. \o/"]
     A --> B --> C --> D --> A
