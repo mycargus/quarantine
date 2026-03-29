@@ -25,7 +25,8 @@ const BRANCH = "quarantine/state"
 const token = process.env.QUARANTINE_GITHUB_TOKEN
 const owner = process.env.QUARANTINE_TEST_OWNER
 const repo = process.env.QUARANTINE_TEST_REPO
-const binPath = process.env.QUARANTINE_BIN ?? new URL("../bin/quarantine", import.meta.url).pathname
+const binPath =
+  process.env.QUARANTINE_BIN ?? new URL("../../bin/quarantine", import.meta.url).pathname
 
 // --- GitHub API helpers ---
 

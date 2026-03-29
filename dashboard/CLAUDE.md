@@ -3,11 +3,11 @@
 ## Commands
 
 ```bash
-make dash-build    # Or: pnpm run build
-make dash-test     # Or: pnpm test
-make dash-lint     # Or: pnpm run lint
-pnpm dev           # Start dev server (no Makefile target)
-pnpm run typecheck
+make dash-build      # Or: pnpm run build
+make dash-test       # Or: pnpm test
+make dash-lint       # Or: pnpm run lint
+make dash-typecheck  # Or: pnpm run typecheck
+pnpm dev             # Start dev server (no Makefile target)
 pnpm run format
 ```
 

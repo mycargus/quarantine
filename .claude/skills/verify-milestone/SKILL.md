@@ -79,20 +79,24 @@ For each scenario file listed in the manifest's Acceptance Scenarios section:
 
 Mark each scenario file as PASS (all scenarios covered) or PARTIAL (with count and list of missing scenarios).
 
-### 7. Check E2E coverage
+### 7. Check contract test and E2E coverage
 
-Determine whether the milestone's scenarios require E2E tests beyond what already exists. E2E tests verify that real external APIs behave as integration test mocks assume. They catch mock-fidelity drift: response shape changes, header behavior, redirect chains, pagination, auth edge cases, and eventual consistency.
+Determine whether the milestone's scenarios require contract tests or E2E tests beyond what already exists. Contract tests verify request/response shape conformance against vendored OpenAPI specs using Prism (ADR-024). E2E tests verify real API behavior that contract tests cannot cover (stateful round-trips, redirects, auth).
 
 #### 7a. Inventory external API interactions
 
 Read the milestone's acceptance scenarios and the **production source code**. List every external API call the production code path exercises — not just what tests call. If a function accepts an injected dependency (e.g., `fetchFn`) for testing but uses real HTTP in production, that IS an external API interaction. Dependency injection makes unit testing possible; it does not eliminate mock-fidelity risk.
 
-For each interaction, note the HTTP method, endpoint, and provider (e.g., `GitHub: GET /repos/.../actions/artifacts`, `Jenkins: GET /job/.../api/json`).
+For each interaction, note the HTTP method, endpoint, and provider (e.g., `GitHub: GET /repos/.../actions/artifacts`).
 
-Classify each interaction as **high-risk** or **low-risk** for mock-vs-real divergence:
+Classify each interaction:
 
-**High-risk** (always need E2E):
-- Response shapes the code destructures (e.g., `data.artifacts`, `response.headers.get("etag")`)
+**Needs contract test** (shape conformance, testable offline):
+- Response shapes the code destructures (e.g., `data.artifacts`, `issue.number`)
+- Request headers the API requires (e.g., `Accept`, `X-GitHub-Api-Version`)
+- Error response shapes the code handles (410 Gone, 404, 422)
+
+**Needs E2E test** (real API behavior, requires credentials):
 - Conditional request round-trips (ETag/If-None-Match, Last-Modified/If-Modified-Since)
 - Redirect chains (302 → blob storage download)
 - Search/query API formats (query string must match what the provider indexes)
@@ -100,21 +104,23 @@ Classify each interaction as **high-risk** or **low-risk** for mock-vs-real dive
 - Sequential state (second call depends on state from first call)
 - Auth header formats (Bearer vs Basic vs token header — varies by provider)
 
-**Low-risk** (skip — mock fidelity is sufficient):
+**Skip both** (low risk):
 - Status code checks (`if (response.status === 401)`) — no shape to drift
 - Pure client-side logic (e.g., parsing `GITHUB_EVENT_PATH`) — no external API involved
 
-#### 7b. Check existing E2E tests
+#### 7b. Check existing test coverage
 
-Read the E2E test files in `e2e/`. List which high-risk API interactions they already exercise.
+Read test files:
+- Contract tests: `test/contract/*.test.js`
+- E2E tests: `test/e2e/*.test.js`
 
-E2E tests in `e2e/` cover ANY component (CLI, dashboard, shared libraries) and ANY provider (GitHub, Jenkins, GitLab). "No E2E infrastructure exists for this component" and "this provider isn't set up yet" are NOT valid reasons to mark E2E as PASS.
+List which interactions from 7a they already exercise. "No E2E infrastructure exists for this component" and "this provider isn't set up yet" are NOT valid reasons to mark as PASS.
 
 #### 7c. Identify gaps
 
-For each high-risk interaction from 7a that is NOT covered by an existing E2E test in 7b, report it as a gap. Group related gaps (e.g., "Scenarios 27 and 49 both need sequential-state E2E tests"). For each gap, note which provider is involved.
+For each interaction from 7a not covered by an existing test, report it as a gap. Specify whether the gap needs a contract test or an E2E test. Group related gaps (e.g., "Scenarios 27 and 49 both destructure artifacts response — needs contract test").
 
-Mark as PASS if all high-risk interactions are covered, or FAIL with the list of uncovered interactions.
+Mark as PASS if all interactions are covered, or FAIL with the list of uncovered interactions.
 
 ### 8. Generate report
 
@@ -140,9 +146,11 @@ Print a structured report in this exact format:
 - [x] Scenarios N–M (filename.md) — X/X covered
 - [ ] Scenarios N–M (filename.md) — X/Y covered, missing: Scenario Z (title)
 
-### E2E Coverage
-- [x] All high-risk API interactions covered by e2e/ tests
-- [ ] Missing E2E coverage — <list of uncovered high-risk interactions>
+### Contract Test & E2E Coverage
+- [x] All API shape interactions covered by contract tests (test/contract/*.test.js)
+- [x] All stateful API interactions covered by E2E tests (test/e2e/*.test.js)
+- [ ] Missing contract test coverage — <list of uncovered shape interactions>
+- [ ] Missing E2E coverage — <list of uncovered stateful interactions>
 
 ### Summary
 X/Y checks passed. Z issues found.

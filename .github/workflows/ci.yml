@@ -63,14 +63,17 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          package_json_file: e2e/package.json
+          package_json_file: test/package.json
 
-      - name: Install E2E dependencies
+      - name: Install test dependencies
         run: pnpm install --frozen-lockfile
-        working-directory: e2e
+        working-directory: test
 
-      - name: Lint E2E
-        run: make e2e-lint
+      - name: Lint tests
+        run: make test-lint
+
+      - name: Contract Tests
+        run: make contract-test
 
       - name: E2E Tests
         run: make e2e-test
@@ -103,8 +106,7 @@ jobs:
         run: make dash-lint
 
       - name: Typecheck
-        run: pnpm run typecheck
-        working-directory: dashboard
+        run: make dash-typecheck
 
       - name: Test
         run: make dash-test

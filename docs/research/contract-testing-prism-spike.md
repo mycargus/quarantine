@@ -12,7 +12,7 @@ Evaluate Stoplight Prism as a contract testing tool for this project, specifical
 
 - **Prism version:** v5.14.2 (`@stoplight/prism-cli` via pnpm)
 - **Spec used:** `schemas/github-api-artifacts.json` -- a 12KB OpenAPI 3.0.3 subset with 2 endpoints (list artifacts, download artifact)
-- **Install:** `pnpm add -D @stoplight/prism-cli` in the `e2e/` directory
+- **Install:** `pnpm add -D @stoplight/prism-cli` in the `test/` directory
 - **Start command:** `./node_modules/.bin/prism mock ../schemas/github-api-artifacts.json -p 4010`
 
 ## Test Results

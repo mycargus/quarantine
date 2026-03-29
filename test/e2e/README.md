@@ -11,7 +11,7 @@ credentials that are not available in standard CI runs from forks.
 ## Requirements
 
 - Node.js ≥ 20
-- The quarantine CLI binary must be built: `cd cli && make cli-build`
+- The quarantine CLI binary must be built: `make cli-build`
 - Three environment variables (see below)
 
 ## Environment Variables
@@ -21,7 +21,7 @@ credentials that are not available in standard CI runs from forks.
 | `QUARANTINE_GITHUB_TOKEN` | PAT or fine-grained token with repo read/write access |
 | `QUARANTINE_TEST_OWNER` | GitHub org or username that owns the test repository |
 | `QUARANTINE_TEST_REPO` | Name of the test repository (e.g. `quarantine-test-fixture`) |
-| `QUARANTINE_BIN` | *(optional)* Path to the quarantine binary. Defaults to `../cli/bin/quarantine`. |
+| `QUARANTINE_BIN` | *(optional)* Path to the quarantine binary. Defaults to `../../bin/quarantine`. |
 
 Tests skip automatically when the required env vars are absent — running
 `npm test` locally without credentials is safe and produces a clean skip.
@@ -82,9 +82,9 @@ export QUARANTINE_TEST_OWNER=your-org
 export QUARANTINE_TEST_REPO=quarantine-test-fixture
 
 # Install deps and run
-cd e2e
+cd test
 pnpm install
-pnpm test
+pnpm run test:e2e
 ```
 
 ## Adding New E2E Tests
@@ -93,7 +93,7 @@ Each milestone that exercises real GitHub API flows should have a corresponding
 test file here. Name files after the command or feature being tested:
 
 ```
-e2e/
+test/e2e/
   init.test.js       # quarantine init (M1)
   run.test.js        # quarantine run full flow (M4/M5)
   ...

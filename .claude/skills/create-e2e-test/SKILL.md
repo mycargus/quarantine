@@ -1,6 +1,6 @@
 ---
 name: create-e2e-test
-description: Create an E2E test in e2e/ that verifies real external API behavior matches what integration test mocks assume. Use when a scenario introduces external API interactions (GitHub, Jenkins, GitLab, etc.).
+description: Create an E2E test in test/e2e/ that verifies real external API behavior matches what integration test mocks assume. Use when a scenario introduces external API interactions (GitHub, Jenkins, GitLab, etc.).
 argument-hint: "<description of what to test>"
 disable-model-invocation: false
 user-invocable: true
@@ -19,7 +19,7 @@ Any time production code calls an external API — even if integration tests use
 
 1. **Tests MUST NOT skip.** Never use `t.skip()`. If a precondition isn't met, fail with a descriptive assertion — that precondition failure is a real problem.
 2. **Tests MUST NOT guard with `if`.** Don't wrap assertions in `if (data.length > 0)`. Assert the precondition, then assert the behavior.
-3. **All components share `e2e/`.** CLI, dashboard, and shared library API interactions all live in `e2e/`. "No E2E infrastructure for this component" is never a valid excuse.
+3. **All components share `test/e2e/`.** CLI, dashboard, and shared library API interactions all live in `test/e2e/`. "No E2E infrastructure for this component" is never a valid excuse.
 4. **Test the production code path, not the mock.** The point is to verify what the mock assumed. If the mock returns `{ artifacts: [...] }`, the E2E test verifies the real API returns that shape.
 5. **Clean up after yourself.** Resources created during the test (issues, comments, branches) must be closed/deleted in `afterEach`.
 
@@ -49,14 +49,14 @@ If the answer to the third question is "yes" for any call, that call needs E2E c
 ## Step 2 — Read existing E2E tests for overlap
 
 ```
-e2e/*.test.js
+test/e2e/*.test.js
 ```
 
 Check whether any existing test already exercises the same API interaction. Don't duplicate coverage.
 
 ## Step 3 — Determine the provider and credentials
 
-Read `e2e/.env.example` for the currently supported env vars. Each external provider needs its own credentials and test fixture target.
+Read `test/e2e/.env.example` for the currently supported env vars. Each external provider needs its own credentials and test fixture target.
 
 ### Currently supported
 
@@ -66,9 +66,9 @@ Read `e2e/.env.example` for the currently supported env vars. Each external prov
 
 ### Adding a new provider
 
-When the test targets a provider not yet in `e2e/.env.example`:
+When the test targets a provider not yet in `test/e2e/.env.example`:
 
-1. Add the new env vars to `e2e/.env.example` with comments explaining what they are
+1. Add the new env vars to `test/e2e/.env.example` with comments explaining what they are
 2. Guard your test in `beforeAll` — fail with a clear message if the required vars are missing
 3. Keep provider-specific helpers (API request wrappers) local to the test file — don't force all tests to import every provider's helpers
 
@@ -76,7 +76,7 @@ When the test targets a provider not yet in `e2e/.env.example`:
 
 ### Location and framework
 
-- File: `e2e/<provider>-<feature>.test.js` (e.g., `github-artifacts.test.js`, `jenkins-builds.test.js`)
+- File: `test/e2e/<provider>-<feature>.test.js` (e.g., `github-artifacts.test.js`, `jenkins-builds.test.js`)
 - Framework: `vitest` + `riteway/vitest`
 - Imports:
   ```js
@@ -92,7 +92,7 @@ Fail immediately if required env vars are missing:
 beforeAll(() => {
   if (!token || !baseUrl) {
     throw new Error(
-      "E2E tests require <LIST_REQUIRED_VARS>. See e2e/.env.example."
+      "E2E tests require <LIST_REQUIRED_VARS>. See test/e2e/.env.example."
     )
   }
 })
@@ -191,7 +191,7 @@ E2E tests require real network access and valid credentials. They run sequential
 ## Step 6 — Lint
 
 ```bash
-cd e2e && pnpm run lint
+cd test && pnpm run lint
 ```
 
 Fix any issues before committing.
@@ -203,7 +203,7 @@ Fix any issues before committing.
 | `t.skip("no data")` | Silently stops verifying | Assert the precondition instead |
 | `if (arr.length > 0) { assert(...) }` | Silently passes when empty | Assert `arr.length >= 1` first |
 | "Mocks cover this" | Mocks verify YOUR assumptions, not reality | E2E verifies the API's actual behavior |
-| "No E2E infra for this component" | `e2e/` serves all components | Write the test in `e2e/` |
+| "No E2E infra for this component" | `test/e2e/` serves all components | Write the test in `test/e2e/` |
 | "This provider isn't set up yet" | Add the env vars and write the test | See Step 3: Adding a new provider |
 | Importing production code | Creates coupling between test and implementation | Use `fetch` directly with a provider-specific helper |
 | Testing implementation details | E2E should verify observable API contracts | Test response shapes, not internal function calls |
