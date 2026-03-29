@@ -1,4 +1,4 @@
-.PHONY: dev cli-build cli-test cli-lint cli-mutate dash-build dash-test dash-lint dash-typecheck test-build e2e-test contract-test test-lint schemas-validate lint-all test-all install-hooks
+.PHONY: dev cli-build cli-test cli-lint cli-mutate dash-build dash-test dash-lint dash-typecheck test-build e2e-test contract-test test-lint schemas-validate lint-all test-all check install-hooks
 
 # --- CLI (Go) ---
 
@@ -64,6 +64,8 @@ install-hooks:
 	git config core.hooksPath .githooks
 
 # --- Aggregate ---
+
+check: lint-all dash-typecheck
 
 lint-all: cli-lint dash-lint test-lint
 
