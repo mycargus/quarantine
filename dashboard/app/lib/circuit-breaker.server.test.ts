@@ -1,4 +1,4 @@
-import { describe } from "riteway/esm"
+import { describe } from "riteway"
 import {
   isPaused,
   PAUSE_DURATION_MS,

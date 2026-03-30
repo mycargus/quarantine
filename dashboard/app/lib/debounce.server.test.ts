@@ -1,4 +1,4 @@
-import { describe } from "riteway/esm"
+import { describe } from "riteway"
 import { shouldPull } from "./debounce.server.js"
 
 const FIVE_MIN = 5 * 60 * 1000

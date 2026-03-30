@@ -1,7 +1,7 @@
 import { unlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { describe } from "riteway/esm"
+import { describe } from "riteway"
 import {
   getLastPulledAt,
   getLastSynced,

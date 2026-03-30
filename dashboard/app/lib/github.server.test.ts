@@ -1,5 +1,5 @@
 import AdmZip from "adm-zip"
-import { describe } from "riteway/esm"
+import { describe } from "riteway"
 import { downloadAndExtractJson, listArtifacts } from "./github.server.js"
 
 type FetchFn = typeof fetch

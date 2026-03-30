@@ -1,4 +1,4 @@
-import { describe } from "riteway/esm"
+import { describe } from "riteway"
 import { initDb } from "./db.server.js"
 import type { TestResult } from "./ingest.server.js"
 import { ingestArtifact } from "./ingest.server.js"
