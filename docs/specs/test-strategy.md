@@ -1,6 +1,6 @@
 # Test Strategy
 
-> Last updated: 2026-03-28
+> Last updated: 2026-03-30
 >
 > Guiding principles for how we test. The goal is confidence in correctness
 > without over-engineering. Specific test cases live in scenario files
