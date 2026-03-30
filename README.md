@@ -143,15 +143,6 @@ make dev
 
 > **Note:** `better-sqlite3` compiles a native binary against your Node.js version. After upgrading Node.js, run `pnpm rebuild better-sqlite3` in `dashboard/` to recompile it.
 
-### Reusable Prompts
-
-Prompts for common development tasks are in [`docs/prompts/`](docs/prompts/):
-
-| Prompt | Use when |
-|--------|----------|
-| [`scenario-authoring.md`](docs/prompts/scenario-authoring.md) | Writing new Given/When/Then scenarios |
-| [`adr-proposal.md`](docs/prompts/adr-proposal.md) | Proposing a new Architecture Decision Record |
-
 ### Claude Code Skills
 
 This project includes skills (invoke with `/skill-name` in Claude Code):
@@ -164,6 +155,8 @@ This project includes skills (invoke with `/skill-name` in Claude Code):
 | `/create-contract-test` | Creating a Prism-based contract test against vendored OpenAPI specs |
 | `/create-e2e-test` | Creating an E2E test that verifies real API behavior matches mocks |
 | `/review-adr` | Checking if a proposed change contradicts an existing ADR |
+| `/create-adr` | Proposing a new Architecture Decision Record |
+| `/create-user-scenario` | Writing new Given/When/Then scenarios for a feature or edge case |
 | `/sync-docs` | Scanning for inconsistencies between code and documentation |
 
 ## Credit

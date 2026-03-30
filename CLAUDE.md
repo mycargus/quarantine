@@ -57,6 +57,8 @@ Project skills (invoke with `/skill-name`):
 - `/create-contract-test` -- Create a Prism-based contract test (offline, no credentials)
 - `/create-e2e-test` -- Create an E2E test verifying real API behavior matches mocks
 - `/review-adr` -- Check if a change contradicts an existing ADR
+- `/create-adr` -- Propose a new Architecture Decision Record
+- `/create-user-scenario` -- Author Given/When/Then scenarios for a feature or edge case
 - `/sync-docs` -- Scan for inconsistencies between code and documentation
 
 ## Documentation
@@ -65,7 +67,6 @@ Project skills (invoke with `/skill-name`):
 - `docs/research/` -- Decision inputs (junit-xml, ci-artifacts, competitive landscape)
 - `docs/scenarios/` -- Given/when/then user scenarios
 - `docs/milestones/` -- Milestone overview ([index](docs/milestones/index.md)) and per-milestone manifests (agent entry points)
-- `docs/prompts/` -- Reusable prompts (scenario-authoring, adr-proposal)
 - `docs/adr/` -- Architecture Decision Records
 
 ## Boundaries
