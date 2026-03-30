@@ -1,6 +1,6 @@
 # Quarantine
 
-Flaky test detection and quarantine for CI pipelines. Go CLI + React dashboard.
+Flaky test detection and quarantine for CI pipelines. Go CLI + Remix 3 dashboard.
 
 ## Commands
 
@@ -12,7 +12,6 @@ make lint-all          # Run all linters (CLI + dashboard + test)
 make cli-build         # Build CLI binary to bin/quarantine
 make cli-test          # Go tests
 make cli-lint          # golangci-lint
-make dash-build        # Dashboard production build
 make dash-test         # Dashboard tests
 make dash-lint         # Biome lint
 make dash-typecheck    # TypeScript type checking

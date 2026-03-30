@@ -141,6 +141,3 @@ jobs:
 
       - name: Test
         run: make dash-test
-
-      - name: Build
-        run: make dash-build

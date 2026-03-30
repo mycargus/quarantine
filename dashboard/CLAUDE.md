@@ -3,7 +3,6 @@
 ## Commands
 
 ```bash
-make dash-build      # Or: pnpm run build (no-op — no build step with Remix 3)
 make dash-test       # Or: pnpm test
 make dash-lint       # Or: pnpm run lint
 make dash-typecheck  # Or: pnpm run typecheck
