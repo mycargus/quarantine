@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   cli:
-    name: CLI (Go)
+    name: CLI
     runs-on: ubuntu-latest
 
     steps:
@@ -112,7 +112,7 @@ jobs:
           QUARANTINE_BIN: ${{ github.workspace }}/bin/quarantine
 
   dashboard:
-    name: Dashboard (TypeScript)
+    name: Dashboard
     runs-on: ubuntu-latest
 
     steps:
