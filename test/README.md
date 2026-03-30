@@ -25,6 +25,8 @@ make test-all        # Run everything (CLI + dashboard + contract + e2e)
 
 **E2E tests** (`e2e/`) — use when behavior depends on real-world API responses: stateful round-trips, redirects, pagination, eventual consistency, or auth edge cases. Requires GitHub credentials. See `e2e/README.md` for setup.
 
+For a complete inventory of every producer-consumer boundary in the project (including which are tested and which are not), see [docs/specs/contracts.md](../docs/specs/contracts.md).
+
 ## Shared dependencies
 
 Both suites share a single `package.json` and `node_modules` at this level. Run `pnpm install` from `test/` (or `make test-build`) before running either suite.

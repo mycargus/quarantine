@@ -61,7 +61,7 @@ Project skills (invoke with `/skill-name`):
 
 ## Documentation
 
-- `docs/specs/` -- Implementation references (cli-spec, config-schema, error-handling, test-strategy, etc.)
+- `docs/specs/` -- Implementation references (cli-spec, config-schema, error-handling, test-strategy, [contracts](docs/specs/contracts.md), etc.)
 - `docs/planning/` -- Architecture, milestones, requirements
 - `docs/research/` -- Decision inputs (junit-xml, ci-artifacts, competitive landscape)
 - `docs/scenarios/` -- Given/when/then user scenarios

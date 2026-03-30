@@ -38,7 +38,7 @@ Integration tests use real instances of internal dependencies (real SQLite, real
 
 ### 5. Contract Tests Bridge Components
 
-When two independently developed components exchange data (e.g., CLI produces JSON that the dashboard consumes), a shared JSON Schema is the contract. Both sides validate against the schema in their own test suites. This is the primary mechanism ensuring components integrate correctly without end-to-end coupling.
+When two independently developed components exchange data (e.g., CLI produces JSON that the dashboard consumes), a shared JSON Schema is the contract. Both sides validate against the schema in their own test suites. This is the primary mechanism ensuring components integrate correctly without end-to-end coupling. See [contracts.md](contracts.md) for a complete inventory of every producer-consumer boundary and its validation status.
 
 ### 6. Scenarios Drive Coverage
 
@@ -143,4 +143,4 @@ Mutation testing validates that existing tests are meaningful. It does not repla
 
 ---
 
-*References: [architecture.md](../planning/architecture.md), scenario files in `docs/scenarios/`, Claude Code skills: [`/mikey:tdd`, `/mikey:testify`](https://github.com/mycargus/mikey-claude-plugins), [`/test-mutation`](https://github.com/chrisallenlane/claude-swe-workflows).*
+*References: [architecture.md](../planning/architecture.md), [contracts.md](contracts.md), scenario files in `docs/scenarios/`, Claude Code skills: [`/mikey:tdd`, `/mikey:testify`](https://github.com/mycargus/mikey-claude-plugins), [`/test-mutation`](https://github.com/chrisallenlane/claude-swe-workflows).*
