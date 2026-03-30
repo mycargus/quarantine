@@ -10,7 +10,7 @@ Review whether the proposed change contradicts any existing ADRs: "$1"
 
 ## Steps
 
-1. Read ALL ADR files in `docs/adr/` (001 through 018). For each ADR, extract the core decision and key constraints.
+1. Read ALL ADR files in `docs/adr/`. For each ADR, extract the core decision and key constraints.
 
 2. Analyze whether the proposed change contradicts, weakens, or conflicts with any existing ADR decision. Check specifically for:
    - Direct contradictions (the change does something an ADR explicitly decided against)
