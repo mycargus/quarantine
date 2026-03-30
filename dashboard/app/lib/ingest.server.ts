@@ -6,8 +6,8 @@
  * idempotency.
  */
 
-import addFormats from "ajv-formats"
 import Ajv2020 from "ajv/dist/2020"
+import addFormats from "ajv-formats"
 import type { Database } from "better-sqlite3"
 import schema from "../../../schemas/test-result.schema.json" with { type: "json" }
 

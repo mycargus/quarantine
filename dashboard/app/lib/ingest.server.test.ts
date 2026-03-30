@@ -1,5 +1,6 @@
 import { describe } from "riteway/esm"
 import { initDb } from "./db.server.js"
+import type { Artifact, TestResult } from "./ingest.server.js"
 import {
   buildTestRunRecord,
   filterArtifactsByPrefix,
@@ -8,7 +9,6 @@ import {
   upsertTestRun,
   validateTestResult,
 } from "./ingest.server.js"
-import type { Artifact, TestResult } from "./ingest.server.js"
 
 const validFixture: TestResult = {
   version: 1,

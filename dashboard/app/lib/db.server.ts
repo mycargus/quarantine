@@ -4,8 +4,8 @@
  * Uses better-sqlite3 in WAL mode for concurrent read access during writes.
  */
 
-import BetterSqlite3 from "better-sqlite3"
 import type { Database } from "better-sqlite3"
+import BetterSqlite3 from "better-sqlite3"
 import type { RepoConfig } from "./config.server.js"
 
 export type { Database }

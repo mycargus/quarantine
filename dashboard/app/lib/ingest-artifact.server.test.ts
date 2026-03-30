@@ -1,7 +1,7 @@
 import { describe } from "riteway/esm"
 import { initDb } from "./db.server.js"
-import { ingestArtifact } from "./ingest.server.js"
 import type { TestResult } from "./ingest.server.js"
+import { ingestArtifact } from "./ingest.server.js"
 
 const validFixture: TestResult = {
   version: 1,

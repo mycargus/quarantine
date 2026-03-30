@@ -8,8 +8,8 @@
 import type { LoaderFunctionArgs } from "react-router"
 import { useLoaderData } from "react-router"
 import { loadConfig } from "../lib/config.server.js"
-import { getProjects, initDb } from "../lib/db.server.js"
 import type { ProjectSummary } from "../lib/db.server.js"
+import { getProjects, initDb } from "../lib/db.server.js"
 
 export async function loader(_: LoaderFunctionArgs) {
   const configPath = process.env.DASHBOARD_CONFIG ?? "./dashboard.yml"

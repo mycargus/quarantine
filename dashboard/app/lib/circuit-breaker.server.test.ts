@@ -1,7 +1,7 @@
 import { describe } from "riteway/esm"
 import {
-  PAUSE_DURATION_MS,
   isPaused,
+  PAUSE_DURATION_MS,
   recordFailure,
   recordSuccess,
 } from "./circuit-breaker.server.js"
