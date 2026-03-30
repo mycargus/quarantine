@@ -1,5 +1,5 @@
 ---
-name: create-manifest
+name: create-milestone
 description: Generate a milestone manifest file — a lightweight routing document that points agents to source docs
 argument-hint: "[milestone-number | --validate [N]]"
 disable-model-invocation: false
@@ -172,7 +172,7 @@ Print a summary:
 
 ## Validation Mode
 
-Triggered by `/create-manifest --validate` or `/create-manifest --validate N`.
+Triggered by `/create-milestone --validate` or `/create-milestone --validate N`.
 
 - `--validate` (no number): validate ALL manifests in `docs/milestones/m*.md`
 - `--validate N`: validate only `docs/milestones/mN.md`

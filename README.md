@@ -160,7 +160,7 @@ This project includes skills (invoke with `/skill-name` in Claude Code):
 |-------|----------|
 | `/implement-milestone` | Implementing a predefined milestone using TDD and atomic commits |
 | `/verify-milestone` | Verifying a milestone's implementation against its manifest |
-| `/create-manifest` | Generating a milestone manifest that points agents to source docs |
+| `/create-milestone` | Generating a milestone manifest that points agents to source docs |
 | `/create-contract-test` | Creating a Prism-based contract test against vendored OpenAPI specs |
 | `/create-e2e-test` | Creating an E2E test that verifies real API behavior matches mocks |
 | `/review-adr` | Checking if a proposed change contradicts an existing ADR |
