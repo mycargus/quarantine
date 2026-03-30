@@ -1,0 +1,4 @@
+source: manual
+repos:
+  - owner: mycargus
+    repo: my-app
