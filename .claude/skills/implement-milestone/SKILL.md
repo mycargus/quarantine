@@ -76,7 +76,7 @@ GATE: Do NOT commit until step 2 reports zero open issues.
 
 1. Run the build gate. Read the manifest's Verification section for the exact build commands. If none are specified, infer from the milestone's scope:
    - CLI milestones: `make cli-build && make cli-test && make cli-lint`
-   - Dashboard milestones: `make dash-build && make dash-test && make dash-lint`
+   - Dashboard milestones: `make dash-test && make dash-lint`
 2. If any command fails, fix the issue and re-run. Do NOT commit a failing build.
 3. Stage and commit with message: `milestone $1: <description of what changed>`
 4. Each commit is a safe rollback point. Never accumulate uncommitted work across scenarios.

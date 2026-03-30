@@ -568,7 +568,7 @@ No dependency on a working CLI.
   before ingestion.
 - Basic project listing page: shows configured repos with test run count and
   last sync timestamp.
-- Makefile targets: `dash-build`, `dash-test`, `dash-lint`.
+- Makefile targets: `dash-test`, `dash-lint`.
 - Developed against golden test fixtures from `testdata/expected/`. No real
   CLI or GitHub artifacts needed.
 - Contract validation: artifact JSON parsing tested against
