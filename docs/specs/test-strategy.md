@@ -46,6 +46,8 @@ Given/When/Then scenario files (`docs/scenarios/`) are the source of truth for w
 
 **Workflow:** Use `/mikey:tdd <scenario-file>` to implement scenarios interactively. The TDD agent guides you through each scenario, generating test code and implementation following Functional Core / Imperative Shell design automatically.
 
+**Verification:** `/verify-milestone` audits scenario-to-test traceability as part of milestone acceptance. It reads each scenario file, searches for corresponding tests by scenario number and title, and reports covered vs missing scenarios. This is the enforcement mechanism — run it after implementing a milestone to confirm all scenarios have tests.
+
 ### 7. Fail Fast, Fail Clearly
 
 Tests should fail immediately on the first broken assertion with a message that tells you what went wrong without reading the test code. The RITEway pattern enforces this — every failure includes the given context and expected vs actual values.
@@ -79,15 +81,15 @@ Run on the main branch and on PRs from within the repository (not forks, which c
 
 ### Contract Tests
 
-Validate that shared data formats (JSON schemas) are respected by both producers and consumers. Golden fixture files are validated against schemas as a build step — if a schema changes, tests break immediately on both sides.
+Validate that shared data formats are respected by both producers and consumers. Contract tests use Prism to validate against vendored OpenAPI specs offline, with no credentials required. If a schema changes, tests break immediately on both sides. See [contracts.md](contracts.md) for the full inventory of producer-consumer boundaries.
 
 ## Test Organization Conventions
 
-- **Go:** Build tags separate test layers. `go test ./...` runs units only. `-tags=integration` adds integration tests.
-- **TypeScript (Dashboard):** Standard test runner. Integration tests in a separate `test/integration/` directory.
+- **Go:** `make cli-test` runs all CLI tests (unit and integration).
+- **TypeScript (Dashboard):** Unit tests are colocated with source files (`dashboard/app/**/*.test.ts`). Integration tests live in `dashboard/test/*.integration.test.ts` — these test the interaction of multiple dashboard components (TypeScript, SQLite, etc.) with external systems (GitHub, Jenkins, Jira) mocked. See `dashboard/test/README.md` for scope.
 - **JavaScript (E2E):** Vitest in `test/e2e/`. Uses RITEway-style `assert` helper. Run with `make e2e-test`.
 - **Test data:** Fixtures live in `testdata/` directories adjacent to the code they test.
-- **Coverage threshold:** Not specified. Revisit once there is enough code to establish a meaningful baseline.
+- **Coverage:** Measure but don't enforce thresholds. Code coverage ≠ requirements coverage — 100% line coverage can still hide bugs if the wrong behaviors are tested. The value of coverage data is knowing which files and lines *aren't* tested, which is especially useful in non-compiled languages where untested code paths can harbor undetected errors. Use coverage reports as a diagnostic tool, not a gate.
 
 ## Mutation Testing
 
