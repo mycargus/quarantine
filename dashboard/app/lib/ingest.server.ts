@@ -8,8 +8,9 @@
 
 import Ajv2020 from "ajv/dist/2020"
 import addFormats from "ajv-formats"
-import type { Database } from "better-sqlite3"
 import schema from "../../../schemas/test-result.schema.json" with { type: "json" }
+import type { Database } from "./db.server.js"
+import { testRuns } from "./db.server.js"
 
 export interface Artifact {
   id: number
@@ -142,25 +143,27 @@ export function buildTestRunRecord(result: TestResult, projectId: number): TestR
 /**
  * I/O: upserts a test run into SQLite, keyed by run_id for idempotency.
  */
-export function upsertTestRun(db: Database, projectId: number, result: TestResult): void {
+export async function upsertTestRun(
+  db: Database,
+  projectId: number,
+  result: TestResult,
+): Promise<void> {
   const record = buildTestRunRecord(result, projectId)
-  db.prepare(`
-    INSERT OR IGNORE INTO test_runs
-      (project_id, run_id, branch, commit_sha, pr_number, timestamp, total_tests, passed_tests, failed_tests, flaky_tests)
-    VALUES
-      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    record.projectId,
-    record.runId,
-    record.branch,
-    record.commitSha,
-    record.prNumber,
-    record.timestamp,
-    record.totalTests,
-    record.passedTests,
-    record.failedTests,
-    record.flakyTests,
-  )
+  const existing = await db.query(testRuns).where({ run_id: record.runId }).first()
+  if (existing) return
+
+  await db.create(testRuns, {
+    project_id: record.projectId,
+    run_id: record.runId,
+    branch: record.branch,
+    commit_sha: record.commitSha,
+    pr_number: record.prNumber ?? undefined,
+    timestamp: record.timestamp,
+    total_tests: record.totalTests,
+    passed_tests: record.passedTests,
+    failed_tests: record.failedTests,
+    flaky_tests: record.flakyTests,
+  })
 }
 
 /**
@@ -170,7 +173,7 @@ export function upsertTestRun(db: Database, projectId: number, result: TestResul
  *
  * @param warn - injectable logger, defaults to console.warn (inject in tests)
  */
-export function ingestArtifact(
+export async function ingestArtifact(
   db: Database,
   owner: string,
   repo: string,
@@ -178,7 +181,7 @@ export function ingestArtifact(
   jsonString: string,
   projectId: number,
   warn: (msg: string) => void = console.warn,
-): "ingested" | "skipped" {
+): Promise<"ingested" | "skipped"> {
   let parsed: unknown
   try {
     parsed = JSON.parse(jsonString)
@@ -198,7 +201,7 @@ export function ingestArtifact(
   }
 
   try {
-    upsertTestRun(db, projectId, parsed as TestResult)
+    await upsertTestRun(db, projectId, parsed as TestResult)
   } catch {
     warn(
       `[ingest] WARNING: skipping artifact ${artifactName} for ${owner}/${repo}: validation failed`,

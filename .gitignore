@@ -9,7 +9,9 @@ node_modules/
 
 # Dashboard (TypeScript)
 dashboard/build/
-dashboard/.react-router/
+dashboard/quarantine.db
+dashboard/quarantine.db-shm
+dashboard/quarantine.db-wal
 
 # OS / editors
 .DS_Store

@@ -1,21 +1,49 @@
 /**
  * SQLite database operations for the quarantine dashboard.
  *
- * Uses better-sqlite3 in WAL mode for concurrent read access during writes.
+ * Uses remix/data-table with better-sqlite3 in WAL mode.
+ * Schema migrations run on startup via raw SQL before the data-table wrapper is applied.
  */
 
-import type { Database } from "better-sqlite3"
-import BetterSqlite3 from "better-sqlite3"
-import type { RepoConfig } from "./config.server.js"
+import BetterSqlite3, { type Database as RawDatabase } from "better-sqlite3"
+import { column as c, createDatabase, table } from "remix/data-table"
+import { createSqliteDatabaseAdapter } from "remix/data-table-sqlite"
+import type { RepoConfig } from "./config.server.ts"
 
-export type { Database }
+export const projects = table({
+  name: "projects",
+  columns: {
+    id: c.integer().primaryKey().autoIncrement(),
+    owner: c.text().notNull(),
+    repo: c.text().notNull(),
+    last_synced: c.text(),
+    last_etag: c.text(),
+    last_pulled_at: c.text(),
+  },
+})
 
-export interface Project {
-  id: number
-  owner: string
-  repo: string
-  lastSynced: string | null
-  testRunCount: number
+export const testRuns = table({
+  name: "test_runs",
+  columns: {
+    id: c.integer().primaryKey().autoIncrement(),
+    project_id: c.integer().notNull(),
+    run_id: c.text().notNull(),
+    branch: c.text().notNull(),
+    commit_sha: c.text().notNull(),
+    pr_number: c.integer(),
+    timestamp: c.text().notNull(),
+    total_tests: c.integer().notNull(),
+    passed_tests: c.integer().notNull(),
+    failed_tests: c.integer().notNull(),
+    flaky_tests: c.integer().notNull(),
+  },
+})
+
+export type Database = ReturnType<typeof createDatabase>
+
+export type DbHandle = {
+  db: Database
+  raw: RawDatabase
 }
 
 export interface ProjectSummary {
@@ -39,14 +67,10 @@ export interface TestRun {
   flakyTests: number
 }
 
-/**
- * Opens (or creates) a SQLite database at dbPath, enables WAL mode, and runs migrations.
- */
-export function initDb(dbPath: string): Database {
-  const db = new BetterSqlite3(dbPath)
-  db.pragma("journal_mode = WAL")
+function runMigrations(raw: RawDatabase): void {
+  raw.pragma("journal_mode = WAL")
 
-  db.exec(`
+  raw.exec(`
     CREATE TABLE IF NOT EXISTS projects (
       id INTEGER PRIMARY KEY,
       owner TEXT NOT NULL,
@@ -72,87 +96,99 @@ export function initDb(dbPath: string): Database {
   `)
 
   try {
-    db.exec("ALTER TABLE projects ADD COLUMN last_pulled_at TEXT")
+    raw.exec("ALTER TABLE projects ADD COLUMN last_pulled_at TEXT")
   } catch {
     // Column already exists — ignore
   }
-
-  return db
 }
 
 /**
- * I/O: for each configured repo, returns its test run count and last sync
+ * Opens (or creates) a SQLite database at dbPath, runs schema migrations,
+ * and returns a DbHandle with both the data-table Database and raw better-sqlite3 instance.
+ * The raw instance is provided for tests, migrations, and utilities (pragma, close, etc.).
+ */
+export function initDb(dbPath: string): DbHandle {
+  const raw = new BetterSqlite3(dbPath)
+  runMigrations(raw)
+  return { raw, db: createDatabase(createSqliteDatabaseAdapter(raw)) }
+}
+
+/**
+ * For each configured repo, returns its test run count and last sync
  * timestamp from SQLite. If a repo has never been ingested, returns
  * testRunCount: 0 and lastSynced: null.
  */
-export function getProjects(db: Database, repos: RepoConfig[]): ProjectSummary[] {
-  const stmt = db.prepare<[string, string], { last_synced: string | null; run_count: number }>(`
-    SELECT p.last_synced, COUNT(tr.id) AS run_count
-    FROM projects p
-    LEFT JOIN test_runs tr ON tr.project_id = p.id
-    WHERE p.owner = ? AND p.repo = ?
-    GROUP BY p.id
-  `)
+export async function getProjects(db: Database, repos: RepoConfig[]): Promise<ProjectSummary[]> {
+  return Promise.all(
+    repos.map(async (r) => {
+      const row = await db.query(projects).where({ owner: r.owner, repo: r.repo }).first()
 
-  return repos.map((r) => {
-    const row = stmt.get(r.owner, r.repo)
-    return {
-      owner: r.owner,
-      repo: r.repo,
-      testRunCount: row ? row.run_count : 0,
-      lastSynced: row ? row.last_synced : null,
-    }
-  })
+      const testRunCount = row ? await db.count(testRuns, { where: { project_id: row.id } }) : 0
+
+      return {
+        owner: r.owner,
+        repo: r.repo,
+        testRunCount,
+        lastSynced: row?.last_synced ?? null,
+      }
+    }),
+  )
 }
 
 /**
  * Insert or ignore a project row, then return its id.
  */
-export function upsertProject(db: Database, owner: string, repo: string): number {
-  db.prepare("INSERT OR IGNORE INTO projects (owner, repo) VALUES (?, ?)").run(owner, repo)
-  const row = db
-    .prepare("SELECT id FROM projects WHERE owner = ? AND repo = ?")
-    .get(owner, repo) as { id: number }
-  return row.id
+export async function upsertProject(db: Database, owner: string, repo: string): Promise<number> {
+  const existing = await db.query(projects).where({ owner, repo }).first()
+  if (existing) return existing.id
+
+  const result = await db.create(projects, { owner, repo }, { returnRow: true })
+  return (result as { id: number }).id
 }
 
 /**
- * I/O: returns the last_synced timestamp for a project, or null if never synced.
+ * Returns the last_synced timestamp for a project, or null if never synced.
  */
-export function getLastSynced(db: Database, projectId: number): string | null {
-  const row = db.prepare("SELECT last_synced FROM projects WHERE id = ?").get(projectId) as
-    | { last_synced: string | null }
-    | undefined
+export async function getLastSynced(db: Database, projectId: number): Promise<string | null> {
+  const row = await db.find(projects, projectId)
   return row?.last_synced ?? null
 }
 
 /**
- * I/O: updates the last_synced timestamp for a project to the given ISO 8601 string.
+ * Updates the last_synced timestamp for a project to the given ISO 8601 string.
+ * No-op when the projectId does not exist.
  */
-export function updateLastSynced(db: Database, projectId: number, timestamp: string): void {
-  db.prepare("UPDATE projects SET last_synced = ? WHERE id = ?").run(timestamp, projectId)
+export async function updateLastSynced(
+  db: Database,
+  projectId: number,
+  timestamp: string,
+): Promise<void> {
+  await db.updateMany(projects, { last_synced: timestamp }, { where: { id: projectId } })
 }
 
 /**
- * I/O: returns the last_pulled_at timestamp for a project, or null if never pulled.
+ * Returns the last_pulled_at timestamp for a project, or null if never pulled.
  */
-export function getLastPulledAt(db: Database, projectId: number): string | null {
-  const row = db.prepare("SELECT last_pulled_at FROM projects WHERE id = ?").get(projectId) as
-    | { last_pulled_at: string | null }
-    | undefined
+export async function getLastPulledAt(db: Database, projectId: number): Promise<string | null> {
+  const row = await db.find(projects, projectId)
   return row?.last_pulled_at ?? null
 }
 
 /**
- * I/O: updates the last_pulled_at timestamp for a project.
+ * Updates the last_pulled_at timestamp for a project.
+ * No-op when the projectId does not exist.
  */
-export function updateLastPulledAt(db: Database, projectId: number, timestamp: string): void {
-  db.prepare("UPDATE projects SET last_pulled_at = ? WHERE id = ?").run(timestamp, projectId)
+export async function updateLastPulledAt(
+  db: Database,
+  projectId: number,
+  timestamp: string,
+): Promise<void> {
+  await db.updateMany(projects, { last_pulled_at: timestamp }, { where: { id: projectId } })
 }
 
 /**
  * Get test runs for a project.
  */
-export function getTestRuns(_projectId: number): TestRun[] {
+export async function getTestRuns(_projectId: number): Promise<TestRun[]> {
   return []
 }

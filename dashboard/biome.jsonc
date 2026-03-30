@@ -44,6 +44,6 @@
     }
   ],
   "files": {
-    "includes": ["**", "!**/node_modules", "!**/build", "!**/.react-router"]
+    "includes": ["**", "!**/node_modules", "!**/build"]
   }
 }
