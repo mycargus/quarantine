@@ -1,4 +1,4 @@
-.PHONY: dev cli-build cli-test cli-lint cli-mutate dash-build dash-test dash-lint dash-lint-ci dash-typecheck test-build e2e-test e2e-lint e2e-lint-ci contract-test contract-lint contract-lint-ci test-lint schemas-validate lint-all test-all check install-hooks
+.PHONY: dev cli-build cli-test cli-lint cli-mutate dash-build dash-test dash-lint dash-lint-ci dash-typecheck test-build e2e-test e2e-lint e2e-lint-ci contract-test contract-lint contract-lint-ci test-lint lint-all test-all check install-hooks
 
 # --- CLI (Go) ---
 
@@ -57,12 +57,6 @@ e2e-lint-ci:
 test-lint:
 	cd test && pnpm run lint
 
-# --- Schemas ---
-
-schemas-validate:
-	@echo "Validating golden fixtures against JSON schemas..."
-	@echo "TODO: Wire up schema validation (Go: santhosh-tekuri/jsonschema, TS: ajv)"
-
 # --- Dev Setup ---
 
 dev: _check-prereqs install-hooks
@@ -84,4 +78,4 @@ check: lint-all dash-typecheck
 
 lint-all: cli-lint dash-lint test-lint
 
-test-all: cli-test dash-test contract-test e2e-test schemas-validate
+test-all: cli-test dash-test contract-test e2e-test

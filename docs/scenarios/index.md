@@ -18,6 +18,7 @@ Each v1 scenario is tagged with the milestone where it first becomes testable.
 | [Test Runner Edge Cases](v1/09-test-runner-edge-cases.md) | M2, M4
 | [GitHub API Edge Cases](v1/10-github-api-edge-cases.md) | M4–M5
 | [Configuration Edge Cases](v1/11-config-edge-cases.md) | M1–M2
+| [Schema Validation](v1/12-schema-validation.md) | M8
 
 ## v2+ Scenarios
 

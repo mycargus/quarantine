@@ -53,9 +53,9 @@ and consumers — they define the expected shape that both sides agree on.
 
 | Schema | Location | Protocol | Validates | Used at | Tested |
 |--------|----------|----------|-----------|---------|--------|
-| `test-result.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `results.json` | Dashboard runtime (ajv); schema tests (planned) | Dashboard uses it at runtime; no build-time validation yet |
-| `quarantine-state.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `quarantine.json` | Schema tests (planned) | Not validated anywhere yet |
-| `quarantine-config.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `quarantine.yml` | Schema tests (planned) | Not validated anywhere yet |
+| `test-result.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `results.json` | Dashboard runtime (ajv); Go marshal test (planned, ADR-025); negative regression test (planned, ADR-025) | Dashboard validates at runtime; Go marshal validation planned |
+| `quarantine-state.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `quarantine.json` | Negative regression test (planned, ADR-025) | Single-component; `issue_number`/`issue_url` to be made optional (ADR-025) |
+| `quarantine-config.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `quarantine.yml` | Negative regression test (planned, ADR-025) | Documentation artifact; CLI validates via Go code, not schema |
 | `github-api-artifacts.json` | `schemas/` | OpenAPI 3.x | GitHub Artifacts API responses | Prism contract tests (planned) | Not validated yet; `test/contract/` has no test files |
 
 ## Contract Details
@@ -639,4 +639,5 @@ Signs you've introduced a new contract:
 [architecture.md](../planning/architecture.md),
 [error-handling.md](error-handling.md),
 [ADR-012 concurrency](../adr/012-concurrency-strategy.md),
-[ADR-024 contract testing](../adr/024-contract-testing-tool.md).*
+[ADR-024 contract testing](../adr/024-contract-testing-tool.md),
+[ADR-025 schema validation](../adr/025-schema-validation-strategy.md).*
