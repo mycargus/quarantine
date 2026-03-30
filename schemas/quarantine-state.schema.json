@@ -43,11 +43,13 @@
         "first_flaky_at",
         "last_flaky_at",
         "flaky_count",
-        "issue_number",
-        "issue_url",
         "quarantined_at",
         "quarantined_by"
       ],
+      "dependentRequired": {
+        "issue_number": ["issue_url"],
+        "issue_url": ["issue_number"]
+      },
       "additionalProperties": false,
       "properties": {
         "test_id": {
