@@ -45,9 +45,9 @@ const invalidFixture = { ...validFixture, run_id: undefined }
 describe("ingestArtifact()", async (assert) => {
   {
     // Test 1: valid JSON → ingested, row exists
-    const db = initDb(":memory:")
-    db.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
-    const project = db
+    const { db, raw } = initDb(":memory:")
+    raw.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
+    const project = raw
       .prepare("SELECT id FROM projects WHERE owner = ? AND repo = ?")
       .get("mycargus", "my-app") as { id: number }
     const projectId = project.id
@@ -56,7 +56,7 @@ describe("ingestArtifact()", async (assert) => {
       warnings.push(msg)
     }
 
-    const result = ingestArtifact(
+    const result = await ingestArtifact(
       db,
       "mycargus",
       "my-app",
@@ -66,7 +66,7 @@ describe("ingestArtifact()", async (assert) => {
       warn,
     )
 
-    const row = db
+    const row = raw
       .prepare("SELECT run_id FROM test_runs WHERE run_id = ?")
       .get("fixture-jest-flaky") as { run_id: string } | undefined
 
@@ -94,9 +94,9 @@ describe("ingestArtifact()", async (assert) => {
 
   {
     // Test 2: invalid JSON (missing run_id) → skipped, warns, no row
-    const db = initDb(":memory:")
-    db.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
-    const project = db
+    const { db, raw } = initDb(":memory:")
+    raw.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
+    const project = raw
       .prepare("SELECT id FROM projects WHERE owner = ? AND repo = ?")
       .get("mycargus", "my-app") as { id: number }
     const projectId = project.id
@@ -105,7 +105,7 @@ describe("ingestArtifact()", async (assert) => {
       warnings.push(msg)
     }
 
-    const result = ingestArtifact(
+    const result = await ingestArtifact(
       db,
       "mycargus",
       "my-app",
@@ -115,7 +115,7 @@ describe("ingestArtifact()", async (assert) => {
       warn,
     )
 
-    const rows = db.prepare("SELECT * FROM test_runs").all()
+    const rows = raw.prepare("SELECT * FROM test_runs").all()
 
     assert({
       given: "a JSON artifact missing the required run_id field",
@@ -149,9 +149,9 @@ describe("ingestArtifact()", async (assert) => {
 
   {
     // Test 3: syntactically malformed JSON → skipped, warns, no row
-    const db = initDb(":memory:")
-    db.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
-    const project = db
+    const { db, raw } = initDb(":memory:")
+    raw.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
+    const project = raw
       .prepare("SELECT id FROM projects WHERE owner = ? AND repo = ?")
       .get("mycargus", "my-app") as { id: number }
     const projectId = project.id
@@ -160,7 +160,7 @@ describe("ingestArtifact()", async (assert) => {
       warnings.push(msg)
     }
 
-    const result = ingestArtifact(
+    const result = await ingestArtifact(
       db,
       "mycargus",
       "my-app",
@@ -170,7 +170,7 @@ describe("ingestArtifact()", async (assert) => {
       warn,
     )
 
-    const rows = db.prepare("SELECT * FROM test_runs").all()
+    const rows = raw.prepare("SELECT * FROM test_runs").all()
 
     assert({
       given: "a syntactically malformed JSON string",
@@ -204,15 +204,15 @@ describe("ingestArtifact()", async (assert) => {
 
   {
     // G1: idempotency — same run_id ingested twice
-    const db = initDb(":memory:")
-    db.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
-    const project = db
+    const { db, raw } = initDb(":memory:")
+    raw.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
+    const project = raw
       .prepare("SELECT id FROM projects WHERE owner = ? AND repo = ?")
       .get("mycargus", "my-app") as { id: number }
     const projectId = project.id
     const warn = (_msg: string) => {}
 
-    ingestArtifact(
+    await ingestArtifact(
       db,
       "mycargus",
       "my-app",
@@ -221,7 +221,7 @@ describe("ingestArtifact()", async (assert) => {
       projectId,
       warn,
     )
-    const secondResult = ingestArtifact(
+    const secondResult = await ingestArtifact(
       db,
       "mycargus",
       "my-app",
@@ -231,7 +231,7 @@ describe("ingestArtifact()", async (assert) => {
       warn,
     )
     const rowCount = (
-      db.prepare("SELECT COUNT(*) as count FROM test_runs").get() as { count: number }
+      raw.prepare("SELECT COUNT(*) as count FROM test_runs").get() as { count: number }
     ).count
 
     assert({
@@ -251,128 +251,124 @@ describe("ingestArtifact()", async (assert) => {
 
   {
     // G2: JSON primitive (valid JSON, schema-invalid)
-    const db = initDb(":memory:")
-    db.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
-    const project = db
+    const { db, raw } = initDb(":memory:")
+    raw.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
+    const project = raw
       .prepare("SELECT id FROM projects WHERE owner = ? AND repo = ?")
       .get("mycargus", "my-app") as { id: number }
     const warnings: string[] = []
 
+    const r = await ingestArtifact(
+      db,
+      "mycargus",
+      "my-app",
+      "quarantine-results-101",
+      "null",
+      project.id,
+      (m) => warnings.push(m),
+    )
+
     assert({
       given: "a JSON string whose top-level value is null",
       should: "return 'skipped' and emit a warning",
-      actual: (() => {
-        const r = ingestArtifact(
-          db,
-          "mycargus",
-          "my-app",
-          "quarantine-results-101",
-          "null",
-          project.id,
-          (m) => warnings.push(m),
-        )
-        return { result: r, warned: warnings.length === 1 }
-      })(),
+      actual: { result: r, warned: warnings.length === 1 },
       expected: { result: "skipped", warned: true },
     })
   }
 
   {
     // G3: empty string input
-    const db = initDb(":memory:")
-    db.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
-    const project = db
+    const { db, raw } = initDb(":memory:")
+    raw.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
+    const project = raw
       .prepare("SELECT id FROM projects WHERE owner = ? AND repo = ?")
       .get("mycargus", "my-app") as { id: number }
     const warnings: string[] = []
 
+    const r = await ingestArtifact(
+      db,
+      "mycargus",
+      "my-app",
+      "quarantine-results-101",
+      "",
+      project.id,
+      (m) => warnings.push(m),
+    )
+
     assert({
       given: "an empty string (artifact download returned empty body)",
       should: "return 'skipped' and emit a warning",
-      actual: (() => {
-        const r = ingestArtifact(
-          db,
-          "mycargus",
-          "my-app",
-          "quarantine-results-101",
-          "",
-          project.id,
-          (m) => warnings.push(m),
-        )
-        return { result: r, warned: warnings.length === 1 }
-      })(),
+      actual: { result: r, warned: warnings.length === 1 },
       expected: { result: "skipped", warned: true },
     })
   }
 
   {
     // G4: unsupported framework enum value
-    const db = initDb(":memory:")
-    db.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
-    const project = db
+    const { db, raw } = initDb(":memory:")
+    raw.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
+    const project = raw
       .prepare("SELECT id FROM projects WHERE owner = ? AND repo = ?")
       .get("mycargus", "my-app") as { id: number }
     const warnings: string[] = []
     const badFramework = { ...validFixture, framework: "mocha" }
 
+    const r = await ingestArtifact(
+      db,
+      "mycargus",
+      "my-app",
+      "quarantine-results-101",
+      JSON.stringify(badFramework),
+      project.id,
+      (m) => warnings.push(m),
+    )
+
     assert({
       given: "an artifact with an unsupported framework value",
       should: "return 'skipped' and emit a warning",
-      actual: (() => {
-        const r = ingestArtifact(
-          db,
-          "mycargus",
-          "my-app",
-          "quarantine-results-101",
-          JSON.stringify(badFramework),
-          project.id,
-          (m) => warnings.push(m),
-        )
-        return { result: r, warned: warnings.length === 1 }
-      })(),
+      actual: { result: r, warned: warnings.length === 1 },
       expected: { result: "skipped", warned: true },
     })
   }
 
   {
     // G5: pr_number = 0 (below schema minimum of 1)
-    const db = initDb(":memory:")
-    db.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
-    const project = db
+    const { db, raw } = initDb(":memory:")
+    raw.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
+    const project = raw
       .prepare("SELECT id FROM projects WHERE owner = ? AND repo = ?")
       .get("mycargus", "my-app") as { id: number }
     const warnings: string[] = []
     const badPr = { ...validFixture, run_id: "run-pr-0", pr_number: 0 }
 
+    const r = await ingestArtifact(
+      db,
+      "mycargus",
+      "my-app",
+      "quarantine-results-101",
+      JSON.stringify(badPr),
+      project.id,
+      (m) => warnings.push(m),
+    )
+
     assert({
       given: "an artifact where pr_number is 0 (below schema minimum)",
       should: "return 'skipped' and emit a warning",
-      actual: (() => {
-        const r = ingestArtifact(
-          db,
-          "mycargus",
-          "my-app",
-          "quarantine-results-101",
-          JSON.stringify(badPr),
-          project.id,
-          (m) => warnings.push(m),
-        )
-        return { result: r, warned: warnings.length === 1 }
-      })(),
+      actual: { result: r, warned: warnings.length === 1 },
       expected: { result: "skipped", warned: true },
     })
   }
 
   {
     // G6: valid artifact with pr_number: null
-    const db = initDb(":memory:")
-    db.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
-    const project = db
+    const { db, raw } = initDb(":memory:")
+    raw.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
+    const project = raw
       .prepare("SELECT id FROM projects WHERE owner = ? AND repo = ?")
       .get("mycargus", "my-app") as { id: number }
     const noPrFixture: TestResult = { ...validFixture, run_id: "run-no-pr", pr_number: null }
 
-    const result = ingestArtifact(
+    const result = await ingestArtifact(
       db,
       "mycargus",
       "my-app",
@@ -381,7 +377,7 @@ describe("ingestArtifact()", async (assert) => {
       project.id,
       (_m) => {},
     )
-    const row = db.prepare("SELECT pr_number FROM test_runs WHERE run_id = ?").get("run-no-pr") as
+    const row = raw.prepare("SELECT pr_number FROM test_runs WHERE run_id = ?").get("run-no-pr") as
       | { pr_number: number | null }
       | undefined
 
@@ -395,9 +391,9 @@ describe("ingestArtifact()", async (assert) => {
 
   {
     // G7: valid artifact with empty tests array
-    const db = initDb(":memory:")
-    db.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
-    const project = db
+    const { db, raw } = initDb(":memory:")
+    raw.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
+    const project = raw
       .prepare("SELECT id FROM projects WHERE owner = ? AND repo = ?")
       .get("mycargus", "my-app") as { id: number }
     const emptyTests: TestResult = { ...validFixture, run_id: "run-empty-tests", tests: [] }
@@ -405,7 +401,7 @@ describe("ingestArtifact()", async (assert) => {
     assert({
       given: "a valid artifact with an empty tests array",
       should: "return 'ingested' and insert one row",
-      actual: ingestArtifact(
+      actual: await ingestArtifact(
         db,
         "mycargus",
         "my-app",
@@ -420,33 +416,32 @@ describe("ingestArtifact()", async (assert) => {
 
   {
     // G8: invalid projectId → upsertTestRun fails; must not throw, must return 'skipped'
-    const db = initDb(":memory:")
+    const { db } = initDb(":memory:")
     const warnings: string[] = []
+
+    const r = await ingestArtifact(
+      db,
+      "mycargus",
+      "my-app",
+      "quarantine-results-101",
+      JSON.stringify(validFixture),
+      99999,
+      (m) => warnings.push(m),
+    )
 
     assert({
       given: "a valid artifact but a projectId that does not exist in projects (FK violation)",
       should: "return 'skipped' and emit a warning (never throws)",
-      actual: (() => {
-        const r = ingestArtifact(
-          db,
-          "mycargus",
-          "my-app",
-          "quarantine-results-101",
-          JSON.stringify(validFixture),
-          99999,
-          (m) => warnings.push(m),
-        )
-        return { result: r, warned: warnings.length === 1 }
-      })(),
+      actual: { result: r, warned: warnings.length === 1 },
       expected: { result: "skipped", warned: true },
     })
   }
 
   {
     // Test 4: three artifacts in sequence — artifact 101 (invalid) does not stop processing
-    const db = initDb(":memory:")
-    db.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
-    const project = db
+    const { db, raw } = initDb(":memory:")
+    raw.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
+    const project = raw
       .prepare("SELECT id FROM projects WHERE owner = ? AND repo = ?")
       .get("mycargus", "my-app") as { id: number }
     const projectId = project.id
@@ -458,7 +453,7 @@ describe("ingestArtifact()", async (assert) => {
     const fixture100: TestResult = { ...validFixture, run_id: "run-100" }
     const fixture102: TestResult = { ...validFixture, run_id: "run-102" }
 
-    const results = [
+    const results = await Promise.all([
       ingestArtifact(
         db,
         "mycargus",
@@ -486,10 +481,10 @@ describe("ingestArtifact()", async (assert) => {
         projectId,
         warn,
       ),
-    ]
+    ])
 
     const rowCount = (
-      db.prepare("SELECT COUNT(*) as count FROM test_runs").get() as { count: number }
+      raw.prepare("SELECT COUNT(*) as count FROM test_runs").get() as { count: number }
     ).count
 
     assert({

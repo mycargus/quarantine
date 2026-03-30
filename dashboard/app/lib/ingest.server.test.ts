@@ -352,17 +352,17 @@ describe("sortArtifactsChronologically()", async (assert) => {
 })
 
 describe("upsertTestRun()", async (assert) => {
-  const db = initDb(":memory:")
+  const { db, raw } = initDb(":memory:")
 
   // Insert a project first so the foreign key is satisfied
-  db.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
-  const project = db
+  raw.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
+  const project = raw
     .prepare("SELECT id FROM projects WHERE owner = ? AND repo = ?")
     .get("mycargus", "my-app") as { id: number }
   const projectId = project.id
 
-  upsertTestRun(db, projectId, validFixture)
-  const row = db.prepare("SELECT * FROM test_runs WHERE run_id = ?").get("fixture-jest-flaky") as
+  await upsertTestRun(db, projectId, validFixture)
+  const row = raw.prepare("SELECT * FROM test_runs WHERE run_id = ?").get("fixture-jest-flaky") as
     | Record<string, unknown>
     | undefined
 
@@ -381,8 +381,8 @@ describe("upsertTestRun()", async (assert) => {
   })
 
   // Second upsert with same run_id — should be idempotent
-  upsertTestRun(db, projectId, validFixture)
-  const allRows = db.prepare("SELECT * FROM test_runs WHERE run_id = ?").all("fixture-jest-flaky")
+  await upsertTestRun(db, projectId, validFixture)
+  const allRows = raw.prepare("SELECT * FROM test_runs WHERE run_id = ?").all("fixture-jest-flaky")
 
   assert({
     given: "the same TestResult upserted twice",
@@ -392,8 +392,8 @@ describe("upsertTestRun()", async (assert) => {
   })
 
   const nullPrFixture = { ...validFixture, run_id: "fixture-null-pr", pr_number: null }
-  upsertTestRun(db, projectId, nullPrFixture)
-  const nullPrRow = db
+  await upsertTestRun(db, projectId, nullPrFixture)
+  const nullPrRow = raw
     .prepare("SELECT pr_number FROM test_runs WHERE run_id = ?")
     .get("fixture-null-pr") as { pr_number: number | null } | undefined
 
