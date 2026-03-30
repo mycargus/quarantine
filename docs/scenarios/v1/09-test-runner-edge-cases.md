@@ -128,6 +128,22 @@ all tests pass.
 
 ---
 
+### Scenario 72: JUnit XML `<error>` element produces status not in schema [M2]
+
+**Risk:** A test framework produces `<error>` instead of `<failure>` for a crashed test. The CLI parser maps this to `"error"` status, which is not in the `test-result.schema.json` enum (`passed|failed|skipped|quarantined|flaky`). The dashboard rejects the result at schema validation, silently dropping the entire test run.
+
+**Given** a test suite where one test crashes with an unhandled exception, and
+the test runner produces JUnit XML with an `<error>` child element on the
+`<testcase>` (instead of `<failure>`)
+
+**When** the CLI parses the JUnit XML
+
+**Then** the CLI maps the `<error>` element to a status value that conforms to
+`test-result.schema.json`. The resulting `results.json` passes schema
+validation. The dashboard ingests it without rejection.
+
+---
+
 ### Scenario 57: All tests in the suite are quarantined — Jest/Vitest [M4]
 
 **Risk:** Excluding all tests causes the test runner to report "no tests found" (exit non-zero), which the CLI misinterprets as a test failure and exits 1.

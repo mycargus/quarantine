@@ -105,3 +105,63 @@ test was detected as flaky even if state wasn't persisted). Exits based on test
 results.
 
 ---
+
+### Scenario 64: Contents API base64 newline wrapping [M4]
+
+**Risk:** The CLI fails to decode `quarantine.json` if GitHub changes its base64 encoding format, causing silent degraded mode or corrupt state.
+
+**Given** `quarantine.json` exists on the `quarantine/state` branch with one
+quarantined test entry
+
+**When** the CLI reads it via `GET /repos/{owner}/{repo}/contents/quarantine.json`
+and the Contents API returns the file content as base64 with `\n` inserted every
+60 characters (GitHub's standard wrapping behavior)
+
+**Then** the CLI strips all `\n` characters from the `content` field before
+base64-decoding, successfully parses the resulting JSON into a valid `State`
+struct, and the quarantined test entry is present in the state.
+
+---
+
+### Scenario 66: quarantine.json entry written before issue creation [M4]
+
+**Risk:** The Go `State.Entry` struct uses `omitempty` on `IssueNumber` and `IssueURL`, but `quarantine-state.schema.json` marks both as `required`. When an entry is written to state before issue creation completes (e.g., issue creation fails or is skipped due to 410 Gone), the marshaled JSON omits these fields, producing output that violates the schema.
+
+**Given** the CLI detects a flaky test and writes it to `quarantine.json`, but
+issue creation has not yet completed (or was skipped because Issues are disabled
+on the repo)
+
+**When** the CLI marshals the state to JSON via `State.MarshalAt()`
+
+**Then** the entry in `quarantine.json` either includes `issue_number` and
+`issue_url` with valid values, or the schema and struct agree on how to
+represent their absence (both treat them as optional, or both require them with
+a sentinel value like `null`). The marshaled JSON conforms to
+`quarantine-state.schema.json`.
+
+---
+
+### Scenario 65: Contents API branch-not-found vs file-not-found [M4]
+
+**Risk:** The CLI misinterprets a missing branch as a missing file (or vice versa), leading to incorrect degraded mode behavior or failed init.
+
+**Given** a repository where the `quarantine/state` branch does not exist
+
+**When** the CLI calls `GET /repos/{owner}/{repo}/contents/quarantine.json?ref=quarantine/state`
+and receives a 404 response with the message `"No commit found for the ref quarantine/state"`
+
+**Then** the CLI identifies this as a missing branch (not a missing file on an
+existing branch), logs a warning, and enters degraded mode — running all tests
+without quarantine filtering.
+
+**And given** a repository where the `quarantine/state` branch exists but
+`quarantine.json` has not yet been created
+
+**When** the CLI calls the same endpoint and receives a 404 response without the
+`"No commit found for the ref"` message
+
+**Then** the CLI identifies this as a missing file on an existing branch and
+treats it as an empty quarantine state (no tests quarantined), not as a branch
+error.
+
+---
