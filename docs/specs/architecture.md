@@ -202,4 +202,4 @@ See `docs/milestones/index.md` for v1 implementation milestones and `docs/milest
 
 ---
 
-*References: ADR-001 through ADR-019 in `docs/adr/`.*
+*References: ADRs in `docs/adr/`.*

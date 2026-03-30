@@ -551,9 +551,8 @@ No dependency on a working CLI.
         repo: other-app
     poll_interval: 300
     ```
-- SQLite schema and migrations per `docs/specs/architecture.md` section 5.3: `orgs`,
-  `projects`, `tests`, `test_runs`, `test_results`, `quarantine_events`
-  tables. WAL mode.
+- SQLite schema and migrations: `orgs`, `projects`, `tests`, `test_runs`,
+  `test_results`, `quarantine_events` tables. WAL mode.
 - Artifact polling pipeline:
   - Background worker polls GitHub Artifacts API per configured repos.
   - Uses `If-None-Match` (ETag) for conditional requests.

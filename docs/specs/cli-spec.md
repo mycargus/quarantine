@@ -242,6 +242,7 @@ Error: Quarantine is not initialized for this repository. Run 'quarantine init' 
 | `--strict` | bool | `false` | Exit 2 on infrastructure errors instead of degraded mode. Useful for debugging and verifying setup. |
 | `--pr N` | int | Auto-detected | Override PR number. Auto-detected from `GITHUB_EVENT_PATH` when running in GitHub Actions. Required for PR comments outside of GitHub Actions. |
 | `--exclude PATTERN` | string | None | Additional exclude patterns. Repeatable. Merged with `exclude` patterns from config. Patterns match against `test_id` (see [Exclude Pattern Matching](#exclude-pattern-matching)). |
+| `--output PATH` | string | `.quarantine/results.json` | Path for the results JSON output file. The directory is created if it does not exist. |
 
 ### Arguments
 
