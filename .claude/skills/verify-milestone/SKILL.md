@@ -46,7 +46,7 @@ For each numbered criterion in the manifest's Acceptance Criteria section:
 
 2. **Criteria referencing test coverage** (e.g., "Unit tests cover: config parsing..."): Use Glob to find test files (`*_test.go` or `*.test.ts`) covering the listed concerns. Read relevant test files to confirm they test the specific things listed.
 
-3. **Criteria with FR/NFR IDs** (e.g., "(FR-1.4.1, FR-1.11.1)"): Read the requirement from `docs/planning/functional-requirements.md` or `docs/planning/non-functional-requirements.md`. Then read the implementation code and verify it addresses the requirement. Check for completeness — partial implementations count as failures.
+3. **Criteria with FR/NFR IDs** (e.g., "(FR-1.4.1, FR-1.11.1)"): Read the requirement from `docs/specs/functional-requirements.md` or `docs/specs/non-functional-requirements.md`. Then read the implementation code and verify it addresses the requirement. Check for completeness — partial implementations count as failures.
 
 4. **Criteria referencing build** (e.g., "`make cli-build` produces a binary"): Already verified in Step 3 — mark as passed if build succeeded.
 

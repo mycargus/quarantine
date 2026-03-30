@@ -902,6 +902,6 @@ defined during M6 (dashboard implementation).
 
 ---
 
-*References: [config-schema.md](config-schema.md), [architecture.md](../planning/architecture.md),
+*References: [config-schema.md](config-schema.md), [architecture.md](architecture.md),
 [ADR-003](../adr/003-quarantine-mechanism.md), [ADR-010](../adr/010-config-format.md),
 [ADR-016](../adr/016-v1-framework-scope.md).*

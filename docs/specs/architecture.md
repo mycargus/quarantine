@@ -194,7 +194,7 @@ The CLI never hard-depends on anything other than GitHub, and degrades gracefull
 
 ## 7. Roadmap
 
-See `docs/planning/milestones.md` for v1 implementation milestones and `docs/milestones/` for per-milestone manifests.
+See `docs/milestones/index.md` for v1 implementation milestones and `docs/milestones/` for per-milestone manifests.
 
 **v2+ directions:** Monorepo support, GitHub App auth, GitHub OAuth for dashboard, code sync adapter (skip markers in source), webhooks for real-time unquarantine, additional CI providers (Jenkins, GitLab, Bitbucket), Slack/email notifications, adaptive polling for inactive repos.
 

@@ -32,7 +32,7 @@ These principles are grounded in published research on AI agent context engineer
 
 ### 1. Gather milestone definition
 
-Read `docs/planning/milestones.md` and extract for M$1:
+Read `docs/milestones/index.md` and extract for M$1:
 - Title
 - Scope (what it builds)
 - Acceptance criteria
@@ -56,8 +56,8 @@ Based on the milestone scope, determine which of these source docs are relevant:
 | `docs/specs/github-api-inventory.md` | Any milestone making GitHub API calls |
 | `docs/specs/error-handling.md` | Any milestone with error handling requirements |
 | `docs/specs/sequence-diagrams.md` | Any milestone with multi-step flows |
-| `docs/planning/functional-requirements.md` | Always — every milestone traces to functional requirements |
-| `docs/planning/non-functional-requirements.md` | Always — every milestone traces to NFRs |
+| `docs/specs/functional-requirements.md` | Always — every milestone traces to functional requirements |
+| `docs/specs/non-functional-requirements.md` | Always — every milestone traces to NFRs |
 | `docs/specs/test-strategy.md` | If the milestone has special testing concerns |
 | `docs/adr/*.md` | Only ADRs directly relevant to this milestone's decisions |
 
@@ -69,8 +69,8 @@ For every link you plan to include in the manifest, verify the target anchor exi
 
 Read the relevant sections of these docs to find concrete, testable invariants for the Verification section:
 - `docs/specs/sequence-diagrams.md` — endpoint call order, branching logic
-- `docs/planning/functional-requirements.md` — specific FR IDs that map to this milestone
-- `docs/planning/non-functional-requirements.md` — specific NFR IDs that map to this milestone
+- `docs/specs/functional-requirements.md` — specific FR IDs that map to this milestone
+- `docs/specs/non-functional-requirements.md` — specific NFR IDs that map to this milestone
 - `docs/specs/error-handling.md` — exit codes, degraded mode behavior
 - `docs/specs/cli-spec.md` — output format, flag behavior
 
@@ -105,16 +105,16 @@ Write the file to `docs/milestones/m$1.md` using this exact structure:
 
 ## Acceptance criteria
 
-From [milestones.md](../planning/milestones.md#[anchor]):
+From [milestones.md](index.md#[anchor]):
 
 [Numbered list — copied from milestones.md since these are the contract.
 Each criterion MUST include the FR/NFR IDs it satisfies in parentheses.
-Read docs/planning/functional-requirements.md and
-docs/planning/non-functional-requirements.md to find matching IDs.
+Read docs/specs/functional-requirements.md and
+docs/specs/non-functional-requirements.md to find matching IDs.
 Example: "1. `quarantine init` creates a valid quarantine.yml... (FR-1.4.1, FR-1.11.1)"]
 
-Requirements: [functional](../planning/functional-requirements.md),
-[non-functional](../planning/non-functional-requirements.md).
+Requirements: [functional](../specs/functional-requirements.md),
+[non-functional](../specs/non-functional-requirements.md).
 
 ## Specifications
 
@@ -143,8 +143,8 @@ Specifically:
 - [concrete invariant with MUST]
 
 **Requirements:** The implementation MUST satisfy [FR-X.Y.Z]
-in [functional-requirements.md](../planning/functional-requirements.md)
-and [NFR-X.Y.Z] in [non-functional-requirements.md](../planning/non-functional-requirements.md).
+in [functional-requirements.md](../specs/functional-requirements.md)
+and [NFR-X.Y.Z] in [non-functional-requirements.md](../specs/non-functional-requirements.md).
 
 **Build:** `make cli-build && make cli-test && make cli-lint` MUST pass.
 ```

@@ -25,7 +25,7 @@ The pre-commit hook runs `make check` automatically.
 
 ## Architecture
 
-See `docs/planning/architecture.md` for full design. See `cli/CLAUDE.md` and `dashboard/CLAUDE.md` for component-specific context.
+See `docs/specs/architecture.md` for full design. See `cli/CLAUDE.md` and `dashboard/CLAUDE.md` for component-specific context.
 
 - **Model C (ADR-011):** GitHub-native CLI + standalone dashboard. CI path depends only on GitHub.
 - **CLI (Go):** Wraps test commands, parses JUnit XML, retries failures, manages quarantine state on `quarantine/state` branch, creates Issues, posts PR comments, uploads Artifacts.
@@ -41,7 +41,7 @@ See `docs/planning/architecture.md` for full design. See `cli/CLAUDE.md` and `da
 
 ## Implementation Notes
 
-- **Milestones** are in `docs/planning/milestones.md`. Manifests in `docs/milestones/` are the entry point for implementation.
+- **Milestones** are in `docs/milestones/index.md`. Manifests in `docs/milestones/` are the entry point for implementation.
 - **Rate limits:** Design for `GITHUB_TOKEN` (1,000 req/hr), not PAT (5,000/hr).
 - **Concurrency:** `quarantine.json` uses compare-and-swap via GitHub Contents API. Issue creation uses check-before-create with deterministic labels.
 - **JUnit XML:** No official schema. Jest needs `jest-junit`, RSpec needs `rspec_junit_formatter`, Vitest has built-in support.
@@ -61,11 +61,10 @@ Project skills (invoke with `/skill-name`):
 
 ## Documentation
 
-- `docs/specs/` -- Implementation references (cli-spec, config-schema, error-handling, test-strategy, [contracts](docs/specs/contracts.md), etc.)
-- `docs/planning/` -- Architecture, milestones, requirements
+- `docs/specs/` -- Implementation references (architecture, requirements, cli-spec, config-schema, error-handling, test-strategy, [contracts](docs/specs/contracts.md), etc.)
 - `docs/research/` -- Decision inputs (junit-xml, ci-artifacts, competitive landscape)
 - `docs/scenarios/` -- Given/when/then user scenarios
-- `docs/milestones/` -- Milestone manifests (agent entry points)
+- `docs/milestones/` -- Milestone overview ([index](docs/milestones/index.md)) and per-milestone manifests (agent entry points)
 - `docs/prompts/` -- Reusable prompts (scenario-authoring, adr-proposal)
 - `docs/adr/` -- Architecture Decision Records
 

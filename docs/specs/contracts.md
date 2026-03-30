@@ -636,7 +636,7 @@ Signs you've introduced a new contract:
 ---
 
 *References: [test-strategy.md](test-strategy.md),
-[architecture.md](../planning/architecture.md),
+[architecture.md](architecture.md),
 [error-handling.md](error-handling.md),
 [ADR-012 concurrency](../adr/012-concurrency-strategy.md),
 [ADR-024 contract testing](../adr/024-contract-testing-tool.md),

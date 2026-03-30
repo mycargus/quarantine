@@ -10,7 +10,7 @@
 > - `docs/specs/config-schema.md` -- quarantine.yml full schema
 > - `docs/specs/github-api-inventory.md` -- GitHub API interactions
 > - `docs/specs/error-handling.md` -- error handling strategy
-> - `docs/planning/architecture.md` -- system design
+> - `docs/specs/architecture.md` -- system design
 
 ## Design Principles
 
@@ -551,7 +551,7 @@ No dependency on a working CLI.
         repo: other-app
     poll_interval: 300
     ```
-- SQLite schema and migrations per `docs/planning/architecture.md` section 5.3: `orgs`,
+- SQLite schema and migrations per `docs/specs/architecture.md` section 5.3: `orgs`,
   `projects`, `tests`, `test_runs`, `test_results`, `quarantine_events`
   tables. WAL mode.
 - Artifact polling pipeline:
@@ -735,7 +735,7 @@ hardens and documents the entire system.
 7. Cross-compiled binaries run on their target platforms (at minimum: linux
    amd64, darwin arm64).
 8. `make test-all` passes (cli-test + dash-test + schemas-validate).
-9. v1 feature-complete per `docs/planning/architecture.md` section 8 roadmap.
+9. v1 feature-complete per `docs/specs/architecture.md` section 8 roadmap.
 
 **Key implementation notes:**
 
@@ -779,6 +779,6 @@ M5 (issues + PR comments) M7 (dashboard analytics)
 - `docs/specs/config-schema.md`: quarantine.yml field definitions and validation.
 - `docs/specs/github-api-inventory.md`: API endpoints, error handling, rate limits.
 - `docs/specs/error-handling.md`: error categories, degraded mode, `--strict`.
-- `docs/planning/architecture.md`: system design, data model, deployment.
+- `docs/specs/architecture.md`: system design, data model, deployment.
 - `schemas/test-result.schema.json`: contract between CLI and dashboard.
 - `schemas/quarantine-state.schema.json`: quarantine.json format.

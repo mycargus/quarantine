@@ -143,4 +143,4 @@ Mutation testing validates that existing tests are meaningful. It does not repla
 
 ---
 
-*References: [architecture.md](../planning/architecture.md), [contracts.md](contracts.md), scenario files in `docs/scenarios/`, Claude Code skills: [`/mikey:tdd`, `/mikey:testify`](https://github.com/mycargus/mikey-claude-plugins), [`/test-mutation`](https://github.com/chrisallenlane/claude-swe-workflows).*
+*References: [architecture.md](architecture.md), [contracts.md](contracts.md), scenario files in `docs/scenarios/`, Claude Code skills: [`/mikey:tdd`, `/mikey:testify`](https://github.com/mycargus/mikey-claude-plugins), [`/test-mutation`](https://github.com/chrisallenlane/claude-swe-workflows).*
