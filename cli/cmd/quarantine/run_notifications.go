@@ -139,7 +139,6 @@ type PRCommentData struct {
 	Failed             int
 	Flaky              int
 	Quarantined        int
-	Unquarantined      int
 	Version            string
 	NewlyFlaky         []FlakyEntry
 	NewToPRFlaky       []FlakyEntry
@@ -164,7 +163,7 @@ func renderPRComment(data PRCommentData) string {
 	fmt.Fprintf(&sb, "| Failed (genuine) | %d |\n", data.Failed)
 	fmt.Fprintf(&sb, "| Flaky (newly detected) | %d |\n", data.Flaky)
 	fmt.Fprintf(&sb, "| Quarantined (excluded) | %d |\n", data.Quarantined)
-	fmt.Fprintf(&sb, "| Unquarantined | %d |\n", data.Unquarantined)
+	fmt.Fprintf(&sb, "| Unquarantined | %d |\n", len(data.UnquarantinedTests))
 
 	if len(data.NewlyFlaky) > 0 {
 		sb.WriteString("\n### New Flaky Tests Detected\n\n")

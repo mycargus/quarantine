@@ -267,7 +267,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 				Failed:             res.Summary.Failed,
 				Flaky:              res.Summary.FlakyDetected,
 				Quarantined:        res.Summary.Quarantined,
-				Unquarantined:      len(removedTestIDs),
 				Version:            version,
 				NewlyFlaky:         flakyWithIssue,
 				NewToPRFlaky:       flakyNewToPR,
@@ -299,11 +298,16 @@ func runRun(cmd *cobra.Command, args []string) error {
 	// Print summary (unless quiet).
 	if !quiet {
 		cmd.PrintErrf("\n[quarantine] Results:\n")
-		cmd.PrintErrf("  Total:           %d\n", res.Summary.Total)
-		cmd.PrintErrf("  Passed:          %d\n", res.Summary.Passed)
-		cmd.PrintErrf("  Failed:          %d\n", res.Summary.Failed)
-		cmd.PrintErrf("  Skipped:         %d\n", res.Summary.Skipped)
-		cmd.PrintErrf("  Flaky:           %d\n", res.Summary.FlakyDetected)
+		cmd.PrintErrf("  Total:        %d\n", res.Summary.Total)
+		cmd.PrintErrf("  Passed:       %d\n", res.Summary.Passed)
+		cmd.PrintErrf("  Failed:       %d\n", res.Summary.Failed)
+		cmd.PrintErrf("  Skipped:      %d\n", res.Summary.Skipped)
+		cmd.PrintErrf("  Flaky:        %d\n", res.Summary.FlakyDetected)
+		cmd.PrintErrf("  Quarantined:  %d\n", res.Summary.Quarantined)
+		cmd.PrintErrf("\n")
+		cmd.PrintErrf("  Skipped:      Tests marked as skipped by your test framework.\n")
+		cmd.PrintErrf("  Flaky:        Tests that failed initially but passed on retry. Will be excluded (quarantined) in future test runs.\n")
+		cmd.PrintErrf("  Quarantined:  Tests excluded from this run due to known flakiness.\n")
 	}
 
 	// Determine exit code based on test results.

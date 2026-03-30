@@ -500,12 +500,16 @@ Error: --verbose and --quiet are mutually exclusive.
 [quarantine] Retrying: PaymentService > should process refund (attempt 3/3)... FAILED
 
 [quarantine] Results:
-  Total:           150
-  Passed:          147
-  Failed:          1 (genuine)
-  Flaky detected:  1 (quarantined)
-  Quarantined:     2 (excluded from execution)
-  Unquarantined:   1
+  Total:        150
+  Passed:       147
+  Failed:       1
+  Skipped:      0
+  Flaky:        1
+  Quarantined:  2
+
+  Skipped:      Tests marked as skipped by your test framework.
+  Flaky:        Tests that failed initially but passed on retry. Will be excluded (quarantined) in future test runs.
+  Quarantined:  Tests excluded from this run due to known flakiness.
 
 [quarantine] Created issue #43: Flaky test: UserService > should handle timeout
 [quarantine] Updated quarantine state (3 tests quarantined).
