@@ -70,8 +70,7 @@ That's it. Quarantine handles detection, quarantine state, GitHub Issues, and PR
 - **GitHub Issues:** one issue per flaky test; closing the issue unquarantines the test
 - **PR comments:** summary of flaky test results posted on each PR
 - **Dashboard:** Web UI with trends and cross-repo analytics (pulls from GitHub Artifacts; read-only in v1)
-- **Supported frameworks:** RSpec, Jest, Vitest
-- **Frameworks with automatic exclusion of flaky tests from new builds:** Jest, Vitest
+- **Supported frameworks:** RSpec, Jest, Vitest. All three support flaky detection. Jest and Vitest also support automatic exclusion of quarantined tests from subsequent builds; RSpec supports detection only.
 
 ## Commands
 
@@ -86,28 +85,24 @@ That's it. Quarantine handles detection, quarantine state, GitHub Issues, and PR
 
 Quarantine follows a GitHub-native architecture. The CLI handles the CI-critical path with no dependencies beyond GitHub. The dashboard is non-critical and discovers data autonomously by polling GitHub Artifacts.
 
-See [`docs/specs/architecture.md`](docs/specs/architecture.md) for the full system design.
+See [`docs/specs/architecture.md`](docs/specs/architecture.md) for the full system design and [`docs/specs/test-strategy.md`](docs/specs/test-strategy.md) for how we test.
 
 ## Roadmap
 
-Quarantine is under active development. Here's where things stand and where they're headed.
-
 ### v1 — GitHub-Native Core *(in progress)*
 
-The focus of v1 is zero-friction adoption for teams already on GitHub Actions. Everything runs through your existing `GITHUB_TOKEN` — no new accounts, no SaaS dependencies in the CI path.
+Zero-friction adoption for teams already on GitHub Actions. Everything runs through your existing `GITHUB_TOKEN` — no new accounts, no SaaS dependencies in the CI path.
 
-| Feature | Status |
-|---------|--------|
-| `quarantine init` + `quarantine doctor` | Done |
-| Test execution + JUnit XML parsing (Jest, Vitest, RSpec) | In progress |
-| Flaky detection via configurable retry | Planned |
-| Quarantine state on `quarantine/state` branch (SHA-based CAS) | Planned |
-| Pre-execution exclusion of quarantined tests | Planned |
-| GitHub Issue per flaky test (deduplicated) | Planned |
-| PR comment summaries | Planned |
-| Result artifacts for dashboard ingestion | Planned |
-| Web dashboard with trend analytics | Planned |
-| CLI + dashboard Docker images, cross-compiled binaries (6 targets) | Planned |
+- `quarantine init` + `quarantine doctor`
+- Test execution + JUnit XML parsing (Jest, Vitest, RSpec)
+- Flaky detection via configurable retry
+- Quarantine state on `quarantine/state` branch (SHA-based CAS)
+- Pre-execution exclusion of quarantined tests
+- GitHub Issue per flaky test (deduplicated)
+- PR comment summaries
+- Result artifacts for dashboard ingestion
+- Web dashboard with trend analytics
+- CLI + dashboard Docker images, cross-compiled binaries (6 targets)
 
 ### v2 — Expanded Integrations
 
