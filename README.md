@@ -106,7 +106,7 @@ The focus of v1 is zero-friction adoption for teams already on GitHub Actions. E
 | GitHub Issue per flaky test (deduplicated) | Planned |
 | PR comment summaries | Planned |
 | Result artifacts for dashboard ingestion | Planned |
-| Web dashboard (React Router v7 + SQLite) with trend analytics | Planned |
+| Web dashboard with trend analytics | Planned |
 | CLI + dashboard Docker images, cross-compiled binaries (6 targets) | Planned |
 
 ### v2 — Expanded Integrations

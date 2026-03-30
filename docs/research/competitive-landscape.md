@@ -219,7 +219,7 @@ Trunk requires a runtime wrapper or framework plugin for quarantine. Datadog req
 
 ### Gap 4: No self-hosted option exists
 
-Trunk, Captain (Pro), BuildPulse, and Datadog are all SaaS-only for their dashboard and quarantine management features. Enterprise customers with data residency requirements or security policies prohibiting third-party test data transmission have no option today. Quarantine's self-hosted dashboard (React Router v7 + SQLite) and GitHub-native state storage (branch + artifacts) mean all data stays within the customer's own infrastructure.
+Trunk, Captain (Pro), BuildPulse, and Datadog are all SaaS-only for their dashboard and quarantine management features. Enterprise customers with data residency requirements or security policies prohibiting third-party test data transmission have no option today. Quarantine's self-hosted dashboard (SQLite) and GitHub-native state storage (branch + artifacts) mean all data stays within the customer's own infrastructure.
 
 ### Gap 5: GitHub-native architecture is unique
 

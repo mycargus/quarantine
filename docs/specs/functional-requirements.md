@@ -57,7 +57,7 @@ creates GitHub issues, and provides a dashboard for visibility.
 | FR-1.5.3 | Uses hybrid polling: background sync every 5 minutes plus on-demand sync when a user views a page. | [v1] |
 | FR-1.5.4 | Uses SQLite for historical data storage. | [v1] |
 | FR-1.5.5 | Provides cross-repo visibility (one dashboard instance for an entire org). | [v1] |
-| FR-1.5.6 | Built with React Router v7 (framework mode), TypeScript, and Tailwind CSS. | [v1] |
+| FR-1.5.6 | Built with Remix 3, TypeScript, and Tailwind CSS. | [v1] |
 
 ## 1.6 Degraded Mode
 

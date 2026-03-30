@@ -533,8 +533,7 @@ No dependency on a working CLI.
 
 **Scope -- included:**
 
-- React Router v7 app scaffolding: Vite bundler, TypeScript, Tailwind CSS,
-  Biome (linting/formatting), pnpm.
+- App scaffolding: TypeScript, Tailwind CSS, Biome (linting/formatting), pnpm.
 - `dashboard/` directory structure: `app/routes/`, `app/lib/`, `app/components/`.
 - `dashboard.yml` configuration file:
   - `source: manual` (explicit repo list, no auto-discovery in v1).

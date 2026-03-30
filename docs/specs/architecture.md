@@ -4,7 +4,7 @@
 
 ## 1. Overview
 
-Quarantine is a developer tool that automatically detects, disables (quarantines), and tracks flaky (non-deterministic) tests in CI pipelines. The system follows a GitHub-native architecture (ADR-011, "Model C"): a Go CLI handles the CI-critical path with no dependencies beyond GitHub, while a separate React Router v7 dashboard provides analytics as a non-critical component. The dashboard pulls data from GitHub on a polling schedule to surface trends and cross-repo analytics.
+Quarantine is a developer tool that automatically detects, disables (quarantines), and tracks flaky (non-deterministic) tests in CI pipelines. The system follows a GitHub-native architecture (ADR-011, "Model C"): a Go CLI handles the CI-critical path with no dependencies beyond GitHub, while a separate web dashboard provides analytics as a non-critical component. The dashboard pulls data from GitHub on a polling schedule to surface trends and cross-repo analytics.
 
 ## 2. System Architecture
 
@@ -52,7 +52,7 @@ For CLI commands, flags, execution flow, and framework-specific behavior, see `d
 
 | Attribute       | Detail                                                                 |
 |-----------------|------------------------------------------------------------------------|
-| Framework       | React Router v7 framework mode (TypeScript) (ADR-005)                  |
+| Framework       | Remix 3 (TypeScript) (ADR-005)                                         |
 | Database        | SQLite (WAL mode)                                                      |
 | Styling         | Tailwind CSS                                                           |
 | Deployment      | Single Docker container [v1]                                           |
@@ -127,7 +127,7 @@ Dashboard SQLite schema will be defined during M6 implementation.
 ```mermaid
 flowchart TD
     subgraph docker["Docker container"]
-        server["React Router v7 server (Node.js)"]
+        server["Node.js server"]
         sqlite["SQLite database (WAL mode, volume-mounted)"]
         poller["Background polling worker"]
     end
