@@ -479,6 +479,6 @@ sequenceDiagram
 | GitHub Branch | The `quarantine/state` branch storing `quarantine.json` |
 | GitHub Issues | GitHub Issues used to track flaky tests |
 | GitHub Actions Cache | Fallback cache for `quarantine.json` in degraded mode |
-| Dashboard | React Router v7 analytics application |
+| Dashboard | Remix 3 analytics application |
 | SQLite | Dashboard's local database (WAL mode) |
 | Poll Timer | Dashboard's scheduled polling worker |

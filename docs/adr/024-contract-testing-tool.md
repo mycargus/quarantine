@@ -5,7 +5,7 @@
 
 ## Context
 
-Quarantine (Go CLI + React dashboard) interacts with GitHub APIs across multiple surfaces: Contents API for state, Issues API for tickets, Artifacts API for results, PR Comments API.
+Quarantine (Go CLI + Remix 3 dashboard) interacts with GitHub APIs across multiple surfaces: Contents API for state, Issues API for tickets, Artifacts API for results, PR Comments API.
 
 Integration tests use dependency injection (e.g., `fetchFn`) to mock HTTP calls, but this creates mock-fidelity risk — the real API could diverge from mocks.
 

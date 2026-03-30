@@ -40,7 +40,7 @@ This document contains v2+ user scenarios. For v1 scenarios, see [`docs/scenario
 
 **Risk:** The dashboard exposes test result data and repository information to unauthorized users.
 
-**Given** the React Router v7 dashboard is deployed and configured with GitHub OAuth credentials (client ID and secret), and a developer has a GitHub account that belongs to an organization with Quarantine installed
+**Given** the dashboard is deployed and configured with GitHub OAuth credentials (client ID and secret), and a developer has a GitHub account that belongs to an organization with Quarantine installed
 **When** the developer clicks "Sign in with GitHub" on the dashboard login page
 **Then** the dashboard redirects to GitHub's OAuth authorization page, the developer authorizes the app, GitHub redirects back to the dashboard with an auth code, the dashboard exchanges the code for an access token, creates a session for the user, and displays the org-level overview filtered to repos the user has access to
 

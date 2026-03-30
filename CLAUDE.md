@@ -28,7 +28,7 @@ See `docs/specs/architecture.md` for full design. See `cli/CLAUDE.md` and `dashb
 
 - **Model C (ADR-011):** GitHub-native CLI + standalone dashboard. CI path depends only on GitHub.
 - **CLI (Go):** Wraps test commands, parses JUnit XML, retries failures, manages quarantine state on `quarantine/state` branch, creates Issues, posts PR comments, uploads Artifacts.
-- **Dashboard (React Router v7 + SQLite):** Pulls from GitHub Artifacts. Read-only analytics.
+- **Dashboard (Remix 3 + SQLite):** Pulls from GitHub Artifacts. Read-only analytics.
 - **No SaaS in the CI path.** CLI never talks to the dashboard.
 
 ## Key Design Principles
