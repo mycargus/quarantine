@@ -171,4 +171,18 @@ describe("quarantine init — E2E against real GitHub", () => {
       expected: "object",
     })
   })
+
+  // Drift detection: the init command calls GET /repos/{owner}/{repo} and reads
+  // default_branch to determine which SHA to branch from. If this field is
+  // renamed or removed, init would silently fail or branch from the wrong ref.
+  test("GET /repos/{owner}/{repo} includes default_branch as a string", async () => {
+    const res = await ghRequest("GET", "")
+    const body = await res.json()
+    assert({
+      given: "GET /repos/{owner}/{repo} against the real GitHub API",
+      should: "return default_branch as a string",
+      actual: typeof body.default_branch,
+      expected: "string",
+    })
+  })
 })
