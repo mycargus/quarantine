@@ -71,3 +71,10 @@ PRISM_URL="${PRISM_URL}" go test -tags contract -count=1 ./...
 echo "[contract] Running JS contract tests..."
 cd "${REPO_ROOT}/test"
 PRISM_URL="${PRISM_URL}" pnpm run test:contract
+
+# ── Summary ──────────────────────────────────────────────────────────────────
+echo ""
+echo "[contract] ✓ All contract tests passed."
+echo "[contract]   Vendored spec : schemas/github-api.json"
+echo "[contract]   Go tests      : cli/internal/github/*_contract_test.go"
+echo "[contract]   JS tests      : test/contract/*.test.js"
