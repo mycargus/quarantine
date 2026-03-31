@@ -199,3 +199,115 @@ describe("test-result.schema.json — negative regression", () => {
     })
   })
 })
+
+// --- quarantine-state.schema.json ---
+
+// Minimal valid quarantine-state entry (no issue fields — pre-issue-creation).
+function validEntry(overrides = {}) {
+  return {
+    test_id: "src/auth.test.ts::AuthService::logs in",
+    file_path: "src/auth.test.ts",
+    classname: "AuthService",
+    name: "logs in",
+    suite: "AuthService",
+    first_flaky_at: "2026-01-01T00:00:00Z",
+    last_flaky_at: "2026-01-01T00:00:00Z",
+    flaky_count: 1,
+    quarantined_at: "2026-01-01T00:00:00Z",
+    quarantined_by: "cli-auto",
+    ...overrides,
+  }
+}
+
+function validStateDoc(testEntries = {}) {
+  return {
+    version: 1,
+    updated_at: "2026-01-01T00:00:00Z",
+    tests: testEntries,
+  }
+}
+
+describe("quarantine-state.schema.json — negative regression", () => {
+  const schema = loadSchema("quarantine-state.schema.json")
+  const ajv = buildAjv()
+  const validate = ajv.compile(schema)
+
+  function rejectsState(doc) {
+    return !validate(doc)
+  }
+
+  function acceptsState(doc) {
+    return validate(doc)
+  }
+
+  test("valid state with no entries is accepted", () => {
+    assert({
+      given: "a quarantine-state with an empty tests map",
+      should: "pass schema validation",
+      actual: acceptsState(validStateDoc()),
+      expected: true,
+    })
+  })
+
+  test("valid entry without issue fields is accepted (Scenario 66)", () => {
+    assert({
+      given: "a quarantine-state entry with no issue_number or issue_url (pre-issue-creation)",
+      should:
+        "pass schema validation (dependentRequired — neither field is independently required)",
+      actual: acceptsState(
+        validStateDoc({ "src/auth.test.ts::AuthService::logs in": validEntry() }),
+      ),
+      expected: true,
+    })
+  })
+
+  test("entry with issue_number but no issue_url is rejected (dependentRequired)", () => {
+    assert({
+      given: "a quarantine-state entry with issue_number but no issue_url",
+      should: "fail schema validation (dependentRequired: issue_number requires issue_url)",
+      actual: rejectsState(
+        validStateDoc({
+          "src/auth.test.ts::AuthService::logs in": validEntry({ issue_number: 42 }),
+        }),
+      ),
+      expected: true,
+    })
+  })
+
+  test("entry with issue_url but no issue_number is rejected (dependentRequired)", () => {
+    assert({
+      given: "a quarantine-state entry with issue_url but no issue_number",
+      should: "fail schema validation (dependentRequired: issue_url requires issue_number)",
+      actual: rejectsState(
+        validStateDoc({
+          "src/auth.test.ts::AuthService::logs in": validEntry({
+            issue_url: "https://github.com/owner/repo/issues/42",
+          }),
+        }),
+      ),
+      expected: true,
+    })
+  })
+
+  test("missing required field 'version' is rejected", () => {
+    const doc = validStateDoc()
+    delete doc.version
+    assert({
+      given: "a quarantine-state missing 'version'",
+      should: "fail schema validation",
+      actual: rejectsState(doc),
+      expected: true,
+    })
+  })
+
+  test("missing required field 'tests' is rejected", () => {
+    const doc = validStateDoc()
+    delete doc.tests
+    assert({
+      given: "a quarantine-state missing 'tests'",
+      should: "fail schema validation",
+      actual: rejectsState(doc),
+      expected: true,
+    })
+  })
+})
