@@ -3,7 +3,7 @@ name: implement-milestone
 description: Implement a predefined milestone using TDD, testify validation, and atomic commits. Use when the user asks to implement, continue, or work on a milestone.
 model: opus
 effort: max
-disable-model-invocation: true
+disable-model-invocation: false
 user-invocable: true
 argument-hint: "<milestone-number> [--from <scenario-number>]"
 allowed-tools: Read, Grep, Glob, Bash, Edit, Write, Agent, Skill
