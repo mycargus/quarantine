@@ -57,6 +57,7 @@ done
 
 export PRISM_URL="http://127.0.0.1:${PORT}"
 echo "[contract] Prism listening on ${PRISM_URL}"
+echo "[contract] Note: 'unknown format' warnings from Prism are expected — it skips format constraints (date-time, uri) but still validates types and required fields."
 
 # ── Run Go contract tests ────────────────────────────────────────────────────
 echo "[contract] Running Go contract tests..."
