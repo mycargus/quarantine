@@ -135,7 +135,19 @@ A scenario does NOT need a new test if every interaction is already covered.
 
 #### 4d. Add tests
 
-For **contract test** gaps, invoke `/create-contract-test <description>` to follow the project's contract test conventions (Prism setup, vendored specs, shape assertions).
+Contract tests are split by consumer:
+
+- **CLI API interactions (Go):** Add `*_contract_test.go` files in
+  `cli/internal/github/` with `//go:build contract`. Use the helpers from
+  `cli/internal/github/contract_test.go` — `newPrismClient(t)` and
+  `newPrismClientWithPrefer(t, ...)`. These exercise the real Go client against
+  Prism. Deferral is NOT permitted when `schemas/github-api.json` and the
+  Go contract infrastructure already exist.
+
+- **Dashboard API interactions (JS):** Invoke `/create-contract-test <description>`
+  to create a test in `test/contract/`. Read `PRISM_URL` from `process.env` —
+  do NOT spawn your own Prism instance. The shared Prism is started by
+  `scripts/run-contract-tests.sh`.
 
 For **E2E test** gaps, invoke `/create-e2e-test <description>` to follow the project's E2E conventions (provider-specific helpers, credential guards, assertion style, cleanup).
 

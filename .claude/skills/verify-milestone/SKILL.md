@@ -31,13 +31,15 @@ Read the manifest's Verification section for the exact build commands. If not sp
 - **CLI milestones:** `make cli-build && make cli-test && make cli-lint`
 - **Dashboard milestones:** `cd dashboard && pnpm build && pnpm test && pnpm lint`
 
-### 3. Run build/test/lint
+### 3. Run build/test/lint/contract
 
 Run the build commands from Step 2. Capture output.
 
 If ANY command fails, report the failure and STOP. Do not proceed to audit steps — there is no point auditing code that does not compile or pass tests.
 
 Record test count from test output if available.
+
+Also run `make contract-test` to verify Prism contract tests pass. Contract test failures are non-waivable FAIL — they cannot be dismissed as "project-wide" issues if the infrastructure (`schemas/github-api.json` and `scripts/run-contract-tests.sh`) exists.
 
 ### 4. Check acceptance criteria
 
@@ -120,6 +122,8 @@ List which interactions from 7a they already exercise. "No E2E infrastructure ex
 #### 7c. Identify gaps
 
 For each interaction from 7a not covered by an existing test, report it as a gap. Specify whether the gap needs a contract test or an E2E test. Group related gaps (e.g., "Scenarios 27 and 49 both destructure artifacts response — needs contract test").
+
+**Contract test gaps are a non-waivable FAIL** if `schemas/github-api.json` exists and the endpoint is covered in the spec. You cannot dismiss them as "planned" or "project-wide". The Prism infrastructure already exists — add the test.
 
 Mark as PASS if all interactions are covered, or FAIL with the list of uncovered interactions.
 

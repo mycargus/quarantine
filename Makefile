@@ -34,7 +34,7 @@ test-build:
 	cd test && pnpm install
 
 contract-test:
-	cd test && pnpm run test:contract
+	@./scripts/run-contract-tests.sh
 
 contract-lint:
 	cd test && pnpm run lint:contract

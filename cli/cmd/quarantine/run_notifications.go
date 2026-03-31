@@ -15,6 +15,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// PRCommentMarker is the HTML comment that marks a quarantine-bot PR comment.
+// It MUST be the first line of every comment body for update-vs-create detection.
+// Changing this value breaks update detection for all existing bot comments.
+const PRCommentMarker = "<!-- quarantine-bot -->"
+
+// IssueTitlePrefix is the prefix prepended to every flaky-test issue title.
+// Changing this breaks dedup label-based search (issues created with the old
+// prefix won't be recognised by the new search query).
+const IssueTitlePrefix = "[Quarantine] "
+
+// IssueLabelBase is the base label applied to every quarantine issue.
+// Changing this breaks the dedup search query.
+const IssueLabelBase = "quarantine"
+
+// IssueLabelPrefix is the prefix for the hash label on every quarantine issue.
+// Changing this breaks the dedup search query.
+const IssueLabelPrefix = "quarantine:"
+
+// DedupHashLength is the number of hex characters in the dedup hash label.
+// The hash is the first DedupHashLength hex chars of SHA-256(test_id).
+// Changing this breaks dedup: issues created with the old length won't be found.
+const DedupHashLength = 8
+
 // testHash returns the first 8 hex characters of the SHA-256 hash of testID.
 // This is a pure function — no I/O, deterministic.
 func testHash(testID string) string {
@@ -153,7 +176,7 @@ type PRCommentData struct {
 func renderPRComment(data PRCommentData) string {
 	var sb strings.Builder
 
-	sb.WriteString("<!-- quarantine-bot -->\n")
+	sb.WriteString(PRCommentMarker + "\n")
 	sb.WriteString("## Quarantine Summary\n\n")
 
 	sb.WriteString("| Metric | Count |\n")
@@ -238,9 +261,8 @@ func postOrUpdatePRComment(ctx context.Context, cmd *cobra.Command, client *gh.C
 		// Fall through to create a new comment.
 	}
 
-	const marker = "<!-- quarantine-bot -->"
 	for _, c := range comments {
-		if strings.HasPrefix(c.Body, marker) {
+		if strings.HasPrefix(c.Body, PRCommentMarker) {
 			// Found existing comment — update it.
 			if updateErr := client.UpdatePRComment(ctx, c.ID, body); updateErr != nil {
 				cmd.PrintErrf("[quarantine] WARNING: Could not update PR comment: %v\n", updateErr)
@@ -298,7 +320,7 @@ func createIssuesForNewFlakyTests(
 		}
 
 		// Create a new issue.
-		title := fmt.Sprintf("[Quarantine] %s", t.Name)
+		title := IssueTitlePrefix + t.Name
 		fm := ""
 		if t.FailureMessage != nil {
 			fm = *t.FailureMessage
@@ -314,7 +336,7 @@ func createIssuesForNewFlakyTests(
 			FailureMessage: fm,
 			Retries:        t.Retries,
 		})
-		labels := []string{"quarantine", fmt.Sprintf("quarantine:%s", hash)}
+		labels := []string{IssueLabelBase, IssueLabelPrefix + hash}
 
 		issueNum, issueURL, createErr := client.CreateIssue(ctx, title, body, labels)
 		if createErr != nil {

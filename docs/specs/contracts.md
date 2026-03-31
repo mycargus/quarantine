@@ -31,20 +31,20 @@ sections below for full context on each contract.
 | [`quarantine.json`](#2-quarantinejson-quarantine-state) | Explicit | `quarantine/state` branch via Contents API | JSON | CLI | CLI | Active quarantine state: which tests are quarantined, associated issues | Go unit tests (`state_test.go`, `state_merge_test.go`); not validated against JSON schema |
 | [`results.json`](#3-resultsjson) | Explicit | Local, then GitHub Artifact | JSON | CLI | Dashboard | Test run results: statuses, retries, flaky detection, summary | Go unit tests (`result_test.go`); dashboard validates against schema at runtime via ajv |
 | [JUnit XML](#4-junit-xml) | Implicit | Local (e.g. `junit.xml`) | XML | Test runner (Jest, RSpec, Vitest) | CLI parser | Raw test results from the framework | Go unit tests (`parser_*_test.go`) with XML fixtures in `testdata/junit-xml/` |
-| [Contents API](#5-contents-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Read/write `quarantine.json` on state branch via CAS | Prism contract tests planned; no test files yet |
-| [Issues API](#6-issues-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Create GitHub Issues for flaky tests (HTTP shape; see [Issue creation](#13-issue-creation) for content conventions) | Prism contract tests planned; no test files yet |
-| [Search API](#7-search-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Find existing issues to avoid duplicates (HTTP shape; see [Issue dedup labels](#14-issue-dedup-labels) for label conventions) | Prism contract tests planned; no test files yet |
-| [Comments API](#8-comments-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Post and update PR comments (HTTP shape; see [PR comment format](#12-pr-comment-format) for content conventions) | Prism contract tests planned; no test files yet |
-| [Refs API](#9-refs-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Check/create `quarantine/state` branch | Prism contract tests planned; no test files yet |
-| [Repository API](#10-repository-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Verify repo exists and token has access | Prism contract tests planned; no test files yet |
-| [Artifacts API](#11-artifacts-api) | Explicit | GitHub API | REST / JSON | GitHub | Dashboard | List and download test result artifacts | Prism contract tests planned; no test files yet |
-| [PR comment format](#12-pr-comment-format) | Implicit | GitHub PR via Comments API | Markdown with `<!-- quarantine-bot -->` marker | CLI | Humans, CLI (update detection) | Content convention for PR comments (built on [Comments API](#8-comments-api)) | Not tested |
-| [Issue creation](#13-issue-creation) | Implicit | GitHub Issues API | Markdown body + label array | CLI | Humans, CLI (dedup search) | Content convention for flaky test issues (built on [Issues API](#6-issues-api)) | Not tested |
-| [Issue dedup labels](#14-issue-dedup-labels) | Implicit | GitHub Issues + Search API | `["quarantine", "quarantine:{hash}"]` | CLI | CLI (search) | Label convention for deduplication (built on [Search API](#7-search-api)) | Dedup logic tested (`run_issues_dedup_test.go`); label format not tested |
+| [Contents API](#5-contents-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Read/write `quarantine.json` on state branch via CAS | Go Prism contract tests (`contents_contract_test.go`) |
+| [Issues API](#6-issues-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Create GitHub Issues for flaky tests (HTTP shape; see [Issue creation](#13-issue-creation) for content conventions) | Go Prism contract tests (`issues_contract_test.go`) |
+| [Search API](#7-search-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Find existing issues to avoid duplicates (HTTP shape; see [Issue dedup labels](#14-issue-dedup-labels) for label conventions) | Go Prism contract tests (`search_contract_test.go`) |
+| [Comments API](#8-comments-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Post and update PR comments (HTTP shape; see [PR comment format](#12-pr-comment-format) for content conventions) | Go Prism contract tests (`comments_contract_test.go`) |
+| [Refs API](#9-refs-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Check/create `quarantine/state` branch | Go Prism contract tests (`refs_contract_test.go`) |
+| [Repository API](#10-repository-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Verify repo exists and token has access | Go Prism contract tests (`repos_contract_test.go`) |
+| [Artifacts API](#11-artifacts-api) | Explicit | GitHub API | REST / JSON | GitHub | Dashboard | List and download test result artifacts | JS Prism contract tests (`github-artifacts.test.js`) |
+| [PR comment format](#12-pr-comment-format) | Implicit | GitHub PR via Comments API | Markdown with `<!-- quarantine-bot -->` marker | CLI | Humans, CLI (update detection) | Content convention for PR comments (built on [Comments API](#8-comments-api)) | `PRCommentMarker` constant in `run_notifications.go`; `TestContractPRCommentMarker*` in `contract_test.go` |
+| [Issue creation](#13-issue-creation) | Implicit | GitHub Issues API | Markdown body + label array | CLI | Humans, CLI (dedup search) | Content convention for flaky test issues (built on [Issues API](#6-issues-api)) | `IssueTitlePrefix` constant in `run_notifications.go`; `TestContractIssueTitleFormat` in `contract_test.go` |
+| [Issue dedup labels](#14-issue-dedup-labels) | Implicit | GitHub Issues + Search API | `["quarantine", "quarantine:{hash}"]` | CLI | CLI (search) | Label convention for deduplication (built on [Search API](#7-search-api)) | `IssueLabelBase`, `IssueLabelPrefix` constants in `run_notifications.go`; `TestContractIssueLabelArrayStructure`, `TestContractDedupHash*` in `contract_test.go` |
 | [Test ID format](#15-test-id-format) | Implicit | `parser.go` | `file_path::classname::name` string | CLI parser | State (map key), issues (hash input), results (display) | Stable test identity across runs for quarantine lookup and issue dedup | Parser tests assert construction; no cross-component test |
 | [Artifact naming](#16-artifact-naming-convention) | Implicit | CI workflow YAML, `github.server.ts` | `quarantine-results-{run_id}` name prefix | CI workflow (`actions/upload-artifact`) | Dashboard (`filterArtifactsByPrefix()`) | Dashboard identifies which artifacts contain quarantine results | Not tested |
 | [CLI exit codes](#17-cli-exit-codes) | Implicit | `run.go` | Integer: 0=pass, 1=failures, 2=infra error | CLI | CI pipeline, scripts, users | CI determines build pass/fail from exit code | Extensively tested (`run_*_test.go`) |
-| [Rate limit headers](#18-rate-limit-headers) | Implicit | `init_ops.go` | `X-RateLimit-Remaining` / `X-RateLimit-Limit` response headers | GitHub API | CLI | Warn before rate limit exhaustion | Not tested |
+| [Rate limit headers](#18-rate-limit-headers) | Implicit | `init_ops.go` | `X-RateLimit-Remaining` / `X-RateLimit-Limit` response headers | GitHub API | CLI | Warn before rate limit exhaustion | 9 tests in `ratelimit_test.go` covering: below/above/exact threshold, missing headers, one header missing, limit=0, reset time formatting |
 
 ## Schemas
 
@@ -56,7 +56,7 @@ and consumers — they define the expected shape that both sides agree on.
 | `test-result.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `results.json` | Dashboard runtime (ajv); Go marshal test (planned, ADR-025); negative regression test (planned, ADR-025) | Dashboard validates at runtime; Go marshal validation planned |
 | `quarantine-state.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `quarantine.json` | Negative regression test (planned, ADR-025) | Single-component; `issue_number`/`issue_url` to be made optional (ADR-025) |
 | `quarantine-config.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `quarantine.yml` | Negative regression test (planned, ADR-025) | Documentation artifact; CLI validates via Go code, not schema |
-| `github-api-artifacts.json` | `schemas/` | OpenAPI 3.x | GitHub Artifacts API responses | Prism contract tests (planned) | Not validated yet; `test/contract/` has no test files |
+| `github-api.json` | `schemas/` | OpenAPI 3.x | All GitHub API endpoints used by CLI and dashboard (Contents, Issues, Search, Comments, Refs, Repository, Artifacts) | Prism contract tests (`make contract-test`) | Go: `*_contract_test.go` in `cli/internal/github/`; JS: `test/contract/github-artifacts.test.js` |
 
 ## Contract Details
 
@@ -210,9 +210,11 @@ detecting flaky tests.
 - 409: concurrent write conflict; CLI retries with fresh SHA
 - 422: file exceeds 1MB size limit
 
-**Current validation:** Prism contract tests planned; no test files yet.
-Scenarios 64–65 cover base64 decoding and branch-not-found detection edge
-cases (not yet tested).
+**Current validation:** Go Prism contract tests in
+`cli/internal/github/contents_contract_test.go` (`//go:build contract`).
+Covers GET 200, GET 404 branch-not-found (returns `BranchNotFoundError`),
+GET 404 file-not-found (returns empty state), PUT 200, PUT 409, PUT 422.
+Run via `make contract-test`.
 
 ---
 
@@ -247,7 +249,10 @@ the Search API.
 **Error handling:**
 - 410 Gone: GitHub Issues disabled on the repo
 
-**Current validation:** Prism contract tests planned; no test files yet.
+**Current validation:** Go Prism contract tests in
+`cli/internal/github/issues_contract_test.go` (`//go:build contract`).
+Covers POST 201 (parses `number`, `html_url`), POST 410 (Issues disabled).
+Run via `make contract-test`.
 
 ---
 
@@ -282,7 +287,11 @@ duplicates. The search uses label-based queries against the GitHub Search API.
 - Dedup logic requires `total_count > 0` AND `items` non-empty
 
 **Current validation:** Mutation tests cover `total_count > 0` condition
-(`issues_test.go`). Prism contract tests planned; no test files yet.
+(`issues_test.go`). Go Prism contract tests in
+`cli/internal/github/search_contract_test.go` (`//go:build contract`).
+Covers GET 200 for both `SearchClosedIssues` (parses `total_count`, `items[].number`)
+and `SearchOpenIssue` (parses `total_count`, `items[].number`, `items[].html_url`);
+pagination params accepted by Prism. Run via `make contract-test`.
 
 ---
 
@@ -310,7 +319,10 @@ runs. Uses the GitHub Issues/Comments API (PRs are issues in GitHub's model).
 - `body`: comment body (scanned for marker; see [PR comment format](#12-pr-comment-format)
   for content conventions)
 
-**Current validation:** Prism contract tests planned; no test files yet.
+**Current validation:** Go Prism contract tests in
+`cli/internal/github/comments_contract_test.go` (`//go:build contract`).
+Covers GET 200 (parses array of `{id, body}`), POST 201, PATCH 200.
+Run via `make contract-test`.
 
 ---
 
@@ -342,7 +354,11 @@ and create it during `quarantine init`.
 **Error handling:**
 - 404: branch doesn't exist (returns `exists=false`, not an error)
 
-**Current validation:** Prism contract tests planned; no test files yet.
+**Current validation:** Go Prism contract tests in
+`cli/internal/github/refs_contract_test.go` (`//go:build contract`).
+Covers GET 200 (parses `ref`, `object.sha`, returns `exists=true`),
+GET 404 (returns `exists=false`, no error), POST 201.
+Run via `make contract-test`.
 
 ---
 
@@ -372,7 +388,10 @@ permissions during `quarantine init`.
 - 403 Forbidden: token lacks permission
 - 404 Not Found: repo doesn't exist
 
-**Current validation:** Prism contract tests planned; no test files yet.
+**Current validation:** Go Prism contract tests in
+`cli/internal/github/repos_contract_test.go` (`//go:build contract`).
+Covers GET 200 (parses `id`, `full_name`, `default_branch`, `private`),
+GET 403, GET 404. Run via `make contract-test`.
 
 ---
 
@@ -409,8 +428,11 @@ runs. This is the only GitHub API the dashboard uses.
 - ZIP extraction: dashboard extracts the first JSON file from the ZIP
 - Pagination: not implemented; only first 100 artifacts are fetched
 
-**Current validation:** Vendored spec exists (`schemas/github-api-artifacts.json`).
-Prism contract tests planned; no test files yet.
+**Current validation:** JS Prism contract tests in
+`test/contract/github-artifacts.test.js`. Covers GET 200 (parses `total_count`,
+`artifacts[]` with `id`, `name`, `archive_download_url`, `created_at`,
+`expires_at`), GET 302 (download, checks `Location` header), GET 410 (expired).
+Vendored spec: `schemas/github-api.json`. Run via `make contract-test`.
 
 ---
 
@@ -438,8 +460,13 @@ is enabled and the run is associated with a PR.
   failed tests, footer with CLI version
 - Update replaces the entire comment body (not append)
 
-**Current validation:** None. No test verifies the marker is present, the
-comment format, or the update-vs-create logic.
+**Current validation:** `PRCommentMarker` constant in
+`cli/cmd/quarantine/run_notifications.go` makes the value grep-able and
+change-resistant. `TestContractPRCommentMarkerValue`,
+`TestContractPRCommentMarkerIsFirstLine`, and
+`TestContractPRCommentMarkerDetectsExistingComment` in
+`cli/cmd/quarantine/contract_test.go` guard the marker value and usage.
+Update-vs-create logic is tested end-to-end in `run_pr_comment_sections_test.go`.
 
 ---
 
@@ -468,8 +495,11 @@ the Search API.
 - 410 Gone handling: if Issues are disabled on the repo, CLI warns and
   continues
 
-**Current validation:** Not tested. No test asserts the issue title format,
-body structure, or label array.
+**Current validation:** `IssueTitlePrefix` constant in
+`cli/cmd/quarantine/run_notifications.go`. `TestContractIssueTitleFormat` in
+`cli/cmd/quarantine/contract_test.go` guards the prefix value.
+Issue body structure tested in `run_notifications_test.go`.
+410-handling tested end-to-end in integration tests.
 
 ---
 
@@ -500,8 +530,12 @@ before creating a new one.
   duplicates
 
 **Current validation:**
-- Dedup logic tested in `run_issues_dedup_test.go`
-- Label structure itself not validated (no test asserts the exact label format)
+- Dedup logic tested in `run_issues_dedup_test.go`.
+- `IssueLabelBase`, `IssueLabelPrefix`, `DedupHashLength` constants in
+  `cli/cmd/quarantine/run_notifications.go` make label structure grep-able.
+- `TestContractIssueLabelArrayStructure`, `TestContractDedupHashIsEightHexChars`,
+  and `TestContractDedupHashIsDeterministic` in
+  `cli/cmd/quarantine/contract_test.go` guard label format and hash properties.
 
 ---
 
@@ -610,8 +644,9 @@ response.
 - Warning emitted if `remaining * 10 < limit` (under 10% remaining)
 - If GitHub changes header names or semantics, warnings stop working silently
 
-**Current validation:** None for header parsing. Rate limit design documented
-in architecture.
+**Current validation:** 9 tests in `cli/internal/github/ratelimit_test.go`
+covering: below/above/exact threshold, missing headers, one header missing,
+limit=0, reset time formatting.
 
 ---
 

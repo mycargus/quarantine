@@ -1,0 +1,1260 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "GitHub REST API - Quarantine subset",
+    "description": "Minimal extract of the GitHub REST API covering all endpoints used by the quarantine CLI and dashboard. Curated manually from the github/rest-api-description repository.",
+    "version": "1.0.0",
+    "x-source-commit": "https://github.com/github/rest-api-description — update this field with the specific commit SHA when refreshing endpoints from the official spec",
+    "license": {
+      "name": "MIT",
+      "url": "https://spdx.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.github.com"
+    }
+  ],
+  "paths": {
+    "/repos/{owner}/{repo}": {
+      "get": {
+        "summary": "Get a repository",
+        "description": "Gets repository metadata. Used by quarantine init to verify the repo exists and the token has access.",
+        "tags": ["repos"],
+        "operationId": "repos/get",
+        "parameters": [
+          { "$ref": "#/components/parameters/owner" },
+          { "$ref": "#/components/parameters/repo" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/repository" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/repository" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/repository" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/repository" }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/git/ref/heads/{ref}": {
+      "get": {
+        "summary": "Get a reference",
+        "description": "Returns a single reference from the git data. Used to check whether the quarantine/state branch exists.",
+        "tags": ["git"],
+        "operationId": "git/get-ref",
+        "parameters": [
+          { "$ref": "#/components/parameters/owner" },
+          { "$ref": "#/components/parameters/repo" },
+          {
+            "name": "ref",
+            "description": "The git reference. For example, heads/feature-a, tags/v1.",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/git-ref" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/git-ref" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/git-ref" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/git-ref" }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/git/refs": {
+      "post": {
+        "summary": "Create a reference",
+        "description": "Creates a new reference (branch) from a SHA. Used by quarantine init to create the quarantine/state branch.",
+        "tags": ["git"],
+        "operationId": "git/create-ref",
+        "parameters": [
+          { "$ref": "#/components/parameters/owner" },
+          { "$ref": "#/components/parameters/repo" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["ref", "sha"],
+                "properties": {
+                  "ref": {
+                    "type": "string",
+                    "description": "The name of the fully qualified reference (e.g., refs/heads/main). Must start with refs/"
+                  },
+                  "sha": {
+                    "type": "string",
+                    "description": "The SHA1 value for this reference."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/git-ref" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/git-ref" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/git-ref" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/git-ref" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/contents/{path}": {
+      "get": {
+        "summary": "Get repository content",
+        "description": "Gets the contents of a file or directory in a repository. Used to read quarantine.json from the quarantine/state branch.",
+        "tags": ["repos"],
+        "operationId": "repos/get-content",
+        "parameters": [
+          { "$ref": "#/components/parameters/owner" },
+          { "$ref": "#/components/parameters/repo" },
+          {
+            "name": "path",
+            "description": "path parameter",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ref",
+            "description": "The name of the commit/branch/tag.",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/content-file" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/content-file" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/content-file" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/content-file" }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found — either the branch does not exist (message contains 'No commit found for the ref') or the file does not exist on the branch.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/basic-error" },
+                "examples": {
+                  "branch-not-found": {
+                    "summary": "Branch does not exist",
+                    "value": {
+                      "message": "No commit found for the ref quarantine/state",
+                      "documentation_url": "https://docs.github.com/rest/repos/contents#get-repository-content",
+                      "status": "404"
+                    }
+                  },
+                  "file-not-found": {
+                    "summary": "File does not exist on branch",
+                    "value": {
+                      "message": "Not Found",
+                      "documentation_url": "https://docs.github.com/rest/repos/contents#get-repository-content",
+                      "status": "404"
+                    }
+                  }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/basic-error" },
+                "examples": {
+                  "branch-not-found": {
+                    "summary": "Branch does not exist",
+                    "value": {
+                      "message": "No commit found for the ref quarantine/state",
+                      "documentation_url": "https://docs.github.com/rest/repos/contents#get-repository-content",
+                      "status": "404"
+                    }
+                  },
+                  "file-not-found": {
+                    "summary": "File does not exist on branch",
+                    "value": {
+                      "message": "Not Found",
+                      "documentation_url": "https://docs.github.com/rest/repos/contents#get-repository-content",
+                      "status": "404"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Create or update file contents",
+        "description": "Creates or updates a file. Used to write quarantine.json via compare-and-swap.",
+        "tags": ["repos"],
+        "operationId": "repos/create-or-update-file-contents",
+        "parameters": [
+          { "$ref": "#/components/parameters/owner" },
+          { "$ref": "#/components/parameters/repo" },
+          {
+            "name": "path",
+            "description": "path parameter",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["message", "content"],
+                "properties": {
+                  "message": { "type": "string", "description": "The commit message." },
+                  "content": { "type": "string", "description": "The new file content, using Base64 encoding." },
+                  "sha": { "type": "string", "description": "Required if updating a file. The blob SHA of the file being replaced." },
+                  "branch": { "type": "string", "description": "The branch name." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Response — file updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/file-commit" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/file-commit" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/file-commit" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/file-commit" }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Response — file created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/file-commit" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/file-commit" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/file-commit" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/file-commit" }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict — SHA mismatch (CAS failure). Retry with a fresh SHA.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/basic-error" },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "message": "sha does not match",
+                      "documentation_url": "https://docs.github.com/rest/repos/contents",
+                      "status": "409"
+                    }
+                  }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/basic-error" },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "message": "sha does not match",
+                      "documentation_url": "https://docs.github.com/rest/repos/contents",
+                      "status": "409"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed — file exceeds 1MB or other validation error.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/validation-error" },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "message": "Validation Failed",
+                      "errors": [
+                        {
+                          "resource": "Blob",
+                          "field": "content",
+                          "code": "too_large"
+                        }
+                      ],
+                      "documentation_url": "https://docs.github.com/rest/repos/contents"
+                    }
+                  }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/validation-error" },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "message": "Validation Failed",
+                      "errors": [
+                        {
+                          "resource": "Blob",
+                          "field": "content",
+                          "code": "too_large"
+                        }
+                      ],
+                      "documentation_url": "https://docs.github.com/rest/repos/contents"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search/issues": {
+      "get": {
+        "summary": "Search issues and pull requests",
+        "description": "Find issues by state and keyword. Used for dedup (finding open issues) and unquarantine (finding closed issues).",
+        "tags": ["search"],
+        "operationId": "search/issues-and-pull-requests",
+        "parameters": [
+          {
+            "name": "q",
+            "description": "The query contains one or more search keywords and qualifiers.",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["comments", "reactions", "reactions-+1", "reactions--1", "reactions-smile", "reactions-thinking_face", "reactions-heart", "reactions-tada", "interactions", "created", "updated"] }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["desc", "asc"] }
+          },
+          { "$ref": "#/components/parameters/per-page" },
+          { "$ref": "#/components/parameters/page" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/issue-search-result" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/issue-search-result" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/issue-search-result" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/issue-search-result" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/issues": {
+      "post": {
+        "summary": "Create an issue",
+        "description": "Creates a GitHub issue for a flaky test. Returns the issue number and URL.",
+        "tags": ["issues"],
+        "operationId": "issues/create",
+        "parameters": [
+          { "$ref": "#/components/parameters/owner" },
+          { "$ref": "#/components/parameters/repo" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title"],
+                "properties": {
+                  "title": { "oneOf": [{ "type": "string" }, { "type": "integer" }], "description": "The title of the issue." },
+                  "body": { "type": "string", "description": "The contents of the issue." },
+                  "assignee": { "type": "string", "nullable": true, "description": "Login for the user that this issue should be assigned to." },
+                  "milestone": { "nullable": true, "description": "The number of the milestone to associate this issue with." },
+                  "labels": {
+                    "type": "array",
+                    "description": "Labels to associate with this issue.",
+                    "items": { "oneOf": [{ "type": "string" }, { "type": "object" }] }
+                  },
+                  "assignees": {
+                    "type": "array",
+                    "description": "Logins for Users to assign to this issue.",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/issue" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/issue" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/issue" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/issue" }
+                }
+              }
+            }
+          },
+          "410": {
+            "$ref": "#/components/responses/gone"
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/issues/{issue_number}/comments": {
+      "get": {
+        "summary": "List issue comments",
+        "description": "You can use the REST API to list comments on issues and pull requests. Used to find an existing quarantine-bot PR comment for update-vs-create logic.",
+        "tags": ["issues"],
+        "operationId": "issues/list-comments",
+        "parameters": [
+          { "$ref": "#/components/parameters/owner" },
+          { "$ref": "#/components/parameters/repo" },
+          {
+            "name": "issue_number",
+            "description": "The number that identifies the issue.",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          { "$ref": "#/components/parameters/per-page" },
+          { "$ref": "#/components/parameters/page" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/issue-comment" }
+                },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/issue-comments" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/issue-comment" }
+                },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/issue-comments" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create an issue comment",
+        "description": "Creates a new comment on an issue or pull request. Used to post the quarantine-bot summary comment.",
+        "tags": ["issues"],
+        "operationId": "issues/create-comment",
+        "parameters": [
+          { "$ref": "#/components/parameters/owner" },
+          { "$ref": "#/components/parameters/repo" },
+          {
+            "name": "issue_number",
+            "description": "The number that identifies the issue.",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["body"],
+                "properties": {
+                  "body": { "type": "string", "description": "The contents of the comment." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/issue-comment" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/issue-comment" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/issue-comment" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/issue-comment" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/issues/comments/{comment_id}": {
+      "patch": {
+        "summary": "Update an issue comment",
+        "description": "You can use the REST API to update comments on issues and pull requests. Used to update the quarantine-bot PR comment on subsequent runs.",
+        "tags": ["issues"],
+        "operationId": "issues/update-comment",
+        "parameters": [
+          { "$ref": "#/components/parameters/owner" },
+          { "$ref": "#/components/parameters/repo" },
+          {
+            "name": "comment_id",
+            "description": "The unique identifier of the comment.",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["body"],
+                "properties": {
+                  "body": { "type": "string", "description": "The contents of the comment." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/issue-comment" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/issue-comment" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/issue-comment" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/issue-comment" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/actions/artifacts": {
+      "get": {
+        "summary": "List artifacts for a repository",
+        "description": "Lists all artifacts for a repository. Used by the dashboard to find test result artifacts.",
+        "tags": ["actions"],
+        "operationId": "actions/list-artifacts-for-repo",
+        "parameters": [
+          { "$ref": "#/components/parameters/owner" },
+          { "$ref": "#/components/parameters/repo" },
+          { "$ref": "#/components/parameters/per-page" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/artifact-name" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["total_count", "artifacts"],
+                  "properties": {
+                    "total_count": { "type": "integer" },
+                    "artifacts": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/artifact" }
+                    }
+                  }
+                },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/artifact-paginated" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["total_count", "artifacts"],
+                  "properties": {
+                    "total_count": { "type": "integer" },
+                    "artifacts": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/artifact" }
+                    }
+                  }
+                },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/artifact-paginated" }
+                }
+              }
+            },
+            "headers": {
+              "Link": { "$ref": "#/components/headers/link" },
+              "ETag": {
+                "description": "Entity tag for conditional requests.",
+                "schema": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}": {
+      "get": {
+        "summary": "Download an artifact",
+        "description": "Gets a redirect URL to download an archive for a repository. The archive_format must be zip.",
+        "tags": ["actions"],
+        "operationId": "actions/download-artifact",
+        "parameters": [
+          { "$ref": "#/components/parameters/owner" },
+          { "$ref": "#/components/parameters/repo" },
+          { "$ref": "#/components/parameters/artifact-id" },
+          {
+            "name": "archive_format",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Response",
+            "headers": {
+              "Location": { "$ref": "#/components/headers/location" }
+            }
+          },
+          "410": {
+            "$ref": "#/components/responses/gone"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "owner": {
+        "name": "owner",
+        "description": "The account owner of the repository. The name is not case sensitive.",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      "repo": {
+        "name": "repo",
+        "description": "The name of the repository without the .git extension. The name is not case sensitive.",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      "per-page": {
+        "name": "per_page",
+        "description": "The number of results per page (max 100).",
+        "in": "query",
+        "schema": { "type": "integer", "default": 30 }
+      },
+      "page": {
+        "name": "page",
+        "description": "The page number of the results to fetch.",
+        "in": "query",
+        "schema": { "type": "integer", "default": 1 }
+      },
+      "artifact-id": {
+        "name": "artifact_id",
+        "description": "The unique identifier of the artifact.",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "integer" }
+      },
+      "artifact-name": {
+        "name": "name",
+        "description": "The name field of an artifact. When specified, only artifacts with this name will be returned.",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      }
+    },
+    "headers": {
+      "link": {
+        "example": "<https://api.github.com/resource?page=2>; rel=\"next\"",
+        "schema": { "type": "string" }
+      },
+      "location": {
+        "example": "https://pipelines.actions.githubusercontent.com/signedlogcontent",
+        "schema": { "type": "string" }
+      }
+    },
+    "responses": {
+      "forbidden": {
+        "description": "Forbidden",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/basic-error" },
+            "examples": {
+              "default": {
+                "value": {
+                  "message": "Must have admin rights to Repository.",
+                  "documentation_url": "https://docs.github.com/rest/repos/repos#get-a-repository",
+                  "status": "403"
+                }
+              }
+            }
+          },
+          "application/vnd.github+json": {
+            "schema": { "$ref": "#/components/schemas/basic-error" },
+            "examples": {
+              "default": {
+                "value": {
+                  "message": "Must have admin rights to Repository.",
+                  "documentation_url": "https://docs.github.com/rest/repos/repos#get-a-repository",
+                  "status": "403"
+                }
+              }
+            }
+          }
+        }
+      },
+      "not-found": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/basic-error" },
+            "examples": {
+              "default": {
+                "value": {
+                  "message": "Not Found",
+                  "documentation_url": "https://docs.github.com/rest",
+                  "status": "404"
+                }
+              }
+            }
+          },
+          "application/vnd.github+json": {
+            "schema": { "$ref": "#/components/schemas/basic-error" },
+            "examples": {
+              "default": {
+                "value": {
+                  "message": "Not Found",
+                  "documentation_url": "https://docs.github.com/rest",
+                  "status": "404"
+                }
+              }
+            }
+          }
+        }
+      },
+      "gone": {
+        "description": "Gone — resource has been removed (e.g. GitHub Issues are disabled on the repo, or artifact has expired).",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/basic-error" },
+            "examples": {
+              "default": {
+                "value": {
+                  "message": "Gone",
+                  "documentation_url": "https://docs.github.com/rest",
+                  "status": "410"
+                }
+              }
+            }
+          },
+          "application/vnd.github+json": {
+            "schema": { "$ref": "#/components/schemas/basic-error" },
+            "examples": {
+              "default": {
+                "value": {
+                  "message": "Gone",
+                  "documentation_url": "https://docs.github.com/rest",
+                  "status": "410"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "repository": {
+        "title": "Repository",
+        "description": "A GitHub repository.",
+        "type": "object",
+        "required": ["id", "full_name", "default_branch", "private"],
+        "properties": {
+          "id": { "type": "integer", "example": 1296269 },
+          "node_id": { "type": "string", "example": "MDEwOlJlcG9zaXRvcnkxMjk2MjY5" },
+          "name": { "type": "string", "example": "Hello-World" },
+          "full_name": { "type": "string", "example": "octocat/Hello-World" },
+          "private": { "type": "boolean" },
+          "default_branch": { "type": "string", "example": "main" },
+          "description": { "type": "string", "nullable": true }
+        }
+      },
+      "git-ref": {
+        "title": "Git Reference",
+        "description": "Git references within a repository.",
+        "type": "object",
+        "required": ["ref", "object"],
+        "properties": {
+          "ref": { "type": "string", "example": "refs/heads/quarantine/state" },
+          "node_id": { "type": "string" },
+          "url": { "type": "string" },
+          "object": {
+            "type": "object",
+            "required": ["sha", "type", "url"],
+            "properties": {
+              "type": { "type": "string", "example": "commit" },
+              "sha": { "type": "string", "example": "aa218f56b14c9653891f9e74264a383fa43fefbd" },
+              "url": { "type": "string" }
+            }
+          }
+        }
+      },
+      "content-file": {
+        "title": "Content File",
+        "description": "Content File",
+        "type": "object",
+        "required": ["content", "sha"],
+        "properties": {
+          "type": { "type": "string" },
+          "encoding": { "type": "string" },
+          "size": { "type": "integer" },
+          "name": { "type": "string" },
+          "path": { "type": "string" },
+          "content": {
+            "type": "string",
+            "description": "Base64-encoded file content.",
+            "example": "eyJ2ZXJzaW9uIjoxLCJ0ZXN0cyI6e319Cg=="
+          },
+          "sha": {
+            "type": "string",
+            "description": "The blob SHA of the file, required for CAS writes.",
+            "example": "abc123def456abc123def456abc123def456abc1"
+          },
+          "url": { "type": "string" },
+          "git_url": { "type": "string", "nullable": true },
+          "html_url": { "type": "string", "nullable": true },
+          "download_url": { "type": "string", "nullable": true }
+        }
+      },
+      "file-commit": {
+        "title": "File Commit",
+        "description": "File Commit",
+        "type": "object",
+        "properties": {
+          "content": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "path": { "type": "string" },
+              "sha": { "type": "string" }
+            }
+          },
+          "commit": {
+            "type": "object",
+            "properties": {
+              "sha": { "type": "string" },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      },
+      "issue-search-result": {
+        "title": "Issue Search Result Item",
+        "description": "Issue Search Result",
+        "type": "object",
+        "required": ["total_count", "incomplete_results", "items"],
+        "properties": {
+          "total_count": { "type": "integer" },
+          "incomplete_results": { "type": "boolean" },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/issue-search-item" }
+          }
+        }
+      },
+      "issue-search-item": {
+        "title": "Issue Search Item",
+        "type": "object",
+        "required": ["number", "html_url"],
+        "properties": {
+          "number": { "type": "integer", "example": 1 },
+          "html_url": { "type": "string", "example": "https://github.com/octocat/Hello-World/issues/1" },
+          "title": { "type": "string" },
+          "state": { "type": "string" },
+          "body": { "type": "string", "nullable": true },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "issue": {
+        "title": "Issue",
+        "description": "Issues are a great way to keep track of tasks.",
+        "type": "object",
+        "required": ["number", "html_url"],
+        "properties": {
+          "id": { "type": "integer" },
+          "node_id": { "type": "string" },
+          "number": { "type": "integer", "example": 1 },
+          "title": { "type": "string" },
+          "state": { "type": "string" },
+          "html_url": {
+            "type": "string",
+            "example": "https://github.com/octocat/Hello-World/issues/1347"
+          },
+          "body": { "type": "string", "nullable": true },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "issue-comment": {
+        "title": "Issue Comment",
+        "description": "Comments provide a way for people to collaborate on an issue.",
+        "type": "object",
+        "required": ["id", "body"],
+        "properties": {
+          "id": { "type": "integer", "example": 10 },
+          "node_id": { "type": "string" },
+          "url": { "type": "string" },
+          "html_url": { "type": "string" },
+          "body": { "type": "string", "example": "Me too" },
+          "body_text": { "type": "string" },
+          "body_html": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "artifact": {
+        "title": "Artifact",
+        "description": "An artifact",
+        "type": "object",
+        "required": ["id", "node_id", "name", "size_in_bytes", "url", "archive_download_url", "expired", "created_at", "expires_at", "updated_at"],
+        "properties": {
+          "id": { "type": "integer", "example": 5 },
+          "node_id": { "type": "string", "example": "MDEwOkNoZWNrU3VpdGU1" },
+          "name": { "type": "string", "example": "quarantine-results-12345" },
+          "size_in_bytes": { "type": "integer", "example": 12345 },
+          "url": { "type": "string" },
+          "archive_download_url": {
+            "type": "string",
+            "example": "https://api.github.com/repos/github/hello-world/actions/artifacts/5/zip"
+          },
+          "expired": { "type": "boolean" },
+          "created_at": { "type": "string", "format": "date-time", "nullable": true },
+          "expires_at": { "type": "string", "format": "date-time", "nullable": true },
+          "updated_at": { "type": "string", "format": "date-time", "nullable": true },
+          "digest": { "type": "string", "nullable": true },
+          "workflow_run": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": { "type": "integer" },
+              "repository_id": { "type": "integer" },
+              "head_repository_id": { "type": "integer" },
+              "head_branch": { "type": "string" },
+              "head_sha": { "type": "string" }
+            }
+          }
+        }
+      },
+      "basic-error": {
+        "title": "Basic Error",
+        "description": "Basic Error",
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "documentation_url": { "type": "string" },
+          "url": { "type": "string" },
+          "status": { "type": "string" }
+        }
+      },
+      "validation-error": {
+        "title": "Validation Error",
+        "description": "Validation Error",
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": { "type": "string" },
+          "documentation_url": { "type": "string" },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resource": { "type": "string" },
+                "field": { "type": "string" },
+                "code": { "type": "string" },
+                "message": { "type": "string" },
+                "index": { "type": "integer" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "repository": {
+        "value": {
+          "id": 1296269,
+          "node_id": "MDEwOlJlcG9zaXRvcnkxMjk2MjY5",
+          "name": "Hello-World",
+          "full_name": "octocat/Hello-World",
+          "private": false,
+          "default_branch": "main",
+          "description": "This your first repo!"
+        }
+      },
+      "git-ref": {
+        "value": {
+          "ref": "refs/heads/quarantine/state",
+          "node_id": "MDM6UmVmcmVmcy9oZWFkcy9mZWF0dXJlQQ==",
+          "url": "https://api.github.com/repos/octocat/Hello-World/git/ref/heads/quarantine/state",
+          "object": {
+            "type": "commit",
+            "sha": "aa218f56b14c9653891f9e74264a383fa43fefbd",
+            "url": "https://api.github.com/repos/octocat/Hello-World/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"
+          }
+        }
+      },
+      "content-file": {
+        "value": {
+          "type": "file",
+          "encoding": "base64",
+          "size": 24,
+          "name": "quarantine.json",
+          "path": "quarantine.json",
+          "content": "eyJ2ZXJzaW9uIjoxLCJ0ZXN0cyI6e319Cg==",
+          "sha": "abc123def456abc123def456abc123def456abc1",
+          "url": "https://api.github.com/repos/octocat/Hello-World/contents/quarantine.json",
+          "git_url": null,
+          "html_url": null,
+          "download_url": null
+        }
+      },
+      "file-commit": {
+        "value": {
+          "content": {
+            "name": "quarantine.json",
+            "path": "quarantine.json",
+            "sha": "def456abc123def456abc123def456abc123def4"
+          },
+          "commit": {
+            "sha": "7638417db6d59f3c431d3e1f261cc637155684cd",
+            "message": "chore: update quarantine state"
+          }
+        }
+      },
+      "issue-search-result": {
+        "value": {
+          "total_count": 1,
+          "incomplete_results": false,
+          "items": [
+            {
+              "number": 42,
+              "html_url": "https://github.com/octocat/Hello-World/issues/42",
+              "title": "[Quarantine] should handle eviction",
+              "state": "open",
+              "labels": [
+                { "name": "quarantine" },
+                { "name": "quarantine:2cf24dba" }
+              ]
+            }
+          ]
+        }
+      },
+      "issue": {
+        "value": {
+          "id": 1,
+          "node_id": "MDU6SXNzdWUx",
+          "number": 1347,
+          "title": "[Quarantine] should handle eviction",
+          "state": "open",
+          "html_url": "https://github.com/octocat/Hello-World/issues/1347",
+          "labels": [
+            { "name": "quarantine" },
+            { "name": "quarantine:2cf24dba" }
+          ]
+        }
+      },
+      "issue-comment": {
+        "value": {
+          "id": 10,
+          "node_id": "MDEyOklzc3VlQ29tbWVudDE=",
+          "url": "https://api.github.com/repos/octocat/Hello-World/issues/comments/10",
+          "html_url": "https://github.com/octocat/Hello-World/issues/1347#issuecomment-10",
+          "body": "<!-- quarantine-bot -->\n## Quarantine Summary"
+        }
+      },
+      "issue-comments": {
+        "value": [
+          {
+            "id": 10,
+            "node_id": "MDEyOklzc3VlQ29tbWVudDE=",
+            "url": "https://api.github.com/repos/octocat/Hello-World/issues/comments/10",
+            "html_url": "https://github.com/octocat/Hello-World/issues/1347#issuecomment-10",
+            "body": "<!-- quarantine-bot -->\n## Quarantine Summary"
+          }
+        ]
+      },
+      "artifact-paginated": {
+        "value": {
+          "total_count": 2,
+          "artifacts": [
+            {
+              "id": 11,
+              "node_id": "MDg6QXJ0aWZhY3QxMQ==",
+              "name": "quarantine-results-2332938",
+              "size_in_bytes": 556,
+              "url": "https://api.github.com/repos/octo-org/octo-docs/actions/artifacts/11",
+              "archive_download_url": "https://api.github.com/repos/octo-org/octo-docs/actions/artifacts/11/zip",
+              "expired": false,
+              "created_at": "2020-01-10T14:59:22Z",
+              "expires_at": "2020-03-21T14:59:22Z",
+              "updated_at": "2020-02-21T14:59:22Z",
+              "digest": null,
+              "workflow_run": {
+                "id": 2332938,
+                "repository_id": 1296269,
+                "head_repository_id": 1296269,
+                "head_branch": "main",
+                "head_sha": "328faa0536e6fef19753d9d91dc96a9931694ce3"
+              }
+            },
+            {
+              "id": 13,
+              "node_id": "MDg6QXJ0aWZhY3QxMw==",
+              "name": "quarantine-results-2332942",
+              "size_in_bytes": 453,
+              "url": "https://api.github.com/repos/octo-org/octo-docs/actions/artifacts/13",
+              "archive_download_url": "https://api.github.com/repos/octo-org/octo-docs/actions/artifacts/13/zip",
+              "expired": false,
+              "created_at": "2020-01-10T14:59:22Z",
+              "expires_at": "2020-03-21T14:59:22Z",
+              "updated_at": "2020-02-21T14:59:22Z",
+              "digest": null,
+              "workflow_run": {
+                "id": 2332942,
+                "repository_id": 1296269,
+                "head_repository_id": 1296269,
+                "head_branch": "main",
+                "head_sha": "178f4f6090b3fccad4a65b3e83d076a622d59652"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

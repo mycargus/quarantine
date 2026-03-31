@@ -14,6 +14,23 @@ Create a contract test for the described API interaction.
 
 Contract tests verify that production code sends **correctly-shaped requests** and handles **response shapes** as defined in vendored OpenAPI specs. They use Stoplight Prism as a local mock server — no network access or API credentials required. See ADR-024 (`docs/adr/024-contract-testing-tool.md`) for the full decision rationale.
 
+## Consumer split — Go vs. JS
+
+Contract tests are split by consumer. Choose the right approach before writing any code:
+
+| Consumer | Approach | Location |
+|----------|----------|----------|
+| CLI (Go) | Go test files with `//go:build contract` — exercises the real Go client against Prism | `cli/internal/github/*_contract_test.go` |
+| Dashboard (JS) | Vitest test — exercises `fetch` calls against Prism | `test/contract/*.test.js` |
+
+**For CLI API interactions (Go):** Use helpers from `cli/internal/github/contract_test.go`:
+- `newPrismClient(t)` — Go GitHub client pointing at Prism
+- `newPrismClientWithPrefer(t, preferHeader(code), ...)` — same with Prefer header injection
+
+Do NOT spawn your own Prism in Go tests. The shared Prism URL is in `$PRISM_URL` (set by `scripts/run-contract-tests.sh`), and `newPrismClient` reads it automatically.
+
+**For Dashboard API interactions (JS):** Read `PRISM_URL` from `process.env`. Do NOT spawn your own Prism instance — a shared Prism is started by `scripts/run-contract-tests.sh` before running all contract tests.
+
 ## When to use this skill
 
 Any time production code interacts with an external API and you want to verify request/response shape conformance against the vendored spec — without real network calls. Contract tests complement E2E tests:
@@ -71,15 +88,17 @@ Read `schemas/*.json` to get the current list. As of last update:
 
 | Provider | Spec file | Covers |
 |----------|-----------|--------|
-| GitHub (Artifacts) | `schemas/github-api-artifacts.json` | Artifacts API subset |
+| GitHub (all CLI + dashboard endpoints) | `schemas/github-api.json` | Contents, Issues, Search, Comments, Refs, Repository, Artifacts APIs |
 
-### Adding a new vendored spec
+The combined spec covers all endpoints the CLI and dashboard use. If you're adding a new GitHub endpoint, add it to `schemas/github-api.json` — do NOT create a new file.
+
+### Adding a new vendored spec (non-GitHub providers)
 
 When the endpoint isn't covered by an existing spec:
 
-1. Find the provider's published OpenAPI spec (e.g., GitHub's `api.github.com.json`)
+1. Find the provider's published OpenAPI spec
 2. Extract only the paths and schemas your code uses into a new file in `schemas/`
-3. Name it `schemas/<provider>-<feature>.json` (e.g., `schemas/github-api-issues.json`)
+3. Name it `schemas/<provider>-<feature>.json`
 4. Validate the extracted spec loads cleanly: `cd test && ./node_modules/.bin/prism mock ../schemas/<spec-file> -p 4010`
 5. If the provider uses a custom media type (e.g., `application/vnd.github+json`), ensure it's included as a content type in the spec's response definitions — Prism strictly validates Accept headers
 
