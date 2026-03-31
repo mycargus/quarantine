@@ -1,10 +1,24 @@
 ---
 name: implement-milestone
 description: Implement a predefined milestone using TDD, testify validation, and atomic commits. Use when the user asks to implement, continue, or work on a milestone.
+model: opus
+effort: max
 disable-model-invocation: true
 user-invocable: true
 argument-hint: "<milestone-number> [--from <scenario-number>]"
 allowed-tools: Read, Grep, Glob, Bash, Edit, Write, Agent, Skill
+hooks:
+  PreToolUse:
+    - matcher: Bash
+      hooks:
+        - type: command
+          command: ".claude/hooks/block-git-push.sh"
+          timeout: 5
+  Stop:
+    - hooks:
+        - type: command
+          command: "make check"
+          timeout: 120
 ---
 
 Implement milestone $1.
@@ -46,6 +60,14 @@ Remaining:
 ```
 
 If a `--from` argument was provided, skip to that scenario number. Otherwise, start with the first remaining scenario.
+
+### External skill reference
+
+This skill invokes two external plugin skills. Here is what to expect:
+
+- **`/mikey:tdd <scenario-file>#<scenario-number>`** — TDD workflow that parses Given/When/Then specs and spawns a `tdd-agent` subagent to implement code via Red-Green-Refactor cycles. It writes test files and implementation code, runs tests to verify each scenario passes, and enforces Functional Core / Imperative Shell design. Returns a summary of scenarios implemented with test/implementation file locations.
+
+- **`/mikey:testify <test-file-path> --with-design`** — Test quality reviewer that analyzes tests for design issues (I/O mixed with logic), excessive mocking, implementation detail testing, and negative coverage gaps. Returns a structured report with findings at HIGH/MEDIUM/LOW severity, evidence citations with `[file:line]` references, and a quality grade (A–F). Does NOT write code — it is analysis only.
 
 ## Phase 2: Per-Scenario Loop
 
