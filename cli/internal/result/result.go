@@ -163,7 +163,7 @@ func BuildAtWithRetries(tests []parser.TestResult, retries map[string]RetryOutco
 		switch entry.Status {
 		case "passed":
 			summary.Passed++
-		case "failed", "error":
+		case "failed":
 			summary.Failed++
 		case "skipped":
 			summary.Skipped++
@@ -208,7 +208,7 @@ func ComputeSummary(tests []parser.TestResult) Summary {
 		switch t.Status {
 		case "passed":
 			s.Passed++
-		case "failed", "error":
+		case "failed":
 			s.Failed++
 		case "skipped":
 			s.Skipped++

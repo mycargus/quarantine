@@ -17,6 +17,9 @@ importers:
       adm-zip:
         specifier: ^0.5.16
         version: 0.5.16
+      ajv:
+        specifier: ^8.18.0
+        version: 8.18.0
       riteway:
         specifier: ^9.2.0
         version: 9.2.0(@types/node@25.5.0)(react@19.2.4)

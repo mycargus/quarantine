@@ -59,9 +59,9 @@ func TestParseAllStatusTypes(t *testing.T) {
 
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "a test case with an <error> element",
-		Should:   "have status 'error'",
+		Should:   "have status 'failed' (error elements are treated as failures)",
 		Actual:   results[2].Status,
-		Expected: "error",
+		Expected: "failed",
 	})
 
 	riteway.Assert(t, riteway.Case[string]{

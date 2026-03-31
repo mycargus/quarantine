@@ -23,6 +23,7 @@
     "@biomejs/biome": "^2.4.10",
     "@stoplight/prism-cli": "^5.14.2",
     "adm-zip": "^0.5.16",
+    "ajv": "^8.18.0",
     "riteway": "^9.2.0",
     "vitest": "^4.1.2"
   }

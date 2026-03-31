@@ -35,14 +35,7 @@ func TestComputeSummary(t *testing.T) {
 	})
 
 	riteway.Assert(t, riteway.Case[result.Summary]{
-		Given:    "error status test",
-		Should:   "count error as failed",
-		Actual:   result.ComputeSummary([]parser.TestResult{{Status: "error"}}),
-		Expected: result.Summary{Total: 1, Failed: 1},
-	})
-
-	riteway.Assert(t, riteway.Case[result.Summary]{
-		Given:    "unknown status",
+		Given:    "unknown status (e.g., a future status value)",
 		Should:   "not count in any named category",
 		Actual:   result.ComputeSummary([]parser.TestResult{{Status: "unknown"}}),
 		Expected: result.Summary{Total: 1},

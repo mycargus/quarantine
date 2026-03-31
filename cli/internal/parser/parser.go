@@ -170,7 +170,7 @@ func determineStatus(tc TestCase) string {
 		return "failed"
 	}
 	if tc.Error != nil {
-		return "error"
+		return "failed"
 	}
 	if tc.Skipped != nil {
 		return "skipped"
