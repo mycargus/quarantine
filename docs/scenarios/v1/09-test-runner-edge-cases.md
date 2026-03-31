@@ -244,3 +244,37 @@ modification. If the test passes on retry, it is classified as flaky. The
 `rerun_command` config option overrides this default when set.
 
 ---
+
+### Scenario 83: Rerun command fails — actionable warning with rerun_command guidance [M3]
+
+**Risk:** When the rerun command fails (e.g., `npx` not found, `bundle exec`
+unavailable, or the framework binary is missing), the CLI silently treats the
+test as a genuine failure with no explanation. The user has no idea the rerun
+mechanism is broken and no idea that `rerun_command` in `quarantine.yml` is
+the fix.
+
+**Given** a test suite where a test fails on the initial run, and the default
+rerun command fails to execute (for example, because `npx` is not installed,
+`bundle exec` cannot locate the Gemfile, or the framework binary is not found)
+
+**When** the CLI attempts to retry the failing test and the rerun command exits
+with a non-zero code or cannot be launched
+
+**Then** the CLI emits a warning to stderr naming the failed command and
+explaining that `rerun_command` in `quarantine.yml` can override it:
+
+```
+[quarantine] WARNING: Rerun failed for "should handle charge timeout" (npx jest exited with error).
+  If your project uses pnpm, bun, or a non-standard setup, set rerun_command in quarantine.yml.
+  Examples:
+    rerun_command: "pnpm exec jest --testNamePattern '{name}'"
+    rerun_command: "bunx jest --testNamePattern '{name}'"
+    rerun_command: "npx jest --config jest.ci.config.js --testNamePattern '{name}'"
+```
+
+The test is classified as a **genuine failure** (not flaky and not silently
+dropped) — quarantine cannot determine flakiness without a successful retry.
+The CLI continues processing remaining tests. Exit code reflects the genuine
+failure (1). No GitHub Issue is created for this test.
+
+---
