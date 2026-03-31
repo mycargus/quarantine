@@ -2,6 +2,9 @@
 name: create-e2e-test
 description: Create an E2E test in test/e2e/ that verifies real external API behavior matches what integration test mocks assume. Use when a scenario introduces external API interactions (GitHub, Jenkins, GitLab, etc.).
 argument-hint: "<description of what to test>"
+model: sonnet
+effort: medium
+context: fork
 disable-model-invocation: false
 user-invocable: true
 allowed-tools: Read, Grep, Glob, Write, Edit, Bash, Agent
@@ -59,6 +62,8 @@ Check whether any existing test already exercises the same API interaction. Don'
 Read `test/e2e/.env.example` for the currently supported env vars. Each external provider needs its own credentials and test fixture target.
 
 ### Currently supported
+
+Read `test/e2e/.env.example` to get the current list. As of last update:
 
 | Provider | Token env var | Target env vars | API base |
 |----------|---------------|-----------------|----------|

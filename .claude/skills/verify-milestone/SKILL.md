@@ -1,8 +1,11 @@
 ---
 name: verify-milestone
 description: Verify a milestone's implementation against its manifest — build, acceptance criteria, flow invariants, and scenario coverage
-argument-hint: "[milestone-number]"
+argument-hint: "<milestone-number>"
+model: opus
+effort: max
 disable-model-invocation: false
+user-invocable: true
 allowed-tools: Read, Grep, Glob, Bash, Edit
 ---
 
@@ -24,11 +27,9 @@ If the manifest does not exist, stop and report: "No manifest found at docs/mile
 
 ### 2. Determine build commands
 
-Use the milestone number to select build commands:
-- **M1–M5, M8 (CLI):** `make cli-build && make cli-test && make cli-lint`
-- **M6–M7 (Dashboard):** `cd dashboard && pnpm build && pnpm test && pnpm lint`
-
-If the manifest's Verification section specifies different build commands, use those instead.
+Read the manifest's Verification section for the exact build commands. If not specified, infer from the milestone's scope:
+- **CLI milestones:** `make cli-build && make cli-test && make cli-lint`
+- **Dashboard milestones:** `cd dashboard && pnpm build && pnpm test && pnpm lint`
 
 ### 3. Run build/test/lint
 

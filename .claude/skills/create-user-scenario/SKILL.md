@@ -2,6 +2,8 @@
 name: create-user-scenario
 description: Author Given/When/Then scenarios for a feature or edge case. Reads existing scenarios and specs to match style, numbering, and intended behavior. Use when adding new acceptance scenarios to docs/scenarios/.
 argument-hint: "[feature or edge case description]"
+model: sonnet
+effort: high
 disable-model-invocation: false
 user-invocable: true
 allowed-tools: Read, Grep, Glob, Write, Edit, AskUserQuestion

@@ -2,9 +2,11 @@
 name: create-adr
 description: Propose a new Architecture Decision Record. Reads existing ADRs for numbering and conflict detection, drafts the ADR following project conventions, and checks for scope boundary impacts. Use when a design decision needs to be documented.
 argument-hint: "[decision title]"
+model: sonnet
+effort: medium
 disable-model-invocation: false
 user-invocable: true
-allowed-tools: Read, Grep, Glob, Write, Edit, AskUserQuestion
+allowed-tools: Read, Grep, Glob, Write, Edit, AskUserQuestion, Skill
 ---
 
 Propose a new ADR for: "$1"

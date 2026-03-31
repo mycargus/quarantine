@@ -1,8 +1,13 @@
 ---
 name: sync-docs
 description: Scan for inconsistencies between code and documentation
-argument-hint: "[scope]"
+argument-hint: "[all | architecture | requirements | scenarios | adrs]"
+model: sonnet
+effort: medium
+context: fork
+agent: Explore
 disable-model-invocation: false
+user-invocable: true
 allowed-tools: Read, Grep, Glob
 ---
 
@@ -35,7 +40,7 @@ Scope: $1 (default: all) — valid values: 'all', 'architecture', 'requirements'
 **Drift:**
 - Data model in code differs from architecture.md section 5 schemas
 - Behavior in code differs from user scenario expectations
-- Error handling in code differs from docs/error-handling.md (if it exists)
+- Error handling in code differs from `docs/specs/error-handling.md`
 
 **Missing documentation:**
 - Code that implements undocumented behavior

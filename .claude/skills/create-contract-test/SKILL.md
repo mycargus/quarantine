@@ -1,7 +1,10 @@
 ---
 name: create-contract-test
-description: Create a Prism-based contract test in test/contract/ that verifies production code sends correctly-shaped requests and handles response shapes from vendored OpenAPI specs — without network access or credentials. Use when code interacts with an external API and you want fast, offline shape validation.
+description: Create a Prism-based contract test in test/contract/ verifying request/response shapes against vendored OpenAPI specs. Use when code interacts with an external API and you want fast, offline shape validation.
 argument-hint: "<description of the API interaction to contract-test>"
+model: sonnet
+effort: medium
+context: fork
 disable-model-invocation: false
 user-invocable: true
 allowed-tools: Read, Grep, Glob, Write, Edit, Bash, Agent
@@ -63,6 +66,8 @@ schemas/*.json
 ```
 
 ### Currently vendored
+
+Read `schemas/*.json` to get the current list. As of last update:
 
 | Provider | Spec file | Covers |
 |----------|-----------|--------|
