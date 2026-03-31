@@ -20,8 +20,9 @@ type State struct {
 // Entry represents a single quarantined test entry in quarantine.json.
 // The map key is the test_id.
 //
-// IssueNumber and IssueURL are optional at the Go level even though the JSON
-// schema marks them as required. A newly detected flaky test is written to
+// IssueNumber and IssueURL are optional. The schema uses dependentRequired,
+// meaning they must appear together if either is present, but neither is
+// required on its own. A newly detected flaky test is written to
 // quarantine.json before GitHub Issue creation, so an entry may exist briefly
 // without an issue. If issue creation fails (degraded mode), the entry persists
 // without an issue number — a subsequent successful run will backfill it.
