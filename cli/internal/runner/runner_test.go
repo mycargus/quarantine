@@ -30,44 +30,44 @@ func TestRunStartFails(t *testing.T) {
 func TestRerunCommand(t *testing.T) {
 	cmd, args := runner.RerunCommand(runner.Jest, "my test", "MyClass", "src/foo.test.js", "")
 	riteway.Assert(t, riteway.Case[string]{
-		Given:    "Jest framework",
-		Should:   "use jest as command",
+		Given:    "Jest framework, no custom rerun_command",
+		Should:   "use npx as command",
 		Actual:   cmd,
-		Expected: "jest",
+		Expected: "npx",
 	})
 	riteway.Assert(t, riteway.Case[[]string]{
-		Given:    "Jest framework",
-		Should:   "pass --testNamePattern with test name",
+		Given:    "Jest framework, no custom rerun_command",
+		Should:   "pass jest --testNamePattern <name> as args",
 		Actual:   args,
-		Expected: []string{"--testNamePattern", "my test"},
+		Expected: []string{"jest", "--testNamePattern", "my test"},
 	})
 
 	cmd, args = runner.RerunCommand(runner.RSpec, "my test", "MyClass", "spec/foo_spec.rb", "")
 	riteway.Assert(t, riteway.Case[string]{
-		Given:    "RSpec framework",
-		Should:   "use rspec as command",
+		Given:    "RSpec framework, no custom rerun_command",
+		Should:   "use bundle as command",
 		Actual:   cmd,
-		Expected: "rspec",
+		Expected: "bundle",
 	})
 	riteway.Assert(t, riteway.Case[[]string]{
-		Given:    "RSpec framework",
-		Should:   "pass -e with test name",
+		Given:    "RSpec framework, no custom rerun_command",
+		Should:   "pass exec rspec -e <name> as args",
 		Actual:   args,
-		Expected: []string{"-e", "my test"},
+		Expected: []string{"exec", "rspec", "-e", "my test"},
 	})
 
 	cmd, args = runner.RerunCommand(runner.Vitest, "my test", "MyClass", "src/foo.test.ts", "")
 	riteway.Assert(t, riteway.Case[string]{
-		Given:    "Vitest framework",
-		Should:   "use vitest as command",
+		Given:    "Vitest framework, no custom rerun_command",
+		Should:   "use npx as command",
 		Actual:   cmd,
-		Expected: "vitest",
+		Expected: "npx",
 	})
 	riteway.Assert(t, riteway.Case[[]string]{
-		Given:    "Vitest framework",
-		Should:   "pass run --reporter=junit <file> -t <name>",
+		Given:    "Vitest framework, no custom rerun_command",
+		Should:   "pass vitest run --reporter=junit <file> -t <name> as args",
 		Actual:   args,
-		Expected: []string{"run", "--reporter=junit", "src/foo.test.ts", "-t", "my test"},
+		Expected: []string{"vitest", "run", "--reporter=junit", "src/foo.test.ts", "-t", "my test"},
 	})
 
 	cmd, args = runner.RerunCommand("unknown", "my test", "MyClass", "src/foo.test.js", "")

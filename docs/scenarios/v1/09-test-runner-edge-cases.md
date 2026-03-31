@@ -184,3 +184,63 @@ from the exit code (all are quarantined). The CLI posts a PR comment noting all
 50 tests are quarantined and suggests reviewing. Exits with code 0.
 
 ---
+
+### Scenario 80: Default Jest rerun uses `npx jest` — framework binary not on PATH [M3]
+
+**Risk:** If the CLI reruns failing tests using bare `jest`, the rerun silently
+fails when Jest is installed locally (in `node_modules/.bin`) but not globally.
+The test is classified as a genuine failure rather than flaky, quarantine never
+quarantines it, and the build continues to fail on every run. Discovered during
+dogfooding: all flaky tests showed 0 flaky detections because reruns were
+failing with "command not found".
+
+**Given** a project using Jest where `jest` is installed as a local
+devDependency (in `node_modules/.bin/jest`) but not available as a global
+command, and `quarantine.yml` does not define `rerun_command`
+
+**When** a test fails on the initial run and the CLI retries it
+
+**Then** the CLI reruns the test using `npx jest --testNamePattern '<name>'`.
+`npx` resolves the local `node_modules/.bin/jest` installation without
+requiring any PATH modification. If the test passes on retry, it is classified
+as flaky. The `rerun_command` config option overrides this default when set.
+
+---
+
+### Scenario 81: Default Vitest rerun uses `npx vitest` — framework binary not on PATH [M3]
+
+**Risk:** Same as Scenario 80 for Vitest projects. Bare `vitest` fails when
+Vitest is a local devDependency, silently preventing flaky detection.
+
+**Given** a project using Vitest where `vitest` is installed as a local
+devDependency but not available as a global command, and `quarantine.yml` does
+not define `rerun_command`
+
+**When** a test fails on the initial run and the CLI retries it
+
+**Then** the CLI reruns the test using
+`npx vitest run --reporter=junit <file> -t '<name>'`.
+`npx` resolves the local `node_modules/.bin/vitest` installation without
+requiring any PATH modification. If the test passes on retry, it is classified
+as flaky. The `rerun_command` config option overrides this default when set.
+
+---
+
+### Scenario 82: Default RSpec rerun uses `bundle exec rspec` — gem not on PATH [M3]
+
+**Risk:** Same failure mode for RSpec projects. Bare `rspec` fails when RSpec
+is managed via Bundler (the standard for Ruby projects), silently preventing
+flaky detection.
+
+**Given** a project using RSpec where `rspec` is managed by Bundler and not
+available as a bare global command, and `quarantine.yml` does not define
+`rerun_command`
+
+**When** a test fails on the initial run and the CLI retries it
+
+**Then** the CLI reruns the test using `bundle exec rspec -e '<name>'`.
+`bundle exec` invokes the Bundler-managed RSpec without requiring PATH
+modification. If the test passes on retry, it is classified as flaky. The
+`rerun_command` config option overrides this default when set.
+
+---

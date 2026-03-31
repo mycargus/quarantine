@@ -101,11 +101,11 @@ func RerunCommand(fw Framework, name, classname, file, customTemplate string) (s
 
 	switch fw {
 	case Jest:
-		return "jest", []string{"--testNamePattern", EscapeJestPattern(name)}
+		return "npx", []string{"jest", "--testNamePattern", EscapeJestPattern(name)}
 	case RSpec:
-		return "rspec", []string{"-e", name}
+		return "bundle", []string{"exec", "rspec", "-e", name}
 	case Vitest:
-		return "vitest", []string{"run", "--reporter=junit", file, "-t", name}
+		return "npx", []string{"vitest", "run", "--reporter=junit", file, "-t", name}
 	default:
 		return "", nil
 	}
