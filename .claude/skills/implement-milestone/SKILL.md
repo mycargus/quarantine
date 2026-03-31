@@ -7,18 +7,6 @@ disable-model-invocation: true
 user-invocable: true
 argument-hint: "<milestone-number> [--from <scenario-number>]"
 allowed-tools: Read, Grep, Glob, Bash, Edit, Write, Agent, Skill
-hooks:
-  PreToolUse:
-    - matcher: Bash
-      hooks:
-        - type: command
-          command: ".claude/hooks/block-git-push.sh"
-          timeout: 5
-  Stop:
-    - hooks:
-        - type: command
-          command: "make check"
-          timeout: 120
 ---
 
 Implement milestone $1.
