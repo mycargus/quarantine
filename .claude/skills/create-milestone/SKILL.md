@@ -1,9 +1,12 @@
 ---
 name: create-milestone
 description: Generate a milestone manifest file — a lightweight routing document that points agents to source docs
-argument-hint: "[milestone-number | --validate [N]]"
+argument-hint: "<milestone-number> | --validate [N]"
+model: sonnet
+effort: max
 disable-model-invocation: false
-allowed-tools: Read, Grep, Glob, Write, Bash
+user-invocable: true
+allowed-tools: Read, Grep, Glob, Write, Bash, Agent, AskUserQuestion
 ---
 
 ## Mode detection
@@ -30,20 +33,26 @@ These principles are grounded in published research on AI agent context engineer
 
 ## Steps
 
-### 1. Gather milestone definition
+### 1. Gather milestone definition and scenarios
 
-Read `docs/milestones/index.md` and extract for M$1:
-- Title
-- Scope (what it builds)
-- Acceptance criteria
-- Exclusions (what it does NOT build)
-- Dependencies on prior milestones
+Use the Agent tool (subagent_type: Explore) to run steps 1a–1c in parallel, keeping the heavy file reads out of main context:
 
-### 2. Gather scenarios
+**1a. Milestone definition:** Read `docs/milestones/index.md` and extract for M$1: title, scope, acceptance criteria, exclusions, and dependencies on prior milestones.
 
-Read `docs/scenarios/index.md` and find ALL scenarios tagged with M$1. Group them by scenario file. Note the scenario number ranges and topics.
+**1b. Scenarios:** Read `docs/scenarios/index.md` and find ALL scenarios tagged with M$1. Group by scenario file. Note number ranges and topics. Check whether any scenarios in other files are partially tagged with M$1 (some files span multiple milestones — include only the M$1 scenarios).
 
-Also check whether any scenarios in other files are partially tagged with M$1 (some files span multiple milestones — include only the M$1 scenarios from those files).
+**1c. Relevant ADRs:** Read `docs/adr/*.md` and identify only the ADRs directly relevant to this milestone's scope.
+
+### 2. Clarify ambiguities
+
+Before proceeding, review the gathered data for issues. Use AskUserQuestion if ANY of the following apply:
+
+- The milestone definition in `index.md` is vague about scope boundaries (what's in vs. out)
+- Scenarios don't clearly map to acceptance criteria (gaps or overlaps)
+- Prior milestone dependencies appear unmet or unclear
+- The milestone scope could reasonably be interpreted in multiple ways
+
+Do NOT proceed past this step with unresolved ambiguities — they propagate into the manifest and mislead implementing agents.
 
 ### 3. Identify relevant source docs
 
@@ -61,26 +70,32 @@ Based on the milestone scope, determine which of these source docs are relevant:
 | `docs/specs/test-strategy.md` | If the milestone has special testing concerns |
 | `docs/adr/*.md` | Only ADRs directly relevant to this milestone's decisions |
 
-### 4. Verify anchors exist
+### 4. Verify anchors and gather invariants
 
-For every link you plan to include in the manifest, verify the target anchor exists in the target file. Use Grep to search for the heading text. If an anchor does not exist, find the correct anchor or reference the file without a broken anchor.
+Use the Agent tool (subagent_type: Explore) to run these in parallel:
 
-### 5. Identify verification invariants
+**4a. Anchor verification:** For every link you plan to include in the manifest, verify the target anchor exists in the target file. Use Grep to search for the heading text. If an anchor does not exist, find the correct anchor or report it as missing.
 
-Read the relevant sections of these docs to find concrete, testable invariants for the Verification section:
+**4b. Verification invariants:** Read the relevant sections of these docs to find concrete, testable invariants:
 - `docs/specs/sequence-diagrams.md` — endpoint call order, branching logic
 - `docs/specs/functional-requirements.md` — specific FR IDs that map to this milestone
 - `docs/specs/non-functional-requirements.md` — specific NFR IDs that map to this milestone
 - `docs/specs/error-handling.md` — exit codes, degraded mode behavior
 - `docs/specs/cli-spec.md` — output format, flag behavior
 
+If any anchors are missing with no clear alternative, use AskUserQuestion to ask which section to reference.
+
 Verification MUST contain specific invariants, NOT vague statements. Good: "MUST call endpoints in this order: GET /repos, GET /git/ref". Bad: "MUST match the spec".
 
-### 6. Generate the manifest
+### 5. Generate the manifest
 
 Write the file to `docs/milestones/m$1.md` using this exact structure:
 
 ```markdown
+---
+status: planned
+---
+
 # M$1: [Title from milestones.md]
 
 ## Workflow
@@ -149,7 +164,7 @@ and [NFR-X.Y.Z] in [non-functional-requirements.md](../specs/non-functional-requ
 **Build:** `make cli-build && make cli-test && make cli-lint` MUST pass.
 ```
 
-### 7. Validate the result
+### 6. Validate the result
 
 After writing, verify:
 - Line count is between 60 and 110 lines
@@ -158,7 +173,7 @@ After writing, verify:
 - MUST/MUST NOT language is used for all constraints
 - The six sections appear in exact order: Workflow, Scope, Acceptance criteria, Specifications, Acceptance scenarios, Verification
 
-### 8. Report
+### 7. Report
 
 Print a summary:
 - Milestone title
