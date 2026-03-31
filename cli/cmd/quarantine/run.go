@@ -215,7 +215,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 	excludePatterns := mergeExcludePatterns(cfg.Exclude, excludeFlag)
 
 	// Retry failing tests individually (skip quarantined and excluded tests).
-	retryOutcomes := retryFailingTests(ctx, testResults, cfg, excludePatterns)
+	retryOutcomes, retryWarnings := retryFailingTests(ctx, testResults, cfg, excludePatterns)
+	for _, w := range retryWarnings {
+		cmd.PrintErrf("[quarantine] WARNING: %s", w)
+	}
 
 	// Build results.
 	meta := buildMetadata(cfg)
@@ -490,11 +493,14 @@ func writeUpdatedQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *c
 }
 
 // retryFailingTests reruns each failed test individually up to cfg.Retries times.
-// Returns a map of TestID -> RetryOutcome for tests that were retried.
-// Exits the retry loop early for each test on the first passing attempt.
-// Tests whose TestID matches any excludePattern are skipped entirely.
-func retryFailingTests(ctx context.Context, tests []parser.TestResult, cfg *config.Config, excludePatterns []string) map[string]result.RetryOutcome {
+// Returns a map of TestID -> RetryOutcome for tests that were retried, and a
+// slice of warning messages for tests whose rerun command failed to execute.
+// Exits the retry loop early on the first passing attempt or if the rerun
+// command itself fails to execute. Tests whose TestID matches any excludePattern
+// are skipped entirely.
+func retryFailingTests(ctx context.Context, tests []parser.TestResult, cfg *config.Config, excludePatterns []string) (map[string]result.RetryOutcome, []string) {
 	outcomes := make(map[string]result.RetryOutcome)
+	var warnings []string
 
 	for _, t := range tests {
 		if t.Status != "failed" && t.Status != "error" {
@@ -514,11 +520,12 @@ func retryFailingTests(ctx context.Context, tests []parser.TestResult, cfg *conf
 		for attempt := 1; attempt <= cfg.Retries; attempt++ {
 			rerunExitCode, runErr := runner.Run(ctx, rerunCmd, rerunArgs, os.Stdout, os.Stderr)
 			if runErr != nil {
+				warnings = append(warnings, rerunFailureWarning(t.Name, rerunCmd, runner.Framework(cfg.Framework)))
 				attempts = append(attempts, result.RetryEntry{
 					Attempt: attempt,
 					Status:  "failed",
 				})
-				continue
+				break
 			}
 			status := "failed"
 			if rerunExitCode == 0 {
@@ -536,7 +543,32 @@ func retryFailingTests(ctx context.Context, tests []parser.TestResult, cfg *conf
 		outcomes[t.TestID] = result.RetryOutcome{Attempts: attempts}
 	}
 
-	return outcomes
+	return outcomes, warnings
+}
+
+// rerunFailureWarning returns a multi-line warning message for a rerun command
+// that failed to execute, including framework-specific rerun_command examples.
+// This is a pure function — no I/O.
+func rerunFailureWarning(testName, rerunCmd string, fw runner.Framework) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Rerun failed for %q (%s exited with error).\n", testName, rerunCmd)
+	sb.WriteString("  If your project uses pnpm, bun, or a non-standard setup, set rerun_command in quarantine.yml.\n")
+	sb.WriteString("  Examples:\n")
+	switch fw {
+	case runner.RSpec:
+		sb.WriteString("    rerun_command: \"bundle exec rspec -e '{name}'\"\n")
+		sb.WriteString("    rerun_command: \"bin/rspec -e '{name}'\"\n")
+		sb.WriteString("    rerun_command: \"bundle exec rspec --format progress -e '{name}'\"\n")
+	case runner.Vitest:
+		sb.WriteString("    rerun_command: \"pnpm exec vitest run --reporter=junit {file} -t '{name}'\"\n")
+		sb.WriteString("    rerun_command: \"bunx vitest run --reporter=junit {file} -t '{name}'\"\n")
+		sb.WriteString("    rerun_command: \"npx vitest run --reporter=junit --config vitest.ci.config.ts {file} -t '{name}'\"\n")
+	default: // Jest (and unknown frameworks)
+		sb.WriteString("    rerun_command: \"pnpm exec jest --testNamePattern '{name}'\"\n")
+		sb.WriteString("    rerun_command: \"bunx jest --testNamePattern '{name}'\"\n")
+		sb.WriteString("    rerun_command: \"npx jest --config jest.ci.config.js --testNamePattern '{name}'\"\n")
+	}
+	return sb.String()
 }
 
 // branchCheckResult holds the result of a branch existence check.

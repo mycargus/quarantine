@@ -1,12 +1,14 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/mycargus/quarantine/internal/config"
 	"github.com/mycargus/quarantine/internal/parser"
 	qstate "github.com/mycargus/quarantine/internal/quarantine"
 	"github.com/mycargus/quarantine/internal/result"
+	"github.com/mycargus/quarantine/internal/runner"
 	riteway "github.com/mycargus/riteway-golang"
 )
 
@@ -360,6 +362,74 @@ func TestAddNewFlakyTestsUpdatesExistingEntry(t *testing.T) {
 		Given:    "a flaky test already present in quarantine state",
 		Should:   "update LastFlakyAt to a non-empty timestamp",
 		Actual:   entry.LastFlakyAt != "",
+		Expected: true,
+	})
+}
+
+func TestRerunFailureWarningJest(t *testing.T) {
+	msg := rerunFailureWarning("should apply discount", "npx", runner.Jest)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a Jest rerun command that fails to execute",
+		Should:   "include the test name in the warning",
+		Actual:   strings.Contains(msg, `"should apply discount"`),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a Jest rerun command that fails to execute",
+		Should:   "include the rerun command in the warning",
+		Actual:   strings.Contains(msg, "npx exited with error"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a Jest rerun command that fails to execute",
+		Should:   "include pnpm example with testNamePattern",
+		Actual:   strings.Contains(msg, "pnpm exec jest --testNamePattern '{name}'"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a Jest rerun command that fails to execute",
+		Should:   "include bun example with testNamePattern",
+		Actual:   strings.Contains(msg, "bunx jest --testNamePattern '{name}'"),
+		Expected: true,
+	})
+}
+
+func TestRerunFailureWarningRSpec(t *testing.T) {
+	msg := rerunFailureWarning("should process payment", "bundle", runner.RSpec)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "an RSpec rerun command that fails to execute",
+		Should:   "include the test name in the warning",
+		Actual:   strings.Contains(msg, `"should process payment"`),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "an RSpec rerun command that fails to execute",
+		Should:   "include rspec -e example",
+		Actual:   strings.Contains(msg, "rspec -e '{name}'"),
+		Expected: true,
+	})
+}
+
+func TestRerunFailureWarningVitest(t *testing.T) {
+	msg := rerunFailureWarning("renders correctly", "npx", runner.Vitest)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a Vitest rerun command that fails to execute",
+		Should:   "include the test name in the warning",
+		Actual:   strings.Contains(msg, `"renders correctly"`),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a Vitest rerun command that fails to execute",
+		Should:   "include pnpm vitest example",
+		Actual:   strings.Contains(msg, "pnpm exec vitest run"),
 		Expected: true,
 	})
 }

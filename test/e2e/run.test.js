@@ -346,7 +346,10 @@ exit 1`,
       mkdirSync(binDir)
       makeScript(binDir, "jest", "exit 0")
 
-      writeConfig(dir, "version: 1\nframework: jest\n")
+      writeConfig(
+        dir,
+        `version: 1\nframework: jest\nrerun_command: "${join(binDir, "jest")} --testNamePattern '{name}'"\n`,
+      )
 
       const resultsPath = join(dir, "results.json")
       const mainScriptPath = join(dir, "fake-jest-main")

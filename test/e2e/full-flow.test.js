@@ -348,7 +348,10 @@ exit 1`,
       mkdirSync(binDir)
       makeScript(binDir, "jest", "exit 0")
 
-      writeConfig(dir, "version: 1\nframework: jest\n")
+      writeConfig(
+        dir,
+        `version: 1\nframework: jest\nrerun_command: "${join(binDir, "jest")} --testNamePattern '{name}'"\n`,
+      )
 
       const mainScriptPath = join(dir, "fake-jest-main")
 
@@ -477,7 +480,10 @@ exit 1`,
       mkdirSync(binDir)
       makeScript(binDir, "jest", "exit 0")
 
-      writeConfig(dir, "version: 1\nframework: jest\n")
+      writeConfig(
+        dir,
+        `version: 1\nframework: jest\nrerun_command: "${join(binDir, "jest")} --testNamePattern '{name}'"\n`,
+      )
       const mainScriptPath = join(dir, "fake-jest-main")
       const pathEnv = { PATH: `${binDir}:${process.env.PATH}` }
 
@@ -548,7 +554,10 @@ exit 1`,
       const binDir2 = join(dir2, "bin")
       mkdirSync(binDir2)
       makeScript(binDir2, "jest", "exit 0")
-      writeConfig(dir2, "version: 1\nframework: jest\n")
+      writeConfig(
+        dir2,
+        `version: 1\nframework: jest\nrerun_command: "${join(binDir2, "jest")} --testNamePattern '{name}'"\n`,
+      )
 
       const run2 = runCLI(
         dir2,
@@ -654,7 +663,10 @@ exit 1`,
       mkdirSync(binDir)
       makeScript(binDir, "jest", "exit 0")
 
-      writeConfig(dir, "version: 1\nframework: jest\n")
+      writeConfig(
+        dir,
+        `version: 1\nframework: jest\nrerun_command: "${join(binDir, "jest")} --testNamePattern '{name}'"\n`,
+      )
       const mainScriptPath = join(dir, "fake-jest-main")
       const pathEnv = { PATH: `${binDir}:${process.env.PATH}` }
 
@@ -724,7 +736,10 @@ exit 1`,
       const binDir2 = join(dir2, "bin")
       mkdirSync(binDir2)
       makeScript(binDir2, "jest", "exit 0")
-      writeConfig(dir2, "version: 1\nframework: jest\n")
+      writeConfig(
+        dir2,
+        `version: 1\nframework: jest\nrerun_command: "${join(binDir2, "jest")} --testNamePattern '{name}'"\n`,
+      )
 
       const run2 = runCLI(
         dir2,
