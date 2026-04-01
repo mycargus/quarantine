@@ -16,6 +16,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/reject-destructive-git.sh \"$TOOL_INPUT\""
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/block-publish.sh \"$TOOL_INPUT\""
           }
         ]
       }
