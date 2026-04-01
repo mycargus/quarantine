@@ -429,6 +429,130 @@ func TestRenderIssueBodyPositivePRNumberShowsPRLine(t *testing.T) {
 	})
 }
 
+// TestRenderIssueBodyDetectedInWithOnlyBranch kills the mutation on line 122:
+// `data.Branch != "" || data.CommitSHA != ""` → `&&`.
+// With OR, having ONLY a Branch (empty CommitSHA) is sufficient to render the
+// "Detected in" line. The && mutation would suppress it.
+func TestRenderIssueBodyDetectedInWithOnlyBranch(t *testing.T) {
+	body := renderIssueBody(IssueBodyData{
+		TestID:    "src/foo.test.js::Foo::bar",
+		Suite:     "src/foo.test.js",
+		Name:      "bar",
+		Timestamp: "2026-03-28T00:00:00Z",
+		Branch:    "feature/my-branch",
+		CommitSHA: "", // empty
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "Branch is set but CommitSHA is empty",
+		Should:   "still include the 'Detected in:' line",
+		Actual:   strings.Contains(body, "**Detected in:**"),
+		Expected: true,
+	})
+}
+
+// TestRenderIssueBodyDetectedInWithOnlyCommitSHA kills the mutation on line 122:
+// `data.Branch != "" || data.CommitSHA != ""` → `&&`.
+// With OR, having ONLY a CommitSHA (empty Branch) is sufficient to render the
+// "Detected in" line. The && mutation would suppress it.
+func TestRenderIssueBodyDetectedInWithOnlyCommitSHA(t *testing.T) {
+	body := renderIssueBody(IssueBodyData{
+		TestID:    "src/foo.test.js::Foo::bar",
+		Suite:     "src/foo.test.js",
+		Name:      "bar",
+		Timestamp: "2026-03-28T00:00:00Z",
+		Branch:    "", // empty
+		CommitSHA: "deadbeef",
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "CommitSHA is set but Branch is empty",
+		Should:   "still include the 'Detected in:' line",
+		Actual:   strings.Contains(body, "**Detected in:**"),
+		Expected: true,
+	})
+}
+
+// TestRenderPRCommentOmitsNewToPRFlakySectionWhenEmpty kills the mutation on
+// line 221: `len(data.NewToPRFlaky) > 0` → `>= 0`.
+// An empty NewToPRFlaky slice must NOT produce the "Flaky Tests in This PR"
+// section.
+func TestRenderPRCommentOmitsNewToPRFlakySectionWhenEmpty(t *testing.T) {
+	comment := renderPRComment(PRCommentData{
+		Total:        3,
+		Passed:       3,
+		NewToPRFlaky: []FlakyEntry{},
+		Version:      "0.1.0",
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "an empty NewToPRFlaky slice",
+		Should:   "not include the 'Flaky Tests in This PR' section",
+		Actual:   strings.Contains(comment, "Flaky Tests in This PR"),
+		Expected: false,
+	})
+}
+
+// TestRenderPRCommentIncludesNewToPRFlakySectionWhenNonEmpty provides the
+// counterpart: a non-empty NewToPRFlaky slice must produce the section.
+func TestRenderPRCommentIncludesNewToPRFlakySectionWhenNonEmpty(t *testing.T) {
+	comment := renderPRComment(PRCommentData{
+		Total:   2,
+		Passed:  1,
+		Version: "0.1.0",
+		NewToPRFlaky: []FlakyEntry{
+			{Name: "brand new flaky test"},
+		},
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a non-empty NewToPRFlaky slice",
+		Should:   "include the 'Flaky Tests in This PR' section",
+		Actual:   strings.Contains(comment, "Flaky Tests in This PR"),
+		Expected: true,
+	})
+}
+
+// TestRenderPRCommentOmitsUnquarantinedSectionWhenEmpty kills the mutation on
+// line 244: `len(data.UnquarantinedTests) > 0` → `>= 0`.
+// An empty UnquarantinedTests slice must NOT produce the "Unquarantined Tests"
+// section.
+func TestRenderPRCommentOmitsUnquarantinedSectionWhenEmpty(t *testing.T) {
+	comment := renderPRComment(PRCommentData{
+		Total:              2,
+		Passed:             2,
+		UnquarantinedTests: []UnquarantinedEntry{},
+		Version:            "0.1.0",
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "an empty UnquarantinedTests slice",
+		Should:   "not include the 'Unquarantined Tests' section",
+		Actual:   strings.Contains(comment, "### Unquarantined Tests"),
+		Expected: false,
+	})
+}
+
+// TestRenderPRCommentIncludesUnquarantinedSectionWhenNonEmpty provides the
+// counterpart: a non-empty UnquarantinedTests slice must produce the section.
+func TestRenderPRCommentIncludesUnquarantinedSectionWhenNonEmpty(t *testing.T) {
+	comment := renderPRComment(PRCommentData{
+		Total:   2,
+		Passed:  2,
+		Version: "0.1.0",
+		UnquarantinedTests: []UnquarantinedEntry{
+			{Name: "formerly-flaky-test", IssueURL: "https://github.com/o/r/issues/9", IssueNum: 9},
+		},
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a non-empty UnquarantinedTests slice",
+		Should:   "include the 'Unquarantined Tests' section",
+		Actual:   strings.Contains(comment, "### Unquarantined Tests"),
+		Expected: true,
+	})
+}
+
 // TestRenderIssueBodyOmitsDetectedInWhenEmpty verifies that when both branch
 // and commitSHA are empty strings, the "Detected in:" line is omitted entirely.
 func TestRenderIssueBodyOmitsDetectedInWhenEmpty(t *testing.T) {

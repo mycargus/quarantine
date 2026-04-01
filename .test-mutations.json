@@ -24,18 +24,19 @@
     "cli/cmd/quarantine/run_notifications.go": {
       "status": "completed",
       "covering_tests": ["cli/cmd/quarantine/run_notifications_test.go", "cli/cmd/quarantine/run_notifications_build_test.go", "cli/cmd/quarantine/run_notifications_issues_test.go"],
-      "last_tested": "2026-04-01T03:00:00Z",
+      "last_tested": "2026-04-01T06:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 24, "killed": 10, "survived": 14, "examples": [
+        "relational": {"total": 23, "killed": 23, "survived": 0, "examples": [
           {"line": 131, "original": "len(data.Retries) > 0", "mutated": ">= 0", "result": "killed", "test_that_caught_it": "TestRenderIssueBodyOmitsRetryResultsWhenEmpty"},
-          {"line": 364, "original": "StatusCode == 410", "mutated": "!= 410", "result": "survived", "test_that_caught_it": null}
+          {"line": 364, "original": "StatusCode == 410", "mutated": "!= 410", "result": "killed", "test_that_caught_it": "TestCreateIssues410LogsDisabledWarning"}
         ]},
-        "logical": {"total": 8, "killed": 0, "survived": 8, "examples": [
-          {"line": 272, "original": "client == nil || prNumber == 0", "mutated": "&& ", "result": "survived", "test_that_caught_it": null}
+        "logical": {"total": 12, "killed": 12, "survived": 0, "examples": [
+          {"line": 272, "original": "client == nil || prNumber == 0", "mutated": "&&", "result": "killed", "test_that_caught_it": "TestPostOrUpdatePRCommentNilClientIsNoOp"},
+          {"line": 122, "original": "data.Branch != \"\" || data.CommitSHA != \"\"", "mutated": "&&", "result": "killed", "test_that_caught_it": "TestRenderIssueBodyDetectedInWithOnlyBranch"}
         ]}
       },
-      "mutation_score": 31.3,
-      "insights": ["Pure rendering functions now tested for empty-section omission", "Issue creation and PR detection logic tested", "Complex compound conditions in postPRComment still untested", "Some issue creation mutations require more sophisticated fake servers"]
+      "mutation_score": 100.0,
+      "insights": ["All rendering, builder, and integration mutations now killed", "postOrUpdatePRComment guard, marker detection, and update-vs-create logic fully tested", "createIssuesForNewFlakyTests: status filter, skip reason, dedup, failure message, and 410 handling all tested", "Builder functions: flaky, quarantined, unquarantined, and failure entry construction fully tested"]
     },
     "cli/cmd/quarantine/init.go": {
       "status": "completed",
@@ -332,9 +333,9 @@
   "global_statistics": {
     "total_modules": 21,
     "completed_modules": 21,
-    "total_mutations": 314,
-    "total_killed": 260,
-    "total_survived": 57,
-    "overall_score": 82.8
+    "total_mutations": 317,
+    "total_killed": 285,
+    "total_survived": 35,
+    "overall_score": 89.9
   }
 }
