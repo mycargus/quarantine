@@ -1,6 +1,6 @@
 import { describe } from "riteway"
 import type { QuarantinedTestDetail } from "./db.server.js"
-import { applyFilters, filterBySearch, filterByStatus } from "./filter.server.js"
+import { applyFilters, filterByDateRange, filterBySearch, filterByStatus } from "./filter.server.js"
 
 function makeTest(
   overrides: Partial<QuarantinedTestDetail> & { name: string; testId: string },
@@ -125,6 +125,87 @@ describe("applyFilters()", async (assert) => {
     given: "an empty test array with empty query and null status",
     should: "return an empty array",
     actual: applyFilters([], "", null),
+    expected: [],
+  })
+
+  assert({
+    given: 'search "timeout", null status, from "2026-01-02", null until',
+    should: "compose search and date range (AND logic)",
+    actual: applyFilters(
+      [
+        makeTest({ name: "timeout early", testId: "e1", quarantinedAt: "2026-01-01T00:00:00Z" }),
+        makeTest({ name: "timeout late", testId: "e2", quarantinedAt: "2026-01-03T00:00:00Z" }),
+        makeTest({ name: "other late", testId: "e3", quarantinedAt: "2026-01-03T00:00:00Z" }),
+      ],
+      "timeout",
+      null,
+      "2026-01-02",
+      null,
+    ).map((t) => t.name),
+    expected: ["timeout late"],
+  })
+})
+
+describe("filterByDateRange()", async (assert) => {
+  const tests: QuarantinedTestDetail[] = [
+    makeTest({ name: "jan test", testId: "t1", quarantinedAt: "2026-01-15T00:00:00Z" }),
+    makeTest({ name: "feb test", testId: "t2", quarantinedAt: "2026-02-15T00:00:00Z" }),
+    makeTest({ name: "mar test", testId: "t3", quarantinedAt: "2026-03-15T00:00:00Z" }),
+  ]
+
+  assert({
+    given: "null from and null until",
+    should: "return all tests unchanged",
+    actual: filterByDateRange(tests, null, null).length,
+    expected: 3,
+  })
+
+  assert({
+    given: 'from "2026-02-01" with no until',
+    should: "return only tests quarantined on or after Feb 1",
+    actual: filterByDateRange(tests, "2026-02-01", null).map((t) => t.name),
+    expected: ["feb test", "mar test"],
+  })
+
+  assert({
+    given: 'until "2026-02-28" with no from',
+    should: "return only tests quarantined on or before Feb 28",
+    actual: filterByDateRange(tests, null, "2026-02-28").map((t) => t.name),
+    expected: ["jan test", "feb test"],
+  })
+
+  assert({
+    given: 'from "2026-02-01" and until "2026-02-28"',
+    should: "return only tests within the date range",
+    actual: filterByDateRange(tests, "2026-02-01", "2026-02-28").map((t) => t.name),
+    expected: ["feb test"],
+  })
+
+  assert({
+    given: "from equals the exact quarantine date (inclusive lower bound)",
+    should: "include the test quarantined on that date",
+    actual: filterByDateRange(tests, "2026-02-15", null).map((t) => t.name),
+    expected: ["feb test", "mar test"],
+  })
+
+  assert({
+    given: "until equals the exact quarantine date (inclusive upper bound)",
+    should: "include the test quarantined on that date",
+    actual: filterByDateRange(tests, null, "2026-02-15").map((t) => t.name),
+    expected: ["jan test", "feb test"],
+  })
+
+  assert({
+    given: "a range that excludes all tests",
+    should: "return an empty array",
+    actual: filterByDateRange(tests, "2026-06-01", null).map((t) => t.name),
+    expected: [],
+  })
+
+  assert({
+    given: "an empty test array",
+    should: "return an empty array",
+    actual: filterByDateRange([], "2026-01-01", "2026-12-31"),
     expected: [],
   })
 })

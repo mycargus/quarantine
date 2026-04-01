@@ -275,6 +275,56 @@ describe("project() — no filters: shows all tests with total count", async (as
   }
 })
 
+describe("project() — date range filter: from and until", async (assert) => {
+  const dbPath = join(tmpdir(), `project-test-daterange-${Date.now()}.db`)
+  const origDb = process.env.DATABASE_URL
+  process.env.DATABASE_URL = dbPath
+
+  makeDbWithFilterTests(dbPath)
+
+  try {
+    // fixture has quarantined_at dates: 2026-01-01, 2026-01-02, 2026-01-03, 2026-01-04, 2026-01-05
+    const url = "http://localhost/acme/filter-repo?from=2026-01-02&until=2026-01-04"
+    const response = await project("acme", "filter-repo", url)
+    const html = await bodyText(response)
+
+    assert({
+      given: "from=2026-01-02 and until=2026-01-04",
+      should: "include tests quarantined within the range",
+      actual:
+        html.includes("timeout on network") &&
+        html.includes("should process payment") &&
+        html.includes("should validate card"),
+      expected: true,
+    })
+
+    assert({
+      given: "from=2026-01-02 and until=2026-01-04",
+      should: "exclude tests outside the range (quarantined before or after)",
+      actual: html.includes("timeout when DB is slow") || html.includes("unknown status test"),
+      expected: false,
+    })
+
+    assert({
+      given: "from=2026-01-02 and until=2026-01-04 (3 of 5 tests match)",
+      should: "show the filtered count phrase 'Showing 3 of 5 quarantined tests'",
+      actual: html.includes("Showing 3 of 5 quarantined tests"),
+      expected: true,
+    })
+  } finally {
+    if (origDb === undefined) {
+      delete process.env.DATABASE_URL
+    } else {
+      process.env.DATABASE_URL = origDb
+    }
+    try {
+      unlinkSync(dbPath)
+    } catch {
+      // db may not have been created
+    }
+  }
+})
+
 describe("project() — project not found", async (assert) => {
   const dbPath = join(tmpdir(), `project-test-notfound-${Date.now()}.db`)
   const origDb = process.env.DATABASE_URL
