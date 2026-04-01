@@ -631,19 +631,21 @@ hardens and documents the entire system.
 **Scope -- included:**
 
 - Quarantined test list per project: shows all currently quarantined tests
-  with issue links, quarantine date, flaky count.
-- Trend charts:
-  - Flaky test count over time (per project).
-  - Test stability trend (pass rate over time).
-  - Quarantine queue size over time.
+  with issue links, quarantine date, flaky count, last flaky occurrence.
+- Trend chart: flaky test count over time (per project).
 - Filters and search:
-  - Filter by project, date range, test status.
+  - Filter by project (route-based), date range, test status.
   - Search by test name or test_id.
 - Cross-repo overview page: aggregated stats across all configured repos
   (total quarantined tests, total flaky detections, most flaky tests).
-- Integration tested with real CLI output from M5 (replace golden fixtures
-  with actual `.quarantine/results.json` artifacts from CI runs).
-- Responsive layout with Tailwind CSS.
+- On-demand sync on page load: check debounce, pull artifacts from GitHub,
+  ingest into both `test_runs` and `quarantined_tests` (FR-1.5.2, FR-1.5.3).
+  Sync failure degrades gracefully — page renders with existing data.
+- Ingest pipeline populates `quarantined_tests` from artifact test entries:
+  `status: "quarantined"` → upsert with quarantined_at, last_run_status,
+  issue_url; `status: "flaky"` → increment flaky_count, update last_flaky_at.
+- Dashboard renders data pulled from real GitHub Artifacts via on-demand sync.
+- Responsive layout via CSS (no build step).
 
 **Scope -- explicitly excluded:**
 
@@ -651,26 +653,35 @@ hardens and documents the entire system.
 - No Docker image (M8).
 - No authentication beyond network-level.
 - No export or API endpoints.
+- No background polling daemon (M8).
 
 **Acceptance criteria:**
 
 1. Project detail page shows a list of quarantined tests with issue links.
+   (FR-1.5.1)
 2. Trend charts render correctly with at least 7 days of data.
-3. Filters narrow the displayed data correctly.
+3. Filters narrow the displayed data correctly (date range, status, search
+   all compose).
 4. Search returns matching tests by name or test_id.
-5. Cross-repo overview page shows aggregated statistics.
-6. Dashboard correctly ingests and displays data from real CLI output (not
-   just fixtures).
-7. UI is responsive on desktop and tablet viewports.
+5. Cross-repo overview page shows aggregated statistics. (FR-1.5.5)
+6. Dashboard pulls and displays data from real GitHub Artifacts via on-demand
+   sync (not just test fixtures). (FR-1.5.2)
+7. UI is responsive on desktop and tablet viewports. (FR-1.5.6)
 8. Unit and integration tests cover: chart data queries, filter logic, search
    functionality, cross-repo aggregation.
+9. On-demand sync fires on page load when data is stale, reads token from
+   env, and respects the debounce. (FR-1.5.3, NFR-2.3.4)
+10. Artifact ingestion populates `quarantined_tests` with `quarantined_at`
+    preserved on conflict. (FR-1.5.1, FR-1.5.4)
+11. Flaky detections increment `flaky_count` and update `last_flaky_at`.
+    (FR-1.5.1)
+12. On-demand sync failure degrades gracefully — page renders with existing
+    SQLite data. (FR-1.6.1 analogy)
 
 **Key implementation notes:**
 
 - Trend data requires multiple test runs over time. Integration testing should
   use a series of fixture files representing runs on different dates.
-- Chart rendering library choice is left to the implementer (e.g., Chart.js,
-  Recharts, or a lightweight alternative).
 - The dashboard stores a SHA-256 hash of `test_id` internally for efficient
   indexing. This is an internal optimization, not part of the cross-system
   contract.
