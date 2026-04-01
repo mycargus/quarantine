@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Local pre-flight checks and tag creation for releases.
+# This script does NOT perform the release itself -- that happens in the
+# GitHub Actions release workflow triggered by the tag push.
 set -euo pipefail
 
 VERSION="${1:-}"
@@ -80,7 +83,10 @@ git tag -a "$VERSION" -m "Release $VERSION"
 # 14. Push tag
 git push origin "$VERSION"
 
+REMOTE_URL=$(git remote get-url origin)
+REPO_URL=$(echo "$REMOTE_URL" | sed -E 's|git@github\.com:|https://github.com/|; s|\.git$||')
+
 echo ""
 echo "Tag $VERSION pushed."
 echo "Monitor the release workflow at:"
-echo "https://github.com/mycargus/quarantine/actions"
+echo "${REPO_URL}/actions"

@@ -8,8 +8,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// version is set at build time via ldflags.
-var version = "0.1.0"
+// version is set at build time via ldflags (-X main.version=...).
+// Local dev builds default to "dev"; GoReleaser sets the real version.
+var version = "dev"
 
 func main() {
 	if err := newRootCmd().Execute(); err != nil {
