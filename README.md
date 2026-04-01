@@ -61,6 +61,23 @@ framework: jest  # or rspec or vitest
 
 That's it. Quarantine handles detection, quarantine state, GitHub Issues, and PR comments automatically.
 
+### Non-standard setups (pnpm, bun, custom config)
+
+If your project uses a package manager other than npm, or a custom Jest config, set `rerun_command` in `quarantine.yml`:
+
+```yaml
+# pnpm
+rerun_command: "pnpm exec jest --testNamePattern '{name}'"
+
+# bun
+rerun_command: "bunx jest --testNamePattern '{name}'"
+
+# custom jest config
+rerun_command: "npx jest --config jest.ci.config.js --testNamePattern '{name}'"
+```
+
+`{name}`, `{classname}`, and `{file}` are substituted with values from the failing test's JUnit XML entry. See [`docs/specs/config-schema.md`](docs/specs/config-schema.md#rerun_command) for the full reference.
+
 ## Features (v1)
 
 - **Zero-friction integration:** one command wraps your existing test runner
