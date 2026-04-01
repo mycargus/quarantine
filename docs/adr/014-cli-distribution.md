@@ -9,11 +9,26 @@ The Go CLI needs to be distributed to CI environments and developer machines. Op
 
 ## Decision
 
-Direct binary downloads via GitHub Releases for v1. Each release publishes pre-compiled binaries for linux/darwin/windows + amd64/arm64. Installation in CI is a curl + chmod:
+Direct binary downloads via GitHub Releases for v1. Each release publishes pre-compiled binaries for linux/darwin + amd64/arm64. An install script handles OS/arch detection, download, and checksum verification:
 
 ```yaml
-- run: |
-    curl -sL https://github.com/org/quarantine/releases/latest/download/quarantine-linux-amd64 -o /usr/local/bin/quarantine
+- name: Install quarantine
+  run: curl -sSL https://raw.githubusercontent.com/mycargus/quarantine/main/scripts/install.sh | bash
+  env:
+    VERSION: v0.1.0  # pin to a specific version
+```
+
+Or download directly with checksum verification:
+
+```yaml
+- name: Install quarantine
+  run: |
+    VERSION="0.1.0"
+    curl -sL "https://github.com/mycargus/quarantine/releases/download/v${VERSION}/quarantine_${VERSION}_linux_amd64" \
+      -o /usr/local/bin/quarantine
+    curl -sL "https://github.com/mycargus/quarantine/releases/download/v${VERSION}/checksums.txt" \
+      -o /tmp/checksums.txt
+    cd /usr/local/bin && grep "quarantine_${VERSION}_linux_amd64" /tmp/checksums.txt | sha256sum --check
     chmod +x /usr/local/bin/quarantine
 ```
 

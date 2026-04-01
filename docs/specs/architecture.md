@@ -42,7 +42,7 @@ sequenceDiagram
 |-----------------|------------------------------------------------------------------------|
 | Language        | Go (ADR-004)                                                           |
 | Artifact        | Single statically-linked binary, no runtime dependencies               |
-| Targets         | linux/darwin/windows x amd64/arm64 (cross-compiled) [v1]              |
+| Targets         | linux/darwin x amd64/arm64 (cross-compiled) [v1]              |
 | Distribution    | GitHub Releases (direct binary download) [v1], Docker image [v1]      |
 | Config          | `quarantine.yml` in repo root (YAML) (ADR-010)                        |
 
@@ -98,7 +98,7 @@ Dashboard SQLite schema will be defined during M6 implementation.
 ### 5.1 CLI Distribution
 
 **[v1] GitHub Releases:**
-- Go binary cross-compiled for 6 targets (linux/darwin/windows x amd64/arm64).
+- Go binary cross-compiled for 4 targets (linux/darwin x amd64/arm64).
 - Published as GitHub Release assets on each tagged version.
 - Checksum file (SHA256) published alongside binaries (ADR-014).
 
@@ -109,9 +109,9 @@ Dashboard SQLite schema will be defined during M6 implementation.
 
 ```yaml
 - name: Install quarantine
-  run: |
-    curl -sSL https://github.com/org/quarantine/releases/latest/download/quarantine-linux-amd64 \
-      -o /usr/local/bin/quarantine && chmod +x /usr/local/bin/quarantine
+  run: curl -sSL https://raw.githubusercontent.com/mycargus/quarantine/main/scripts/install.sh | bash
+  env:
+    VERSION: v0.1.0
 
 - name: Run tests
   run: quarantine run -- jest --ci --reporters=default --reporters=jest-junit

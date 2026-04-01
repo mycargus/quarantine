@@ -708,8 +708,7 @@ hardens and documents the entire system.
     context names.
   - Vitest parameterized tests: verify `test_id` construction.
   - Golden fixtures added to `testdata/` for parameterized test output.
-- CLI binary cross-compilation: linux/darwin/windows x amd64/arm64 (6
-  targets).
+- CLI binary cross-compilation: linux/darwin x amd64/arm64 (4 targets).
 - Release automation: GitHub Actions workflow for building, checksumming
   (SHA256), and publishing release assets.
 

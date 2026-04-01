@@ -38,7 +38,7 @@
 
 | ID | Requirement | Version |
 |----|-------------|---------|
-| NFR-2.5.1 | CLI is a single Go binary, cross-compiled for linux/darwin/windows on amd64 and arm64. | [v1] |
+| NFR-2.5.1 | CLI is a single Go binary, cross-compiled for linux/darwin on amd64 and arm64. | [v1] |
 | NFR-2.5.2 | CLI distributed via GitHub Releases as a direct download. | [v1] |
 | NFR-2.5.3 | CLI Docker image published with usage instructions. | [v1] |
 | NFR-2.5.4 | Dashboard ships as a single Docker container (`docker run quarantine-dash`) as a convenience; Docker is not required. | [v1] |
