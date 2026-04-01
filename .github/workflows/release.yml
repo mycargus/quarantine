@@ -9,8 +9,133 @@ permissions:
   contents: write
 
 jobs:
+  cli:
+    name: CLI
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache-dependency-path: go.sum
+
+      - name: Build
+        run: make cli-build
+
+      - name: Test
+        run: make cli-test
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          args: ./cli/...
+
+  dashboard:
+    name: Dashboard
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: node-version
+        run: echo "version=$(grep nodejs .tool-versions | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node-version.outputs.version }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: dashboard/package.json
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: dashboard
+
+      - name: Lint
+        run: make dash-lint-ci
+
+      - name: Typecheck
+        run: make dash-typecheck
+
+      - name: Test
+        run: make dash-test
+
+  contract:
+    name: Contract Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: node-version
+        run: echo "version=$(grep nodejs .tool-versions | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node-version.outputs.version }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: test/package.json
+
+      - name: Install test dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: test
+
+      - name: Lint
+        run: make contract-lint-ci
+
+      - name: Contract Tests
+        run: make contract-test
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    environment: CI
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache-dependency-path: go.sum
+
+      - name: Build CLI binary
+        run: make cli-build
+
+      - id: node-version
+        run: echo "version=$(grep nodejs .tool-versions | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node-version.outputs.version }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: test/package.json
+
+      - name: Install test dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: test
+
+      - name: Lint
+        run: make e2e-lint-ci
+
+      - name: E2E Tests
+        run: make e2e-test
+        env:
+          QUARANTINE_GITHUB_TOKEN: ${{ secrets.QUARANTINE_GITHUB_TOKEN }}
+          QUARANTINE_TEST_OWNER: ${{ vars.QUARANTINE_TEST_OWNER }}
+          QUARANTINE_TEST_REPO: ${{ vars.QUARANTINE_TEST_REPO }}
+          QUARANTINE_BIN: ${{ github.workspace }}/bin/quarantine
+
   release:
     name: Release
+    needs: [cli, dashboard, contract, e2e]
     runs-on: ubuntu-latest
     environment: release
 
@@ -21,7 +146,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: stable
           cache-dependency-path: go.sum
 
       - name: Verify CHANGELOG entry
@@ -39,32 +164,6 @@ jobs:
           VERSION_NUM="${VERSION#v}"
           awk "/^## \[${VERSION_NUM}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md \
             > /tmp/release-notes.md
-
-      - name: CLI Lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          args: ./cli/...
-
-      - name: CLI Test
-        run: make cli-test
-
-      - id: node-version
-        run: echo "version=$(grep nodejs .tool-versions | awk '{print $2}')" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ steps.node-version.outputs.version }}
-
-      - uses: pnpm/action-setup@v4
-        with:
-          package_json_file: test/package.json
-
-      - name: Install test dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: test
-
-      - name: Contract Tests
-        run: make contract-test
 
       - name: GoReleaser
         uses: goreleaser/goreleaser-action@v6
