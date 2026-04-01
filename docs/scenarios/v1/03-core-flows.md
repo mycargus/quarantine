@@ -402,3 +402,39 @@ and `should process refund` fails on the first run but passes on retry 1 of 3
 8. Exits with code 0 (flaky is forgiven — the test passed on retry).
 
 ---
+
+### Scenario 84: GitHub Issue body includes a link to the CI build [M5]
+
+**Risk:** When a developer opens a quarantine issue, they have no way to find the CI build where the flaky test was first detected, making root-cause investigation harder.
+
+**Given** the CLI is running in GitHub Actions (GITHUB_RUN_ID is set) and
+detects a flaky test `PaymentService > should handle charge timeout`
+
+**When** the CLI creates a GitHub Issue for the flaky test
+
+**Then** the issue body includes a **Build:** line with a clickable link to the
+GitHub Actions run:
+`https://github.com/{owner}/{repo}/actions/runs/{run_id}`
+
+The link is constructed from the repo (`res.Repo`) and run ID (`res.RunID`).
+When the run ID is not a GitHub Actions run ID (e.g. starts with `local-` for
+local runs), the **Build:** line is omitted entirely.
+
+---
+
+### Scenario 85: GitHub Issue body omits "Detected in:" when branch and SHA are unavailable [M5]
+
+**Risk:** When the CLI runs outside GitHub Actions (e.g. local development or a non-standard CI environment) without `GITHUB_REF_NAME`/`GITHUB_SHA` env vars and in a git repo with no commits, the issue body renders a broken "Detected in: @" line.
+
+**Given** the CLI runs in an environment where `GITHUB_REF_NAME` and
+`GITHUB_SHA` are not set, and the working directory is a git repository with no
+commits (so `git rev-parse HEAD` and `git rev-parse --abbrev-ref HEAD` both
+fail)
+
+**When** the CLI creates a GitHub Issue for a flaky test
+
+**Then** the issue body omits the **Detected in:** line entirely (no empty
+"Detected in: @" output). All other fields (Test ID, Suite, Name, First
+detected, etc.) render normally.
+
+---
