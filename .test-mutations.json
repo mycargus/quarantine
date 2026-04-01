@@ -121,17 +121,21 @@
     "cli/internal/quarantine/state.go": {
       "status": "completed",
       "covering_tests": ["cli/internal/quarantine/state_test.go", "cli/internal/quarantine/state_merge_test.go", "cli/internal/quarantine/state_schema_test.go"],
-      "last_tested": "2026-04-01T04:30:00Z",
+      "last_tested": "2026-04-01T09:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 4, "killed": 2, "survived": 2, "examples": [
-          {"line": 136, "original": "<", "mutated": "<=", "result": "survived", "test_that_caught_it": null},
-          {"line": 140, "original": "<", "mutated": "<=", "result": "survived", "test_that_caught_it": null}
+        "relational": {"total": 18, "killed": 16, "survived": 2, "examples": [
+          {"line": 136, "original": "<", "mutated": "<=", "result": "survived (equivalent mutant)", "test_that_caught_it": null},
+          {"line": 140, "original": "<", "mutated": "<=", "result": "survived (equivalent mutant)", "test_that_caught_it": null}
         ]},
         "constant": {"total": 2, "killed": 2, "survived": 0, "examples": []},
-        "logical": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+        "logical": {"total": 10, "killed": 9, "survived": 1, "examples": [
+          {"line": 135, "original": "&&", "mutated": "||", "result": "survived (equivalent mutant — self-heals via entry block)", "test_that_caught_it": null}
+        ]},
+        "statement": {"total": 5, "killed": 5, "survived": 0, "examples": []},
+        "return": {"total": 1, "killed": 1, "survived": 0, "examples": []}
       },
-      "mutation_score": 71.4,
-      "insights": ["Timestamp comparison boundary mutations survive — < vs <= equivalent when timestamps never equal in tests"]
+      "mutation_score": 93.3,
+      "insights": ["All 3 survivors are equivalent mutants — no behavioral difference possible", "Lines 136/140: < vs <= is a no-op when values are equal", "Line 135: && vs || self-heals because the entry block immediately re-assigns the correct value", "28/30 valid mutations killed, 2 relational + 1 logical are equivalent"]
     },
     "cli/internal/runner/runner.go": {
       "status": "completed",
@@ -334,9 +338,9 @@
   "global_statistics": {
     "total_modules": 21,
     "completed_modules": 21,
-    "total_mutations": 330,
-    "total_killed": 312,
-    "total_survived": 21,
-    "overall_score": 94.5
+    "total_mutations": 359,
+    "total_killed": 340,
+    "total_survived": 22,
+    "overall_score": 94.7
   }
 }
