@@ -150,6 +150,12 @@ function runMigrations(raw: RawDatabase): void {
       UNIQUE(project_id, test_id)
     );
   `)
+
+  try {
+    raw.exec("ALTER TABLE quarantined_tests ADD COLUMN last_run_status TEXT")
+  } catch {
+    // Column already exists — ignore
+  }
 }
 
 /**
@@ -321,11 +327,13 @@ export interface ProjectRow {
 }
 
 export interface QuarantinedTestDetail {
+  testId: string
   name: string
   quarantinedAt: string
   lastFlakyAt: string | null
   issueNumber: number | null
   issueUrl: string | null
+  lastRunStatus: "passing" | "failing" | null
 }
 
 export interface TrendPoint {
@@ -360,25 +368,29 @@ export async function getProjectQuarantinedTests(
 ): Promise<QuarantinedTestDetail[]> {
   const rows = handle.raw
     .prepare(
-      `SELECT qt.name, qt.quarantined_at, qt.last_flaky_at, qt.issue_number, qt.issue_url
+      `SELECT qt.test_id, qt.name, qt.quarantined_at, qt.last_flaky_at, qt.issue_number, qt.issue_url, qt.last_run_status
        FROM quarantined_tests qt
        JOIN projects p ON p.id = qt.project_id
        WHERE p.owner = ? AND p.repo = ?`,
     )
     .all(owner, repo) as {
+    test_id: string
     name: string
     quarantined_at: string
     last_flaky_at: string | null
     issue_number: number | null
     issue_url: string | null
+    last_run_status: string | null
   }[]
 
   return rows.map((row) => ({
+    testId: row.test_id,
     name: row.name,
     quarantinedAt: row.quarantined_at,
     lastFlakyAt: row.last_flaky_at,
     issueNumber: row.issue_number,
     issueUrl: row.issue_url,
+    lastRunStatus: (row.last_run_status as "passing" | "failing" | null) ?? null,
   }))
 }
 

@@ -7,6 +7,7 @@ import {
   getProjectTrend,
   initDb,
 } from "../lib/db.server.js"
+import { applyFilters } from "../lib/filter.server.js"
 
 function NotFoundPage(_handle: Handle, repoHandle: string) {
   return () => (
@@ -57,6 +58,8 @@ interface ProjectPageData {
   repo: string
   tests: QuarantinedTestDetail[]
   trend: TrendPoint[]
+  filteredCount: number
+  totalCount: number
 }
 
 function ProjectPage(_handle: Handle, data: ProjectPageData) {
@@ -73,6 +76,13 @@ function ProjectPage(_handle: Handle, data: ProjectPageData) {
 
           <section>
             <h2>Quarantined Tests</h2>
+            <p>
+              {"Showing "}
+              {String(data.filteredCount)}
+              {" of "}
+              {String(data.totalCount)}
+              {" quarantined tests"}
+            </p>
             <table>
               <thead>
                 <tr>
@@ -112,7 +122,7 @@ function ProjectPage(_handle: Handle, data: ProjectPageData) {
   )
 }
 
-export async function project(owner: string, repo: string): Promise<Response> {
+export async function project(owner: string, repo: string, url: string): Promise<Response> {
   const dbPath = process.env.DATABASE_URL ?? "./quarantine.db"
   const handle = initDb(dbPath)
 
@@ -125,12 +135,30 @@ export async function project(owner: string, repo: string): Promise<Response> {
     })
   }
 
-  const [tests, trend] = await Promise.all([
+  const parsedUrl = new URL(url)
+  const search = parsedUrl.searchParams.get("search") ?? ""
+  const statusParam = parsedUrl.searchParams.get("status")
+  const status = statusParam === "failing" || statusParam === "passing" ? statusParam : null
+
+  const [allTests, trend] = await Promise.all([
     getProjectQuarantinedTests(handle, owner, repo),
     getProjectTrend(handle, owner, repo),
   ])
 
-  const stream = renderToStream(<ProjectPage setup={{ owner, repo, tests, trend }} />)
+  const tests = applyFilters(allTests, search, status)
+
+  const stream = renderToStream(
+    <ProjectPage
+      setup={{
+        owner,
+        repo,
+        tests,
+        trend,
+        filteredCount: tests.length,
+        totalCount: allTests.length,
+      }}
+    />,
+  )
   return new Response(stream, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   })

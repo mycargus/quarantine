@@ -10,7 +10,7 @@ const router = createRouter()
 router.map(routes, {
   actions: {
     home,
-    projectDetail: (ctx) => project(ctx.params.owner, ctx.params.repo),
+    projectDetail: (ctx) => project(ctx.params.owner, ctx.params.repo, ctx.request.url),
   },
 })
 
