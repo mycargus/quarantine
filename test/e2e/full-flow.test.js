@@ -276,6 +276,25 @@ if (!token) throw new Error("QUARANTINE_GITHUB_TOKEN is required")
 if (!owner) throw new Error("QUARANTINE_TEST_OWNER is required")
 if (!repo) throw new Error("QUARANTINE_TEST_REPO is required")
 
+// Close any issues left open by previous test runs before starting.
+// Issues with the 'quarantine' label belong to the fixture repo's own CI
+// workflow (quarantine-test-fixture) and must never be closed here.
+async function closeStaleE2EIssues() {
+  const res = await ghRequest("GET", "/issues?state=open&per_page=100")
+  if (res.status !== 200) return
+  const issues = await res.json()
+  const stale = issues.filter((issue) => !issue.labels.some((label) => label.name === "quarantine"))
+  await Promise.all(
+    stale.map((issue) =>
+      ghRequest("PATCH", `/issues/${issue.number}`, { state: "closed" }).catch(() => {}),
+    ),
+  )
+}
+
+beforeAll(async () => {
+  await closeStaleE2EIssues()
+})
+
 describe("quarantine run — Scenario 20: CI run detects a new flaky test (issue + PR comment)", () => {
   let dir
   let proxyIssueNumber = null
