@@ -39,6 +39,21 @@ export const testRuns = table({
   },
 })
 
+export const quarantinedTests = table({
+  name: "quarantined_tests",
+  columns: {
+    id: c.integer().primaryKey().autoIncrement(),
+    project_id: c.integer().notNull(),
+    test_id: c.text().notNull(),
+    name: c.text().notNull(),
+    issue_number: c.integer(),
+    issue_url: c.text(),
+    quarantined_at: c.text().notNull(),
+    flaky_count: c.integer(),
+    last_flaky_at: c.text(),
+  },
+})
+
 export type Database = ReturnType<typeof createDatabase>
 
 export type DbHandle = {
@@ -65,6 +80,26 @@ export interface TestRun {
   passedTests: number
   failedTests: number
   flakyTests: number
+}
+
+export interface RepoQuarantineCount {
+  owner: string
+  repo: string
+  quarantinedCount: number
+}
+
+export interface RecentlyQuarantinedTest {
+  owner: string
+  repo: string
+  name: string
+  quarantinedAt: string
+  issueUrl: string | null
+}
+
+export interface OrgOverview {
+  totalQuarantined: number
+  byRepo: RepoQuarantineCount[]
+  mostRecentlyQuarantined: RecentlyQuarantinedTest[]
 }
 
 function runMigrations(raw: RawDatabase): void {
@@ -100,6 +135,21 @@ function runMigrations(raw: RawDatabase): void {
   } catch {
     // Column already exists — ignore
   }
+
+  raw.exec(`
+    CREATE TABLE IF NOT EXISTS quarantined_tests (
+      id INTEGER PRIMARY KEY,
+      project_id INTEGER NOT NULL REFERENCES projects(id),
+      test_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      issue_number INTEGER,
+      issue_url TEXT,
+      quarantined_at TEXT NOT NULL,
+      flaky_count INTEGER DEFAULT 0,
+      last_flaky_at TEXT,
+      UNIQUE(project_id, test_id)
+    );
+  `)
 }
 
 /**
@@ -184,6 +234,67 @@ export async function updateLastPulledAt(
   timestamp: string,
 ): Promise<void> {
   await db.updateMany(projects, { last_pulled_at: timestamp }, { where: { id: projectId } })
+}
+
+/**
+ * Returns an org-wide overview of quarantined tests across all configured repos.
+ * For each repo in `repos`, returns its quarantined test count. Also returns
+ * the top 5 most recently quarantined tests across all repos (by quarantined_at desc).
+ *
+ * Accepts both the data-table `db` (for ORM queries) and the raw better-sqlite3
+ * instance (for the cross-table JOIN query that the ORM cannot express directly).
+ */
+export async function getOrgOverview(handle: DbHandle, repos: RepoConfig[]): Promise<OrgOverview> {
+  const { db, raw } = handle
+  // Fetch each project row once; reuse it for both the count query and the recent query.
+  const repoRows = await Promise.all(
+    repos.map((r) => db.query(projects).where({ owner: r.owner, repo: r.repo }).first()),
+  )
+
+  const byRepo: RepoQuarantineCount[] = await Promise.all(
+    repos.map(async (r, i) => {
+      const row = repoRows[i]
+      const quarantinedCount = row
+        ? await db.count(quarantinedTests, { where: { project_id: row.id } })
+        : 0
+      return { owner: r.owner, repo: r.repo, quarantinedCount }
+    }),
+  )
+
+  const totalQuarantined = byRepo.reduce((sum, r) => sum + r.quarantinedCount, 0)
+
+  const projectIds = repoRows.filter((r): r is NonNullable<typeof r> => r != null).map((r) => r.id)
+
+  let mostRecentlyQuarantined: RecentlyQuarantinedTest[] = []
+  if (projectIds.length > 0) {
+    const placeholders = projectIds.map(() => "?").join(", ")
+    const rows = raw
+      .prepare(
+        `SELECT qt.name, qt.quarantined_at, qt.issue_url, p.owner, p.repo
+         FROM quarantined_tests qt
+         JOIN projects p ON p.id = qt.project_id
+         WHERE qt.project_id IN (${placeholders})
+         ORDER BY qt.quarantined_at DESC
+         LIMIT 5`,
+      )
+      .all(...projectIds) as {
+      name: string
+      quarantined_at: string
+      issue_url: string | null
+      owner: string
+      repo: string
+    }[]
+
+    mostRecentlyQuarantined = rows.map((row) => ({
+      owner: row.owner,
+      repo: row.repo,
+      name: row.name,
+      quarantinedAt: row.quarantined_at,
+      issueUrl: row.issue_url,
+    }))
+  }
+
+  return { totalQuarantined, byRepo, mostRecentlyQuarantined }
 }
 
 /**

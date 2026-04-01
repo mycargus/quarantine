@@ -1,8 +1,8 @@
 import type { Handle } from "remix/component"
 import { renderToStream } from "remix/component/server"
 import { loadConfig } from "../lib/config.server.js"
-import type { ProjectSummary } from "../lib/db.server.js"
-import { getProjects, initDb } from "../lib/db.server.js"
+import type { OrgOverview, ProjectSummary } from "../lib/db.server.js"
+import { getOrgOverview, getProjects, initDb } from "../lib/db.server.js"
 
 function ProjectRow(_handle: Handle, project: ProjectSummary) {
   return () => (
@@ -14,7 +14,34 @@ function ProjectRow(_handle: Handle, project: ProjectSummary) {
   )
 }
 
-function ProjectsPage(_handle: Handle, projects: ProjectSummary[]) {
+interface PageData {
+  projects: ProjectSummary[]
+  overview: OrgOverview
+}
+
+function RecentTestRow(_handle: Handle, test: OrgOverview["mostRecentlyQuarantined"][number]) {
+  return () => (
+    <tr>
+      <td>{`${test.owner}/${test.repo}`}</td>
+      <td>{test.name}</td>
+      <td>{test.quarantinedAt}</td>
+      <td>{test.issueUrl ? <a href={test.issueUrl}>Issue</a> : "—"}</td>
+    </tr>
+  )
+}
+
+function RepoOverviewRow(_handle: Handle, row: OrgOverview["byRepo"][number]) {
+  return () => (
+    <tr>
+      <td>
+        <a href={`/projects/${row.owner}/${row.repo}`}>{`${row.owner}/${row.repo}`}</a>
+      </td>
+      <td>{String(row.quarantinedCount)}</td>
+    </tr>
+  )
+}
+
+function ProjectsPage(_handle: Handle, data: PageData) {
   return () => (
     <html lang="en">
       <head>
@@ -25,20 +52,63 @@ function ProjectsPage(_handle: Handle, projects: ProjectSummary[]) {
       <body>
         <main style="font-family: system-ui, sans-serif; padding: 2rem">
           <h1>Projects</h1>
-          <table>
-            <thead>
-              <tr>
-                <th>Repository</th>
-                <th>Test Runs</th>
-                <th>Last Synced</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects.map((p) => (
-                <ProjectRow setup={p} key={`${p.owner}/${p.repo}`} />
-              ))}
-            </tbody>
-          </table>
+
+          <section>
+            <h2>Overview</h2>
+            <p>
+              Total quarantined tests: <strong>{String(data.overview.totalQuarantined)}</strong>
+            </p>
+
+            <h3>By Repository</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Repository</th>
+                  <th>Quarantined</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.overview.byRepo.map((r) => (
+                  <RepoOverviewRow setup={r} key={`${r.owner}/${r.repo}`} />
+                ))}
+              </tbody>
+            </table>
+
+            <h3>Most Recently Quarantined</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Repository</th>
+                  <th>Test</th>
+                  <th>Quarantined At</th>
+                  <th>Issue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.overview.mostRecentlyQuarantined.map((t) => (
+                  <RecentTestRow setup={t} key={`${t.owner}/${t.repo}/${t.name}`} />
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          <section>
+            <h2>All Repositories</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Repository</th>
+                  <th>Test Runs</th>
+                  <th>Last Synced</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.projects.map((p) => (
+                  <ProjectRow setup={p} key={`${p.owner}/${p.repo}`} />
+                ))}
+              </tbody>
+            </table>
+          </section>
         </main>
       </body>
     </html>
@@ -83,10 +153,13 @@ export async function home(): Promise<Response> {
     })
   }
 
-  const { db } = initDb(dbPath)
-  const projects = await getProjects(db, config.repos)
+  const handle = initDb(dbPath)
+  const [projects, overview] = await Promise.all([
+    getProjects(handle.db, config.repos),
+    getOrgOverview(handle, config.repos),
+  ])
 
-  const stream = renderToStream(<ProjectsPage setup={projects} />)
+  const stream = renderToStream(<ProjectsPage setup={{ projects, overview }} />)
 
   return new Response(stream, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
