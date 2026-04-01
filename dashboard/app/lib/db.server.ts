@@ -237,6 +237,13 @@ export async function updateLastPulledAt(
 }
 
 /**
+ * Pure: sums quarantined test counts across all repos.
+ */
+export function sumQuarantinedCounts(byRepo: RepoQuarantineCount[]): number {
+  return byRepo.reduce((sum, r) => sum + r.quarantinedCount, 0)
+}
+
+/**
  * Returns an org-wide overview of quarantined tests across all configured repos.
  * For each repo in `repos`, returns its quarantined test count. Also returns
  * the top 5 most recently quarantined tests across all repos (by quarantined_at desc).
@@ -261,7 +268,7 @@ export async function getOrgOverview(handle: DbHandle, repos: RepoConfig[]): Pro
     }),
   )
 
-  const totalQuarantined = byRepo.reduce((sum, r) => sum + r.quarantinedCount, 0)
+  const totalQuarantined = sumQuarantinedCounts(byRepo)
 
   const projectIds = repoRows.filter((r): r is NonNullable<typeof r> => r != null).map((r) => r.id)
 
@@ -302,4 +309,102 @@ export async function getOrgOverview(handle: DbHandle, repos: RepoConfig[]): Pro
  */
 export async function getTestRuns(_projectId: number): Promise<TestRun[]> {
   return []
+}
+
+export interface ProjectRow {
+  id: number
+  owner: string
+  repo: string
+  last_synced: string | null
+  last_etag: string | null
+  last_pulled_at: string | null
+}
+
+export interface QuarantinedTestDetail {
+  name: string
+  quarantinedAt: string
+  lastFlakyAt: string | null
+  issueNumber: number | null
+  issueUrl: string | null
+}
+
+export interface TrendPoint {
+  date: string
+  flakyCount: number
+}
+
+/**
+ * Returns the project row for the given owner/repo, or null if not found.
+ */
+export async function getProjectByOwnerRepo(
+  handle: DbHandle,
+  owner: string,
+  repo: string,
+): Promise<ProjectRow | null> {
+  const row = handle.raw
+    .prepare(
+      "SELECT id, owner, repo, last_synced, last_etag, last_pulled_at FROM projects WHERE owner = ? AND repo = ?",
+    )
+    .get(owner, repo) as ProjectRow | undefined
+  return row ?? null
+}
+
+/**
+ * Returns all quarantined tests for the given owner/repo.
+ * Returns an empty array if the project does not exist.
+ */
+export async function getProjectQuarantinedTests(
+  handle: DbHandle,
+  owner: string,
+  repo: string,
+): Promise<QuarantinedTestDetail[]> {
+  const rows = handle.raw
+    .prepare(
+      `SELECT qt.name, qt.quarantined_at, qt.last_flaky_at, qt.issue_number, qt.issue_url
+       FROM quarantined_tests qt
+       JOIN projects p ON p.id = qt.project_id
+       WHERE p.owner = ? AND p.repo = ?`,
+    )
+    .all(owner, repo) as {
+    name: string
+    quarantined_at: string
+    last_flaky_at: string | null
+    issue_number: number | null
+    issue_url: string | null
+  }[]
+
+  return rows.map((row) => ({
+    name: row.name,
+    quarantinedAt: row.quarantined_at,
+    lastFlakyAt: row.last_flaky_at,
+    issueNumber: row.issue_number,
+    issueUrl: row.issue_url,
+  }))
+}
+
+/**
+ * Returns flaky test counts aggregated by day for the given owner/repo,
+ * ordered by date ascending. Returns an empty array if the project does not
+ * exist or has no test runs.
+ */
+export async function getProjectTrend(
+  handle: DbHandle,
+  owner: string,
+  repo: string,
+): Promise<TrendPoint[]> {
+  const rows = handle.raw
+    .prepare(
+      `SELECT DATE(tr.timestamp) AS date, SUM(tr.flaky_tests) AS flaky_count
+       FROM test_runs tr
+       JOIN projects p ON p.id = tr.project_id
+       WHERE p.owner = ? AND p.repo = ?
+       GROUP BY DATE(tr.timestamp)
+       ORDER BY DATE(tr.timestamp) ASC`,
+    )
+    .all(owner, repo) as { date: string; flaky_count: number }[]
+
+  return rows.map((row) => ({
+    date: row.date,
+    flakyCount: row.flaky_count,
+  }))
 }
