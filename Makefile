@@ -1,4 +1,4 @@
-.PHONY: dev cli-build cli-test cli-lint cli-mutate dash-test dash-lint dash-lint-ci dash-typecheck test-build e2e-test e2e-lint e2e-lint-ci contract-test contract-lint contract-lint-ci test-lint lint-all test-all check install-hooks
+.PHONY: dev cli-build cli-test cli-lint cli-mutate dash-test dash-lint dash-lint-ci dash-typecheck test-build e2e-test e2e-lint e2e-lint-ci contract-test contract-lint contract-lint-ci test-lint lint-all test-all check install-hooks release
 
 # --- CLI (Go) ---
 
@@ -76,3 +76,8 @@ check: lint-all dash-typecheck
 lint-all: cli-lint dash-lint test-lint
 
 test-all: cli-test dash-test contract-test e2e-test
+
+# --- Release ---
+
+release:
+	@./scripts/release.sh $(VERSION)

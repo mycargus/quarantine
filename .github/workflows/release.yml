@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    environment: release
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Verify CHANGELOG entry
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          VERSION_NUM="${VERSION#v}"
+          if ! grep -q "^## \[${VERSION_NUM}\]" CHANGELOG.md; then
+            echo "Error: CHANGELOG.md has no entry for [${VERSION_NUM}]"
+            exit 1
+          fi
+
+      - name: Extract release notes
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          VERSION_NUM="${VERSION#v}"
+          awk "/^## \[${VERSION_NUM}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md \
+            > /tmp/release-notes.md
+
+      - name: CLI Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          args: ./cli/...
+
+      - name: CLI Test
+        run: make cli-test
+
+      - id: node-version
+        run: echo "version=$(grep nodejs .tool-versions | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node-version.outputs.version }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: test/package.json
+
+      - name: Install test dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: test
+
+      - name: Contract Tests
+        run: make contract-test
+
+      - name: GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: '~> v2'
+          args: release --clean --release-notes /tmp/release-notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
