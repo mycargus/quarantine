@@ -48,9 +48,23 @@ function ProjectsPage(_handle: Handle, data: PageData) {
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Quarantine Dashboard</title>
+        <style>{`
+          body { font-family: system-ui, sans-serif; margin: 0; padding: 0; }
+          main { padding: 1rem 2rem; max-width: 1200px; margin: 0 auto; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+          th { font-weight: 600; background: #f9fafb; }
+          @media (max-width: 640px) {
+            main { padding: 1rem; }
+            table, thead, tbody, tr { display: block; }
+            thead { display: none; }
+            td { display: flex; gap: 0.5rem; padding: 0.25rem 0; }
+            td::before { content: attr(data-label); font-weight: 600; min-width: 8rem; }
+          }
+        `}</style>
       </head>
       <body>
-        <main style="font-family: system-ui, sans-serif; padding: 2rem">
+        <main>
           <h1>Projects</h1>
 
           <section>
@@ -124,7 +138,7 @@ function ErrorPage(_handle: Handle, message: string) {
         <title>Quarantine Dashboard — Error</title>
       </head>
       <body>
-        <main style="font-family: system-ui, sans-serif; padding: 2rem">
+        <main>
           <h1>Configuration Error</h1>
           <p>{message}</p>
         </main>

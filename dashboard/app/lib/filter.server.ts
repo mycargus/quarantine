@@ -28,12 +28,36 @@ export function filterByStatus(
 }
 
 /**
- * Pure: apply both search and status filters (AND logic).
+ * Pure: filter tests by quarantine date range (inclusive on both ends).
+ * Compares the YYYY-MM-DD portion of quarantinedAt against from/until.
+ * Null bounds are unbounded (no lower or upper limit).
+ */
+export function filterByDateRange(
+  tests: QuarantinedTestDetail[],
+  from: string | null,
+  until: string | null,
+): QuarantinedTestDetail[] {
+  if (from === null && until === null) return tests
+  const fromDate = from?.slice(0, 10) ?? null
+  const untilDate = until?.slice(0, 10) ?? null
+  return tests.filter((t) => {
+    const date = t.quarantinedAt.slice(0, 10)
+    if (fromDate !== null && date < fromDate) return false
+    if (untilDate !== null && date > untilDate) return false
+    return true
+  })
+}
+
+/**
+ * Pure: apply search, status, and date range filters (all AND logic).
+ * from and until default to null (unbounded).
  */
 export function applyFilters(
   tests: QuarantinedTestDetail[],
   query: string,
   status: "passing" | "failing" | null,
+  from: string | null = null,
+  until: string | null = null,
 ): QuarantinedTestDetail[] {
-  return filterByStatus(filterBySearch(tests, query), status)
+  return filterByDateRange(filterByStatus(filterBySearch(tests, query), status), from, until)
 }

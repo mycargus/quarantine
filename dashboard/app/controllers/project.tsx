@@ -18,7 +18,7 @@ function NotFoundPage(_handle: Handle, repoHandle: string) {
         <title>Not Found — Quarantine Dashboard</title>
       </head>
       <body>
-        <main style="font-family: system-ui, sans-serif; padding: 2rem">
+        <main>
           <h1>Not Found</h1>
           <p>Project {repoHandle} was not found.</p>
         </main>
@@ -69,9 +69,23 @@ function ProjectPage(_handle: Handle, data: ProjectPageData) {
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{`${data.owner}/${data.repo} — Quarantine Dashboard`}</title>
+        <style>{`
+          body { font-family: system-ui, sans-serif; margin: 0; padding: 0; }
+          main { padding: 1rem 2rem; max-width: 1200px; margin: 0 auto; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+          th { font-weight: 600; background: #f9fafb; }
+          @media (max-width: 640px) {
+            main { padding: 1rem; }
+            table, thead, tbody, tr { display: block; }
+            thead { display: none; }
+            td { display: flex; gap: 0.5rem; padding: 0.25rem 0; }
+            td::before { content: attr(data-label); font-weight: 600; min-width: 8rem; }
+          }
+        `}</style>
       </head>
       <body>
-        <main style="font-family: system-ui, sans-serif; padding: 2rem">
+        <main>
           <h1>{`${data.owner}/${data.repo}`}</h1>
 
           <section>
@@ -139,13 +153,15 @@ export async function project(owner: string, repo: string, url: string): Promise
   const search = parsedUrl.searchParams.get("search") ?? ""
   const statusParam = parsedUrl.searchParams.get("status")
   const status = statusParam === "failing" || statusParam === "passing" ? statusParam : null
+  const from = parsedUrl.searchParams.get("from")
+  const until = parsedUrl.searchParams.get("until")
 
   const [allTests, trend] = await Promise.all([
     getProjectQuarantinedTests(handle, owner, repo),
     getProjectTrend(handle, owner, repo),
   ])
 
-  const tests = applyFilters(allTests, search, status)
+  const tests = applyFilters(allTests, search, status, from, until)
 
   const stream = renderToStream(
     <ProjectPage
