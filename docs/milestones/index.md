@@ -42,6 +42,9 @@ Phase 2 -- Parallel development (two agents)
 Phase 3 -- Integration and polish (sequential)
   M7: Dashboard analytics and UI
   M8: Polish and hardening
+
+Phase 4 -- Init UX improvements (depends on M5, parallel with M6-M8)
+  M9: Init UX improvements
 ```
 
 ---
@@ -745,6 +748,67 @@ hardens and documents the entire system.
 
 ---
 
+---
+
+## Phase 4 -- Init UX Improvements
+
+### M9: Init UX Improvements
+
+**Owner:** `cli-dev`
+
+**Dependencies:** M5 (quarantine init + GitHub client foundation).
+
+**Scope -- included:**
+
+- Framework auto-detection from `package.json` and `Gemfile` in a new
+  `cli/internal/detect` package. Detection is advisory: never fatal, always
+  falls back to manual prompt.
+- Modified `quarantine init` framework prompt: one detected → default in
+  brackets; multiple → numbered list; none → current behavior.
+- `--yes`/`-y`, `--framework`, `--retries`, `--junitxml` flags on
+  `quarantine init`.
+- `--yes` mode: fully non-interactive; requires `--framework`; overwrites
+  existing config with a log message.
+- Flags without `--yes`: each flag skips its prompt; others still appear.
+- Retries range validation (1–10) in both interactive and non-interactive paths.
+- TTY detection: warn when stdin is not a terminal and `--yes` is absent.
+
+**Scope -- explicitly excluded:**
+
+- Package manager detection (no consumer in v1).
+- JUnit XML path detection from config files.
+- `--config` flag on `quarantine init`.
+- Changes to `quarantine run`, `quarantine doctor`, or `quarantine version`.
+
+**Acceptance criteria:**
+
+1. `quarantine init` detects jest/vitest from `package.json` and presents as
+   prompt default.
+2. `quarantine init` detects rspec from `Gemfile` and presents as prompt default.
+3. Multiple detected frameworks show a numbered list; vitest ordered before
+   jest; user selects by number or name.
+4. No detection falls back to current prompt behavior, unchanged.
+5. Malformed `package.json` silently falls back to undetected behavior.
+6. `quarantine init --yes --framework jest` creates `quarantine.yml` without
+   prompts, exits 0.
+7. `quarantine init --yes` without `--framework` exits 2 with actionable error.
+8. `quarantine init --framework jest` (no `--yes`) skips framework prompt;
+   still prompts retries and junitxml.
+9. Invalid `--framework` exits 2 immediately (no fallthrough to prompt).
+10. `quarantine init --yes --framework jest --retries 11` exits 2.
+11. Interactive retries prompt rejects out-of-range values and re-prompts.
+12. `make cli-build && make cli-test && make cli-lint` pass.
+
+**Key implementation notes:**
+
+- See `docs/plans/auto-detect-framework.md` for the detect package design.
+- See `docs/plans/non-interactive-init.md` for flag semantics and TTY
+  detection approach.
+- Run `/create-adr` for each feature's design decisions before coding.
+- Run `/create-user-scenario` to author scenarios before coding.
+
+---
+
 ## Milestone Dependency Graph
 
 ```
@@ -764,10 +828,11 @@ M4 (state + exclusion)   M6 (dashboard scaffolding)
   v                       v
 M5 (issues + PR comments) M7 (dashboard analytics)
   |                       |
-  +-----------+-----------+
-              |
-              v
-            M8 (polish + hardening)
+  |           +-----------+
+  |           |
+  v           v
+  M9        M8 (polish + hardening)
+(init UX)
 ```
 
 ## Cross-References
