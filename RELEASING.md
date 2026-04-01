@@ -29,13 +29,17 @@ make release VERSION=v0.1.0
 
 GitHub Actions takes over on tag push:
 
-1. Verifies the `CHANGELOG.md` entry
-2. Runs CLI lint and tests
-3. Runs contract tests
-4. Builds cross-compiled binaries (linux/darwin × amd64/arm64)
-5. Creates a GitHub Release with archives and `checksums.txt`
+1. Runs CLI build, test, and lint (parallel)
+2. Runs dashboard lint, typecheck, and test (parallel)
+3. Runs contract lint and tests (parallel)
+4. Runs E2E lint and tests (parallel)
+5. After all jobs pass: verifies CHANGELOG entry, builds cross-compiled
+   binaries (linux/darwin × amd64/arm64), creates GitHub Release with
+   binaries and `checksums.txt`
 
 ## One-time setup
+
+### `release` environment
 
 Configure the `release` environment in the repository settings before the first release:
 
@@ -44,25 +48,78 @@ Configure the `release` environment in the repository settings before the first 
 3. **Add deployment branch or tag rule** → enter `v*` as a **tag** pattern
 4. Save
 
-## Installing a release
+No secrets are required — the release job uses the automatic `GITHUB_TOKEN`.
 
-### Pre-compiled binary (recommended)
+### `CI` environment (E2E tests)
+
+The release workflow runs E2E tests that require GitHub credentials. These are
+configured under the `CI` environment (shared with the regular CI workflow):
+
+1. **Settings → Environments** → select or create `CI`
+2. **Environment secrets:**
+   - `QUARANTINE_GITHUB_TOKEN` — PAT with `repo` scope for the test repository
+3. **Environment variables:**
+   - `QUARANTINE_TEST_OWNER` — GitHub owner for the E2E test repository
+   - `QUARANTINE_TEST_REPO` — GitHub repository name for E2E tests
+
+See `test/e2e/README.md` for full E2E setup instructions.
+
+### Signed commits
+
+Require commit signature verification on `main`:
+
+1. **Settings → Branches → Branch protection rules** → edit the `main` rule
+2. Enable **Require signed commits**
+
+Or via the CLI:
 
 ```bash
-# Linux amd64
-gh release download --repo mycargus/quarantine \
-  --pattern 'quarantine_*_linux_amd64.tar.gz' --output quarantine.tar.gz
-tar xzf quarantine.tar.gz
-sudo mv quarantine /usr/local/bin/quarantine
-
-# macOS arm64
-gh release download --repo mycargus/quarantine \
-  --pattern 'quarantine_*_darwin_arm64.tar.gz' --output quarantine.tar.gz
-tar xzf quarantine.tar.gz
-sudo mv quarantine /usr/local/bin/quarantine
+gh api repos/mycargus/quarantine/branches/main/protection/required_signatures \
+  --method POST
 ```
 
-Or download directly from the [Releases page](https://github.com/mycargus/quarantine/releases).
+All committers must configure GPG or SSH commit signing. See
+[GitHub docs on signing commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
+
+## Installing a release
+
+### Install script (recommended)
+
+```bash
+curl -sSL https://raw.githubusercontent.com/mycargus/quarantine/main/scripts/install.sh | bash
+```
+
+Pin to a specific version:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/mycargus/quarantine/main/scripts/install.sh | VERSION=v0.1.0 bash
+```
+
+Install to a custom directory:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/mycargus/quarantine/main/scripts/install.sh | INSTALL_DIR=./bin bash
+```
+
+The install script detects OS and architecture, downloads the binary, verifies the
+SHA-256 checksum, and installs it.
+
+### Manual download
+
+```bash
+VERSION="0.1.0"
+
+# Linux amd64
+curl -sL "https://github.com/mycargus/quarantine/releases/download/v${VERSION}/quarantine_${VERSION}_linux_amd64" \
+  -o quarantine
+
+# macOS arm64
+curl -sL "https://github.com/mycargus/quarantine/releases/download/v${VERSION}/quarantine_${VERSION}_darwin_arm64" \
+  -o quarantine
+
+chmod +x quarantine
+sudo mv quarantine /usr/local/bin/
+```
 
 ### Build from source
 
@@ -74,8 +131,51 @@ go build -o quarantine ./cli/cmd/quarantine
 
 ## Verify checksums
 
-Each release includes `checksums.txt` with SHA256 hashes:
+Each release includes `checksums.txt` with SHA-256 hashes:
 
 ```bash
+VERSION="0.1.0"
+curl -sL "https://github.com/mycargus/quarantine/releases/download/v${VERSION}/checksums.txt" \
+  -o checksums.txt
+
+# Linux
+sha256sum --check --ignore-missing checksums.txt
+
+# macOS
 shasum -a 256 --check checksums.txt
 ```
+
+## Rollback
+
+### Patch release (preferred)
+
+Fix forward with a new patch release:
+
+1. Fix the issue on `main`
+2. Update `CHANGELOG.md` with a new version entry
+3. `make release VERSION=vX.Y.Z` (incrementing the patch version)
+
+### Mark as pre-release (emergency)
+
+If a release needs to be pulled immediately while a fix is in progress:
+
+```bash
+gh release edit vX.Y.Z --prerelease --repo mycargus/quarantine
+```
+
+This removes it from the "latest" release endpoint. Users with a pinned version
+are unaffected. Users relying on `latest` will get the previous stable release.
+Revert with `gh release edit vX.Y.Z --latest` after publishing the fix.
+
+### Delete release and tag (last resort)
+
+Only use this if the release was created in error (wrong tag, wrong branch):
+
+```bash
+gh release delete vX.Y.Z --yes --repo mycargus/quarantine
+git push origin --delete vX.Y.Z
+git tag -d vX.Y.Z
+```
+
+Warning: this breaks any install scripts or CI configs that reference the
+deleted version. Prefer a patch release or pre-release marking instead.
