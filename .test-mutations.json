@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "test_command": "go test ./cli/...",
-  "last_updated": "2026-04-01T01:00:00Z",
+  "last_updated": "2026-04-01T02:00:00Z",
   "modules": {
     "cli/cmd/quarantine/run.go": {
       "status": "pending",
@@ -101,12 +101,24 @@
       "insights": []
     },
     "cli/cmd/quarantine/main.go": {
-      "status": "pending",
-      "covering_tests": [],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "status": "completed",
+      "covering_tests": ["cli/cmd/quarantine/run_pure_test.go"],
+      "last_tested": "2026-04-01T02:00:00Z",
+      "mutations_by_type": {
+        "constant": {"total": 12, "killed": 10, "survived": 2, "examples": [
+          {"line": 32, "original": "SilenceUsage: true", "mutated": "false", "result": "survived", "test_that_caught_it": null},
+          {"line": 33, "original": "SilenceErrors: true", "mutated": "false", "result": "survived", "test_that_caught_it": null}
+        ]},
+        "string": {"total": 4, "killed": 2, "survived": 2, "examples": [
+          {"line": 40, "original": "Error:", "mutated": "MUTATED:", "result": "survived", "test_that_caught_it": null},
+          {"line": 80, "original": "missing separator", "mutated": "different error", "result": "killed", "test_that_caught_it": "TestNewRunCmdMissingSeparatorError"}
+        ]},
+        "statement": {"total": 2, "killed": 0, "survived": 2, "examples": [
+          {"line": 41, "original": "PrintErrln(UsageString())", "mutated": "deleted", "result": "survived", "test_that_caught_it": null}
+        ]}
+      },
+      "mutation_score": 66.7,
+      "insights": ["SilenceUsage/SilenceErrors are Cobra output formatting — low risk", "Root flag error handler text is low-value to test", "Flag defaults for config, retries, output, junitxml, and boolean flags are all now tested"]
     },
     "cli/internal/cas/cas.go": {
       "status": "pending",
@@ -222,10 +234,10 @@
   },
   "global_statistics": {
     "total_modules": 21,
-    "completed_modules": 2,
-    "total_mutations": 57,
-    "total_killed": 52,
-    "total_survived": 4,
-    "overall_score": 91.2
+    "completed_modules": 3,
+    "total_mutations": 75,
+    "total_killed": 58,
+    "total_survived": 16,
+    "overall_score": 77.3
   }
 }

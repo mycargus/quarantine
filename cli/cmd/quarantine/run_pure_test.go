@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"os"
 	"strings"
 	"testing"
 
@@ -430,6 +432,94 @@ func TestRerunFailureWarningVitest(t *testing.T) {
 		Given:    "a Vitest rerun command that fails to execute",
 		Should:   "include pnpm vitest example",
 		Actual:   strings.Contains(msg, "pnpm exec vitest run"),
+		Expected: true,
+	})
+}
+
+// --- Command construction: flag defaults and error messages ---
+
+func TestNewRunCmdFlagDefaults(t *testing.T) {
+	cmd := newRunCmd()
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "newRunCmd with no arguments",
+		Should:   "default --config flag to quarantine.yml",
+		Actual:   cmd.Flags().Lookup("config").DefValue,
+		Expected: "quarantine.yml",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "newRunCmd with no arguments",
+		Should:   "default --retries flag to 0",
+		Actual:   cmd.Flags().Lookup("retries").DefValue,
+		Expected: "0",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "newRunCmd with no arguments",
+		Should:   "default --output flag to .quarantine/results.json",
+		Actual:   cmd.Flags().Lookup("output").DefValue,
+		Expected: ".quarantine/results.json",
+	})
+}
+
+func TestNewDoctorCmdFlagDefaults(t *testing.T) {
+	cmd := newDoctorCmd()
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "newDoctorCmd with no arguments",
+		Should:   "default --config flag to quarantine.yml",
+		Actual:   cmd.Flags().Lookup("config").DefValue,
+		Expected: "quarantine.yml",
+	})
+}
+
+func TestNewRunCmdMissingSeparatorError(t *testing.T) {
+	rootCmd := newRootCmd()
+	buf := &bytes.Buffer{}
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"run", "--unknown-flag"})
+
+	err := rootCmd.Execute()
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "run called with an unknown flag and no -- separator",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "run called with an unknown flag and no -- separator",
+		Should:   "error message contains missing separator",
+		Actual:   strings.Contains(err.Error(), "missing separator"),
+		Expected: true,
+	})
+}
+
+func TestNewVersionCmdOutput(t *testing.T) {
+	cmd := newVersionCmd()
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	// version is a package-level var; capture stdout via os.Pipe since
+	// fmt.Printf bypasses cmd.OutOrStdout().
+	// Instead, redirect stdout at the process level for this call.
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	_ = cmd.Execute()
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+	var out bytes.Buffer
+	_, _ = out.ReadFrom(r)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "quarantine version command",
+		Should:   "output quarantine v prefix",
+		Actual:   strings.HasPrefix(out.String(), "quarantine v"),
 		Expected: true,
 	})
 }
