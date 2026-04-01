@@ -29,37 +29,6 @@ it from the project:
 - `quarantine init --framework jest --yes` — override specific values
 - Enables use in CI, scripts, Docker builds, non-TTY environments
 
-## Rerun command
-
-### Remove PATH workaround from fixture repo
-
-The fixture repo (`quarantine-test-fixture`) workflow still has
-`export PATH="${{ github.workspace }}/node_modules/.bin:$PATH"`. Now that the
-CLI uses `npx jest` by default, this workaround should be removed to prove
-`npx` actually works without it.
-
-### Document rerun_command for non-standard setups
-
-`rerun_command` examples for pnpm, bun, and custom configs should be added to
-docs (README, cli-spec, config-schema). Examples:
-
-```yaml
-# pnpm
-rerun_command: "pnpm exec jest --testNamePattern '{name}'"
-
-# bun
-rerun_command: "bunx jest --testNamePattern '{name}'"
-
-# custom jest config
-rerun_command: "npx jest --config jest.ci.config.js --testNamePattern '{name}'"
-```
-
-### Update config-schema.md auto-detected commands table
-
-The table at `docs/specs/config-schema.md` line 393 still lists bare `jest`,
-`rspec`, `vitest` as auto-detected commands. Update to reflect `npx jest`,
-`bundle exec rspec`, `npx vitest`.
-
 ## Testify findings (runner package)
 
 From testify review of `cli/internal/runner/runner_test.go`:
