@@ -3,6 +3,7 @@ import { renderToStream } from "remix/component/server"
 import { loadConfig } from "../lib/config.server.js"
 import type { OrgOverview, ProjectSummary } from "../lib/db.server.js"
 import { getOrgOverview, getProjects, initDb } from "../lib/db.server.js"
+import { syncRepo } from "../lib/sync.server.js"
 
 function ProjectRow(_handle: Handle, project: ProjectSummary) {
   return () => (
@@ -147,7 +148,11 @@ function ErrorPage(_handle: Handle, message: string) {
   )
 }
 
-export async function home(): Promise<Response> {
+interface HomeOptions {
+  fetchFn?: typeof fetch
+}
+
+export async function home(options: HomeOptions = {}): Promise<Response> {
   const configPath = process.env.DASHBOARD_CONFIG ?? "./dashboard.yml"
   const dbPath = process.env.DATABASE_URL ?? "./quarantine.db"
 
@@ -167,15 +172,34 @@ export async function home(): Promise<Response> {
     })
   }
 
-  const handle = initDb(dbPath)
-  const [projects, overview] = await Promise.all([
-    getProjects(handle.db, config.repos),
-    getOrgOverview(handle, config.repos),
-  ])
+  try {
+    const handle = initDb(dbPath)
+    const token = process.env.QUARANTINE_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN
 
-  const stream = renderToStream(<ProjectsPage setup={{ projects, overview }} />)
+    if (token) {
+      const now = new Date()
+      const fetchFn = options.fetchFn ?? fetch
+      for (const { owner, repo } of config.repos) {
+        await syncRepo(owner, repo, token, handle, now, fetchFn, console.warn)
+      }
+    }
 
-  return new Response(stream, {
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  })
+    const [projects, overview] = await Promise.all([
+      getProjects(handle.db, config.repos),
+      getOrgOverview(handle, config.repos),
+    ])
+
+    const stream = renderToStream(<ProjectsPage setup={{ projects, overview }} />)
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    })
+  } catch (e) {
+    const message = `Internal error: ${e instanceof Error ? e.message : String(e)}`
+    const stream = renderToStream(<ErrorPage setup={message} />)
+    return new Response(stream, {
+      status: 500,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    })
+  }
 }
