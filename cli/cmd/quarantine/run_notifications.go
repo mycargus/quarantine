@@ -92,8 +92,22 @@ type IssueBodyData struct {
 	Branch         string
 	CommitSHA      string
 	PRNumber       int
+	RunURL         string
 	FailureMessage string
 	Retries        []result.RetryEntry
+}
+
+// buildRunURL constructs the GitHub Actions run URL from the repo and runID.
+// Returns empty when runID starts with "local-" or when repo or runID is empty.
+// This is a pure function — no I/O.
+func buildRunURL(repo, runID string) string {
+	if repo == "" || runID == "" {
+		return ""
+	}
+	if strings.HasPrefix(runID, "local-") {
+		return ""
+	}
+	return "https://github.com/" + repo + "/actions/runs/" + runID
 }
 
 // renderIssueBody renders the body of a GitHub issue for a flaky test.
@@ -105,9 +119,14 @@ func renderIssueBody(data IssueBodyData) string {
 	fmt.Fprintf(&sb, "**Suite:** `%s`\n", data.Suite)
 	fmt.Fprintf(&sb, "**Name:** `%s`\n", data.Name)
 	fmt.Fprintf(&sb, "**First detected:** %s\n", data.Timestamp)
-	fmt.Fprintf(&sb, "**Detected in:** %s @ %s\n", data.Branch, data.CommitSHA)
+	if data.Branch != "" || data.CommitSHA != "" {
+		fmt.Fprintf(&sb, "**Detected in:** %s @ %s\n", data.Branch, data.CommitSHA)
+	}
 	if data.PRNumber > 0 {
 		fmt.Fprintf(&sb, "**PR:** #%d\n", data.PRNumber)
+	}
+	if data.RunURL != "" {
+		fmt.Fprintf(&sb, "**Build:** <%s>\n", data.RunURL)
 	}
 	if len(data.Retries) > 0 {
 		sb.WriteString("\n### Retry Results\n\n")
@@ -333,6 +352,7 @@ func createIssuesForNewFlakyTests(
 			Branch:         branch,
 			CommitSHA:      commitSHA,
 			PRNumber:       prNumber,
+			RunURL:         buildRunURL(res.Repo, res.RunID),
 			FailureMessage: fm,
 			Retries:        t.Retries,
 		})

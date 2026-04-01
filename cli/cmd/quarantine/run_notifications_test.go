@@ -428,3 +428,39 @@ func TestRenderIssueBodyPositivePRNumberShowsPRLine(t *testing.T) {
 		Expected: true,
 	})
 }
+
+// TestRenderIssueBodyOmitsDetectedInWhenEmpty verifies that when both branch
+// and commitSHA are empty strings, the "Detected in:" line is omitted entirely.
+func TestRenderIssueBodyOmitsDetectedInWhenEmpty(t *testing.T) {
+	body := renderIssueBody(IssueBodyData{
+		TestID:    "src/foo.test.js::Foo::bar",
+		Suite:     "src/foo.test.js",
+		Name:      "bar",
+		Timestamp: "2026-03-28T00:00:00Z",
+		Branch:    "",
+		CommitSHA: "",
+		PRNumber:  42,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "empty branch and commitSHA",
+		Should:   "omit the 'Detected in:' line entirely",
+		Actual:   strings.Contains(body, "**Detected in:**"),
+		Expected: false,
+	})
+
+	// Other fields should still render normally.
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "empty branch and commitSHA",
+		Should:   "still include the Test ID line",
+		Actual:   strings.Contains(body, "**Test ID:** `src/foo.test.js::Foo::bar`"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "empty branch and commitSHA",
+		Should:   "still include the PR line",
+		Actual:   strings.Contains(body, "**PR:** #42"),
+		Expected: true,
+	})
+}
