@@ -5,7 +5,7 @@ import (
 
 	riteway "github.com/mycargus/riteway-golang"
 
-	"github.com/mycargus/quarantine/internal/config"
+	"github.com/mycargus/quarantine/cli/internal/config"
 )
 
 // --- ApplyDefaults does not overwrite already-set values ---

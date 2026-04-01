@@ -4,7 +4,7 @@ package result
 import (
 	"time"
 
-	"github.com/mycargus/quarantine/internal/parser"
+	"github.com/mycargus/quarantine/cli/internal/parser"
 )
 
 // Result is the top-level structure for results.json.

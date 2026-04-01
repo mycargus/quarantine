@@ -3,8 +3,8 @@ package quarantine_test
 import (
 	"testing"
 
-	"github.com/mycargus/quarantine/internal/parser"
-	"github.com/mycargus/quarantine/internal/quarantine"
+	"github.com/mycargus/quarantine/cli/internal/parser"
+	"github.com/mycargus/quarantine/cli/internal/quarantine"
 	riteway "github.com/mycargus/riteway-golang"
 )
 

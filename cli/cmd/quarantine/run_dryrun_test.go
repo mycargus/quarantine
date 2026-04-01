@@ -15,7 +15,7 @@ import (
 
 	riteway "github.com/mycargus/riteway-golang"
 
-	"github.com/mycargus/quarantine/internal/quarantine"
+	"github.com/mycargus/quarantine/cli/internal/quarantine"
 )
 
 // fakeM4GitHubAPIWithPUTTracking creates a test server like fakeM4GitHubAPI

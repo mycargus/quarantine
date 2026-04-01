@@ -6,7 +6,7 @@ import (
 
 	riteway "github.com/mycargus/riteway-golang"
 
-	"github.com/mycargus/quarantine/internal/config"
+	"github.com/mycargus/quarantine/cli/internal/config"
 )
 
 // errorContains reports whether err is non-nil and its message contains sub.

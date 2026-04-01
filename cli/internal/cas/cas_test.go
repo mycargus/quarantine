@@ -13,9 +13,9 @@ import (
 
 	riteway "github.com/mycargus/riteway-golang"
 
-	"github.com/mycargus/quarantine/internal/cas"
-	ghclient "github.com/mycargus/quarantine/internal/github"
-	"github.com/mycargus/quarantine/internal/quarantine"
+	"github.com/mycargus/quarantine/cli/internal/cas"
+	ghclient "github.com/mycargus/quarantine/cli/internal/github"
+	"github.com/mycargus/quarantine/cli/internal/quarantine"
 )
 
 func newTestGHClient(t *testing.T, serverURL string) *ghclient.Client {

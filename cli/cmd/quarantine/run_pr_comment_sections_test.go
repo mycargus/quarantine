@@ -15,7 +15,7 @@ import (
 
 	riteway "github.com/mycargus/riteway-golang"
 
-	"github.com/mycargus/quarantine/internal/quarantine"
+	"github.com/mycargus/quarantine/cli/internal/quarantine"
 )
 
 // --- Scenario 26: PR comment sections — quarantined, unquarantined, flaky, failures ---

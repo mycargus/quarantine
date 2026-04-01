@@ -3,9 +3,9 @@
 ## Commands
 
 ```bash
-make cli-build   # Or: go build -o bin/quarantine ./cmd/quarantine
-make cli-test    # Or: go test ./...
-make cli-lint    # Or: golangci-lint run
+make cli-build   # Or: go build -o bin/quarantine ./cli/cmd/quarantine
+make cli-test    # Or: go test ./cli/...
+make cli-lint    # Or: golangci-lint run ./cli/...
 ```
 
 ## Packages

@@ -8,7 +8,7 @@ import (
 
 	riteway "github.com/mycargus/riteway-golang"
 
-	"github.com/mycargus/quarantine/internal/git"
+	"github.com/mycargus/quarantine/cli/internal/git"
 )
 
 // --- ParseGitHubURL ---

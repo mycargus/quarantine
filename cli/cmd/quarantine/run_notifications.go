@@ -9,9 +9,9 @@ import (
 	"os"
 	"strings"
 
-	gh "github.com/mycargus/quarantine/internal/github"
-	qstate "github.com/mycargus/quarantine/internal/quarantine"
-	"github.com/mycargus/quarantine/internal/result"
+	gh "github.com/mycargus/quarantine/cli/internal/github"
+	qstate "github.com/mycargus/quarantine/cli/internal/quarantine"
+	"github.com/mycargus/quarantine/cli/internal/result"
 	"github.com/spf13/cobra"
 )
 

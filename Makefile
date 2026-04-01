@@ -3,13 +3,13 @@
 # --- CLI (Go) ---
 
 cli-build:
-	cd cli && go build -o ../bin/quarantine ./cmd/quarantine
+	go build -o bin/quarantine ./cli/cmd/quarantine
 
 cli-test:
-	cd cli && go test ./...
+	go test ./cli/...
 
 cli-lint:
-	cd cli && golangci-lint run
+	golangci-lint run ./cli/...
 
 cli-mutate:
 	claude --model sonnet "/test-mutation cli"
@@ -57,7 +57,7 @@ test-lint:
 # --- Dev Setup ---
 
 dev: _check-prereqs install-hooks
-	cd cli && go mod download
+	go mod download
 	cd dashboard && pnpm install
 	cd test && pnpm install
 

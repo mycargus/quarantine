@@ -13,7 +13,7 @@ import (
 
 	riteway "github.com/mycargus/riteway-golang"
 
-	"github.com/mycargus/quarantine/internal/quarantine"
+	"github.com/mycargus/quarantine/cli/internal/quarantine"
 )
 
 // fakeBranchProtectedAPI creates a test server that returns 403 on PUT

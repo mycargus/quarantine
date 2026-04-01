@@ -9,8 +9,8 @@ import (
 
 	riteway "github.com/mycargus/riteway-golang"
 
-	"github.com/mycargus/quarantine/internal/quarantine"
-	"github.com/mycargus/quarantine/internal/result"
+	"github.com/mycargus/quarantine/cli/internal/quarantine"
+	"github.com/mycargus/quarantine/cli/internal/result"
 )
 
 // --- False positive guard: no quarantine state + empty results should NOT warn ---

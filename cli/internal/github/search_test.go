@@ -10,7 +10,7 @@ import (
 
 	riteway "github.com/mycargus/riteway-golang"
 
-	ghclient "github.com/mycargus/quarantine/internal/github"
+	ghclient "github.com/mycargus/quarantine/cli/internal/github"
 )
 
 // --- SearchClosedIssues ---

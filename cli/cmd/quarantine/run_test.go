@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mycargus/quarantine/internal/config"
+	"github.com/mycargus/quarantine/cli/internal/config"
 	riteway "github.com/mycargus/riteway-golang"
 )
 

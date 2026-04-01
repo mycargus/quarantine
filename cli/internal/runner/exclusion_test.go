@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mycargus/quarantine/internal/quarantine"
-	"github.com/mycargus/quarantine/internal/runner"
+	"github.com/mycargus/quarantine/cli/internal/quarantine"
+	"github.com/mycargus/quarantine/cli/internal/runner"
 	riteway "github.com/mycargus/riteway-golang"
 )
 

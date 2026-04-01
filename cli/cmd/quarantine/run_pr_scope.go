@@ -4,7 +4,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/mycargus/quarantine/internal/result"
+	"github.com/mycargus/quarantine/cli/internal/result"
 )
 
 // prScopeInput holds the fields needed to classify a single flaky test by PR scope.

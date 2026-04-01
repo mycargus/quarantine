@@ -13,7 +13,7 @@ import (
 
 	riteway "github.com/mycargus/riteway-golang"
 
-	"github.com/mycargus/quarantine/internal/quarantine"
+	"github.com/mycargus/quarantine/cli/internal/quarantine"
 )
 
 // fakeWarningsGitHubAPI creates a test server with configurable search response and PUT behavior.

@@ -9,8 +9,8 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
-	"github.com/mycargus/quarantine/internal/parser"
-	"github.com/mycargus/quarantine/internal/result"
+	"github.com/mycargus/quarantine/cli/internal/parser"
+	"github.com/mycargus/quarantine/cli/internal/result"
 	riteway "github.com/mycargus/riteway-golang"
 )
 

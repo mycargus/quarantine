@@ -12,14 +12,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mycargus/quarantine/internal/cas"
-	"github.com/mycargus/quarantine/internal/config"
-	"github.com/mycargus/quarantine/internal/git"
-	gh "github.com/mycargus/quarantine/internal/github"
-	"github.com/mycargus/quarantine/internal/parser"
-	qstate "github.com/mycargus/quarantine/internal/quarantine"
-	"github.com/mycargus/quarantine/internal/result"
-	"github.com/mycargus/quarantine/internal/runner"
+	"github.com/mycargus/quarantine/cli/internal/cas"
+	"github.com/mycargus/quarantine/cli/internal/config"
+	"github.com/mycargus/quarantine/cli/internal/git"
+	gh "github.com/mycargus/quarantine/cli/internal/github"
+	"github.com/mycargus/quarantine/cli/internal/parser"
+	qstate "github.com/mycargus/quarantine/cli/internal/quarantine"
+	"github.com/mycargus/quarantine/cli/internal/result"
+	"github.com/mycargus/quarantine/cli/internal/runner"
 	"github.com/spf13/cobra"
 )
 

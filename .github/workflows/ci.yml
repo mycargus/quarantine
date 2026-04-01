@@ -26,8 +26,8 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: cli/go.mod
-          cache-dependency-path: cli/go.sum
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       - name: Build
         run: make cli-build
@@ -38,7 +38,7 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v6
         with:
-          working-directory: cli
+          args: ./cli/...
 
   contract:
     name: Contract Tests
@@ -79,8 +79,8 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: cli/go.mod
-          cache-dependency-path: cli/go.sum
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       - name: Build CLI binary
         run: make cli-build

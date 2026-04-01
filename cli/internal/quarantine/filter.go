@@ -2,7 +2,7 @@
 package quarantine
 
 import (
-	"github.com/mycargus/quarantine/internal/parser"
+	"github.com/mycargus/quarantine/cli/internal/parser"
 )
 
 // FilterQuarantinedFailures reclassifies test results whose status is "failed"

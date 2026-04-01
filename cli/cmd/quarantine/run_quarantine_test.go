@@ -14,8 +14,8 @@ import (
 
 	riteway "github.com/mycargus/riteway-golang"
 
-	"github.com/mycargus/quarantine/internal/quarantine"
-	"github.com/mycargus/quarantine/internal/result"
+	"github.com/mycargus/quarantine/cli/internal/quarantine"
+	"github.com/mycargus/quarantine/cli/internal/result"
 )
 
 // fakeM4GitHubAPI creates a test server that handles all M4 GitHub API endpoints.

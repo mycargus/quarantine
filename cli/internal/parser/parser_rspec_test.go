@@ -6,7 +6,7 @@ import (
 
 	riteway "github.com/mycargus/riteway-golang"
 
-	"github.com/mycargus/quarantine/internal/parser"
+	"github.com/mycargus/quarantine/cli/internal/parser"
 )
 
 func TestParseSinglePassRSpec(t *testing.T) {

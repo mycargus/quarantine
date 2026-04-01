@@ -8,7 +8,7 @@ import (
 
 	riteway "github.com/mycargus/riteway-golang"
 
-	"github.com/mycargus/quarantine/internal/result"
+	"github.com/mycargus/quarantine/cli/internal/result"
 )
 
 // --- Unit tests for pure functions: testHash, detectPRNumber, renderIssueBody, renderPRComment ---

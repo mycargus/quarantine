@@ -11,10 +11,10 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/mycargus/quarantine/internal/config"
-	"github.com/mycargus/quarantine/internal/git"
-	ghclient "github.com/mycargus/quarantine/internal/github"
-	"github.com/mycargus/quarantine/internal/quarantine"
+	"github.com/mycargus/quarantine/cli/internal/config"
+	"github.com/mycargus/quarantine/cli/internal/git"
+	ghclient "github.com/mycargus/quarantine/cli/internal/github"
+	"github.com/mycargus/quarantine/cli/internal/quarantine"
 )
 
 // runInit implements the `quarantine init` command.

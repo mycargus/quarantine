@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mycargus/quarantine/internal/config"
-	"github.com/mycargus/quarantine/internal/git"
-	ghclient "github.com/mycargus/quarantine/internal/github"
+	"github.com/mycargus/quarantine/cli/internal/config"
+	"github.com/mycargus/quarantine/cli/internal/git"
+	ghclient "github.com/mycargus/quarantine/cli/internal/github"
 	"github.com/spf13/cobra"
 )
 

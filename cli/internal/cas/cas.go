@@ -8,8 +8,8 @@ import (
 	"errors"
 	"fmt"
 
-	ghclient "github.com/mycargus/quarantine/internal/github"
-	"github.com/mycargus/quarantine/internal/quarantine"
+	ghclient "github.com/mycargus/quarantine/cli/internal/github"
+	"github.com/mycargus/quarantine/cli/internal/quarantine"
 )
 
 // ErrCASExhausted is returned when all CAS retry attempts are exhausted due to

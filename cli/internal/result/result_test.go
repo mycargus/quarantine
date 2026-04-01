@@ -3,8 +3,8 @@ package result_test
 import (
 	"testing"
 
-	"github.com/mycargus/quarantine/internal/parser"
-	"github.com/mycargus/quarantine/internal/result"
+	"github.com/mycargus/quarantine/cli/internal/parser"
+	"github.com/mycargus/quarantine/cli/internal/result"
 	riteway "github.com/mycargus/riteway-golang"
 )
 

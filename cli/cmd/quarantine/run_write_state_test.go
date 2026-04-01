@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/mycargus/quarantine/internal/config"
-	gh "github.com/mycargus/quarantine/internal/github"
-	qstate "github.com/mycargus/quarantine/internal/quarantine"
+	"github.com/mycargus/quarantine/cli/internal/config"
+	gh "github.com/mycargus/quarantine/cli/internal/github"
+	qstate "github.com/mycargus/quarantine/cli/internal/quarantine"
 	riteway "github.com/mycargus/riteway-golang"
 )
 
