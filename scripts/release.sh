@@ -24,7 +24,7 @@ if ! grep -q "^## \[${VERSION_NUM}\]" CHANGELOG.md; then
 fi
 
 # 4. Extract release notes for this version
-RELEASE_NOTES=$(awk "/^## \[${VERSION_NUM}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+RELEASE_NOTES=$(awk "/^## \[${VERSION_NUM}\]/{found=1; next} found && /^## \[/{exit} found && /^\[.*\]: /{exit} found{print}" CHANGELOG.md)
 
 # 5. Verify working tree is clean
 if [[ -n "$(git status --porcelain)" ]]; then

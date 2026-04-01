@@ -162,7 +162,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF#refs/tags/}"
           VERSION_NUM="${VERSION#v}"
-          awk "/^## \[${VERSION_NUM}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md \
+          awk "/^## \[${VERSION_NUM}\]/{found=1; next} found && /^## \[/{exit} found && /^\[.*\]: /{exit} found{print}" CHANGELOG.md \
             > /tmp/release-notes.md
 
       - name: GoReleaser
