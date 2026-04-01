@@ -183,6 +183,7 @@ each containing valid test result JSON
 4. `last_pulled_at` is updated to the current time after a successful sync.
 5. The home page renders with the ingested data (test run counts, last synced time, quarantined test totals).
 6. A second page load within 5 minutes does NOT re-trigger a GitHub API call (`shouldPull` returns `false`).
+7. If the sync fails (no token, 401, 500, network unreachable), the page still renders with whatever data SQLite has (possibly empty) and logs a warning — sync failure MUST NOT produce an HTTP error page.
 
 ---
 
@@ -214,8 +215,8 @@ each containing valid test result JSON
 
 **Given** `quarantined_tests` already contains an entry for
 `spec/payments_spec.rb::PaymentsService::processes_payment` in project `mycargus/my-app`
-with `quarantined_at: "2026-01-15T09:00:00Z"` and `last_run_status: "failing"` (set by an
-earlier artifact), and a new artifact is ingested with
+with `quarantined_at: "2026-01-15T09:00:00Z"`, `last_run_status: "failing"`, and
+`flaky_count: 1` (set by earlier artifacts), and a new artifact is ingested with
 `timestamp: "2026-03-01T10:00:00Z"` containing the same test entry with
 `status: "quarantined"` and `original_status: "passed"` (the test is still quarantined
 but now passing in this run)
@@ -225,6 +226,32 @@ but now passing in this run)
 **Then:**
 1. `last_run_status` is updated to `"passing"` (reflecting the most recent run).
 2. `quarantined_at` remains `"2026-01-15T09:00:00Z"` (the original quarantine date is preserved — not overwritten).
-3. No duplicate row is created — the existing row is updated in place.
+3. `flaky_count` remains `1` (unchanged — this run was not a flaky detection).
+4. No duplicate row is created — the existing row is updated in place.
+
+---
+
+### Scenario 89: Flaky detection increments flaky_count and updates last_flaky_at [M7]
+
+**Risk:** The "last flaky occurrence" column always shows "Never" and flaky count is always 0, because the ingest pipeline never processes `status: "flaky"` entries — making it impossible to gauge how often a quarantined test is still misbehaving. (FR-1.5.1)
+
+**Given** an artifact for `mycargus/my-app` is being ingested with
+`timestamp: "2026-03-15T14:00:00Z"`, containing these test entries:
+- `test_id: "spec/payments_spec.rb::PaymentsService::processes_payment"`, `status: "flaky"`,
+  `issue_number: 42` (failed initially, passed on retry — a new flaky detection for an
+  already-quarantined test)
+- `test_id: "spec/auth_spec.rb::Auth::login"`, `status: "quarantined"`,
+  `original_status: "passed"`, `issue_number: 43` (quarantined, running normally — NOT
+  a flaky detection)
+
+and `quarantined_tests` already has entries for both tests with `flaky_count: 2` and
+`last_flaky_at: "2026-02-20T10:00:00Z"`
+
+**When** the ingestion pipeline processes the artifact
+
+**Then:**
+1. The `processes_payment` entry: `flaky_count` is incremented to `3` and `last_flaky_at` is updated to `"2026-03-15T14:00:00Z"`.
+2. The `login` entry: `flaky_count` remains `2` and `last_flaky_at` remains `"2026-02-20T10:00:00Z"` — `status: "quarantined"` is NOT a flaky detection.
+3. `last_run_status` for `processes_payment` is set to `"passing"` (a flaky test ultimately passed on retry).
 
 ---
