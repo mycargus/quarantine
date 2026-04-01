@@ -1,6 +1,5 @@
 # CLI (Go)
 bin/
-quarantine
 .quarantine/
 
 # pnpm
