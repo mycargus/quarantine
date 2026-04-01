@@ -74,6 +74,19 @@ From testify review of `cli/internal/runner/runner_test.go`:
   when framework is irrelevant (`customTemplate != ""` ignores it). Minor
   clarity issue — passing an empty string would make intent clearer.
 
+## E2E test cleanup robustness
+
+E2E tests leave open issues on the fixture repo when tests timeout or are
+aborted mid-run (vitest may skip `afterEach` on hard timeout). Also,
+`closeIssue` in `full-flow.test.js` doesn't check the response status, so
+silent API failures leave issues open.
+
+Fix: add a suite-level `afterAll` in each E2E test file that does a
+best-effort bulk close of all issue numbers created during the suite — a
+safety net that runs even when per-test `afterEach` cleanup is skipped. Also
+update `closeIssue` in `full-flow.test.js` to match the pattern in
+`github-unquarantine.test.js` (check response status and throw on failure).
+
 ## Release workflow
 
 See `RELEASE-PLAN.md` for the full plan (GoReleaser, CHANGELOG, scripts,
