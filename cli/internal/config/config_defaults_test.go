@@ -138,6 +138,68 @@ storage:
 	})
 }
 
+// --- ApplyDefaults sets exact default values on a zero-value Config ---
+
+func TestApplyDefaultsSetsRetriesToThree(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a zero-value config",
+		Should:   "set Retries to exactly 3",
+		Actual:   cfg.Retries,
+		Expected: 3,
+	})
+}
+
+func TestApplyDefaultsSetsIssueTrackerToGitHub(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a zero-value config",
+		Should:   "set IssueTracker to exactly \"github\"",
+		Actual:   cfg.IssueTracker,
+		Expected: "github",
+	})
+}
+
+func TestApplyDefaultsSetsLabelToQuarantine(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a zero-value config",
+		Should:   "set Labels[0] to exactly \"quarantine\"",
+		Actual:   cfg.Labels[0],
+		Expected: "quarantine",
+	})
+}
+
+func TestApplyDefaultsSetsGitHubPRCommentToTrue(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a zero-value config",
+		Should:   "set GitHubPRComment to exactly true",
+		Actual:   *cfg.Notifications.GitHubPRComment,
+		Expected: true,
+	})
+}
+
+func TestApplyDefaultsSetsStorageBranchToQuarantineState(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a zero-value config",
+		Should:   "set Storage.Branch to exactly \"quarantine/state\"",
+		Actual:   cfg.Storage.Branch,
+		Expected: "quarantine/state",
+	})
+}
+
 // FrameworkDefaultJUnit is tested here as it directly supports ApplyDefaults.
 
 func TestFrameworkDefaultJUnitKnownFrameworks(t *testing.T) {

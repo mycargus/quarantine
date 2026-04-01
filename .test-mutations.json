@@ -55,12 +55,18 @@
       "insights": ["Line 219 else-if to if is an equivalent mutant — preceding block returns, so else is redundant", "All relational and logical operator mutations killed — excellent error handling coverage"]
     },
     "cli/internal/config/config.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/internal/config/config_test.go", "cli/internal/config/config_defaults_test.go", "cli/internal/config/config_validate_schema_test.go", "cli/internal/config/config_validate_unknown_keys_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T03:45:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 15, "killed": 13, "survived": 2, "examples": [
+          {"line": 151, "original": "i+1 < len()", "mutated": "i+1 <= len()", "result": "survived", "test_that_caught_it": null}
+        ]},
+        "logical": {"total": 4, "killed": 2, "survived": 2, "examples": []},
+        "constant": {"total": 9, "killed": 6, "survived": 3, "examples": []}
+      },
+      "mutation_score": 82.1,
+      "insights": ["Validation logic excellent — 13/13 relational killed", "Default value constants now tested", "YAML parsing loop boundaries survive — edge case only"]
     },
     "cli/internal/github/init_ops.go": {
       "status": "pending",
@@ -139,12 +145,19 @@
       "insights": ["SilenceUsage/SilenceErrors are Cobra output formatting — low risk", "Root flag error handler text is low-value to test", "Flag defaults for config, retries, output, junitxml, and boolean flags are all now tested"]
     },
     "cli/internal/cas/cas.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/internal/cas/cas_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T03:30:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 12, "killed": 10, "survived": 2, "examples": [
+          {"line": 62, "original": "!= 409", "mutated": "> 409", "result": "survived", "test_that_caught_it": null}
+        ]},
+        "logical": {"total": 3, "killed": 3, "survived": 0, "examples": []},
+        "constant": {"total": 2, "killed": 2, "survived": 0, "examples": []},
+        "statement": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+      },
+      "mutation_score": 88.9,
+      "insights": ["Status code range mutations survive — tests only use 409 and 403", "len > 0 vs >= 1 is equivalent for slices"]
     },
     "cli/cmd/quarantine/doctor.go": {
       "status": "completed",
@@ -257,10 +270,10 @@
   },
   "global_statistics": {
     "total_modules": 21,
-    "completed_modules": 6,
-    "total_mutations": 148,
-    "total_killed": 97,
-    "total_survived": 50,
-    "overall_score": 65.5
+    "completed_modules": 8,
+    "total_mutations": 194,
+    "total_killed": 140,
+    "total_survived": 53,
+    "overall_score": 72.2
   }
 }
