@@ -676,11 +676,11 @@ The rerun uses framework-specific commands.
 
 ### Auto-Detected Rerun Commands
 
-| Framework | Rerun command template                                    |
-|-----------|-----------------------------------------------------------|
-| `jest`    | `jest --testNamePattern "{name}"`                         |
-| `rspec`   | `rspec -e "{name}"`                                      |
-| `vitest`  | `vitest run --reporter=junit {file} -t "{name}"`         |
+| Framework | Rerun command template                                        |
+|-----------|---------------------------------------------------------------|
+| `jest`    | `npx jest --testNamePattern "{name}"`                         |
+| `rspec`   | `bundle exec rspec -e "{name}"`                               |
+| `vitest`  | `npx vitest run --reporter=junit {file} -t "{name}"`          |
 
 ### Placeholder Variables
 
@@ -694,6 +694,19 @@ The rerun uses framework-specific commands.
 
 The `rerun_command` field in `quarantine.yml` overrides the auto-detected
 command. See [config-schema.md](config-schema.md#rerun_command).
+
+**Non-standard package managers and configurations:**
+
+```yaml
+# pnpm
+rerun_command: "pnpm exec jest --testNamePattern '{name}'"
+
+# bun
+rerun_command: "bunx jest --testNamePattern '{name}'"
+
+# custom jest config file
+rerun_command: "npx jest --config jest.ci.config.js --testNamePattern '{name}'"
+```
 
 ### Framework Caveats
 

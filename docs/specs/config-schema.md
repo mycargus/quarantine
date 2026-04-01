@@ -382,19 +382,29 @@ non-standard test runner configurations.
 | `{classname}` | Class name from JUnit XML `classname` attribute|
 | `{file}`      | File path extracted from the test identifier   |
 
-**Example:**
+**Examples:**
 
 ```yaml
+# Custom jest config file
+rerun_command: "npx jest --config jest.ci.config.js --testNamePattern '{name}'"
+
+# pnpm
+rerun_command: "pnpm exec jest --testNamePattern '{name}'"
+
+# bun
+rerun_command: "bunx jest --testNamePattern '{name}'"
+
+# Narrow by file and name
 rerun_command: "npx jest --testPathPattern={file} --testNamePattern={name}"
 ```
 
 **Framework-specific auto-detected commands (when `rerun_command` is empty):**
 
-| Framework | Auto-detected rerun command                                |
-|-----------|------------------------------------------------------------|
-| `jest`    | `jest --testNamePattern "{name}"`                          |
-| `rspec`   | `rspec -e "{name}"`                                       |
-| `vitest`  | `vitest run --reporter=junit {file} -t "{name}"`          |
+| Framework | Auto-detected rerun command                                      |
+|-----------|------------------------------------------------------------------|
+| `jest`    | `npx jest --testNamePattern "{name}"`                            |
+| `rspec`   | `bundle exec rspec -e "{name}"`                                  |
+| `vitest`  | `npx vitest run --reporter=junit {file} -t "{name}"`             |
 
 **Validation rules:**
 - Must be a string.
