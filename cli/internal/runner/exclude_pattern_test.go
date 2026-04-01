@@ -174,3 +174,117 @@ func TestMatchesExcludePatternDoubleStarCanMatchColonSeparator(t *testing.T) {
 		Expected: true,
 	})
 }
+
+// TestMatchesExcludePatternDoubleStarAtEndMatchesRemainingSegments verifies
+// that a pattern ending with ** matches all remaining characters after the
+// literal prefix — including nested path segments.
+// Kills mutation on line 44: `return true` → `return false`.
+func TestMatchesExcludePatternDoubleStarAtEndMatchesRemainingSegments(t *testing.T) {
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "pattern 'com/example/**' and test ID 'com/example/Foo/Bar'",
+		Should:   "match (** at end matches all remaining path segments)",
+		Actual:   runner.MatchesExcludePattern("com/example/Foo/Bar", []string{"com/example/**"}),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "pattern 'com/example/**' and test ID with deeply nested path and classname",
+		Should:   "match (** at end matches remaining path and test_id segments)",
+		Actual:   runner.MatchesExcludePattern(
+			"com/example/sub/pkg::SomeClass::someMethod",
+			[]string{"com/example/**"},
+		),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "pattern 'other/**' and test ID 'com/example/Foo/Bar'",
+		Should:   "not match (literal prefix differs)",
+		Actual:   runner.MatchesExcludePattern("com/example/Foo/Bar", []string{"other/**"}),
+		Expected: false,
+	})
+}
+
+// TestMatchesExcludePatternDoubleStarConsumesFull verifies that ** in the
+// middle of a pattern can consume ALL remaining characters so that the rest
+// of the pattern matches the empty suffix. This exercises the i == len(s)
+// iteration of the loop on line 48.
+// Kills mutation on line 48: `i <= len(s)` → `i < len(s)`.
+func TestMatchesExcludePatternDoubleStarConsumesFull(t *testing.T) {
+	// Pattern "**::SlowTest" against "SlowTest": the ** handler tries every
+	// prefix of "SlowTest". At i=len("SlowTest"), s[i:] is "" and
+	// globMatch("::SlowTest", "") returns false. The match is found at i=0
+	// where globMatch("::SlowTest", "SlowTest") also fails (no leading ::).
+	// Use a case where ** must consume the WHOLE string so that the recursive
+	// call sees an empty remainder.
+	//
+	// Pattern "**/SlowTest" against "/SlowTest": rest = "/SlowTest".
+	// i=0: globMatch("/SlowTest", "/SlowTest") → true.
+	// This is not the i=len(s) case.
+	//
+	// To exercise i=len(s), we need a case where only globMatch(rest, "") is
+	// true. Since * matches zero characters, pattern "***" uses ** handler
+	// (rest="*"). At i=len(s), globMatch("*","") returns true (empty match).
+	// Without i<=len(s), that iteration is skipped, but i=0 already tries
+	// globMatch("*", s) which for non-empty s also succeeds via the * handler
+	// consuming nothing. So we need s to contain separators that block *.
+	//
+	// Pattern "***" against "a/b": ** handler, rest="*".
+	// i=0: globMatch("*","a/b") → * stops at /, only matches "" prefix, then
+	//   globMatch("","a/b") → false. No match at i=0.
+	// i=1: globMatch("*",""/b") → * stops at /, tries "", then
+	//   globMatch("","/b") → false.
+	// i=2: globMatch("*","/b") → * hits / immediately, only i=0 tried,
+	//   globMatch("","/b") → false.
+	// i=3: globMatch("*","b") → * matches "b", globMatch("","") → true. Match!
+	// i=4=len("a/b"): globMatch("*","") → * matches "", globMatch("","")→true.
+	// So i=3 finds the match before i=len(s). Need s with trailing separator.
+	//
+	// Pattern "***" against "a/": ** handler, rest="*".
+	// i=0: globMatch("*","a/") → * tries "","a" then ch='/' breaks; neither
+	//   leaves empty remainder for globMatch("",suffix). False.
+	// i=1: globMatch("*","/") → * hits '/' at i=0 (i>0 check), waits—actually
+	//   i=0 is tried first: globMatch("","/") → false. Then ch=s[0]='/', break.
+	//   Returns false.
+	// i=2: globMatch("*","") → true (i=2=len("a/")=2).
+	// So i=2=len(s) is the ONLY winning iteration. With i<len(s) the loop
+	// stops at i=1, misses i=2, and returns false.
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "pattern '***' and test ID 'a/' (trailing separator)",
+		Should:   "match (** consumes 'a/', * matches empty remainder)",
+		Actual:   runner.MatchesExcludePattern("a/", []string{"***"}),
+		Expected: true,
+	})
+
+	// Confirm the inverse: a string without trailing separator is still
+	// matched (via an earlier iteration), so the boundary is specific to
+	// trailing-separator inputs.
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "pattern '***' and test ID 'ab' (no separator)",
+		Should:   "match (**  can consume '' and * matches 'ab')",
+		Actual:   runner.MatchesExcludePattern("ab", []string{"***"}),
+		Expected: true,
+	})
+}
+
+// TestMatchesExcludePatternSingleStarDoesNotCrossSlash verifies that a single
+// * will not match across a '/' path separator. This directly targets the '/'
+// branch of the `ch == '/' || ch == ':'` guard on line 62.
+// Kills mutation on line 62: removing the '/' check, leaving only ch == ':'.
+func TestMatchesExcludePatternSingleStarDoesNotCrossSlash(t *testing.T) {
+	// foo/*/baz should NOT match foo/bar/qux/baz because * cannot cross /.
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "pattern 'foo/*/baz' and test ID 'foo/bar/qux/baz'",
+		Should:   "not match (* cannot cross / separator)",
+		Actual:   runner.MatchesExcludePattern("foo/bar/qux/baz", []string{"foo/*/baz"}),
+		Expected: false,
+	})
+
+	// Confirm the positive case: foo/*/baz DOES match foo/bar/baz (single segment).
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "pattern 'foo/*/baz' and test ID 'foo/bar/baz'",
+		Should:   "match (* matches single path segment 'bar')",
+		Actual:   runner.MatchesExcludePattern("foo/bar/baz", []string{"foo/*/baz"}),
+		Expected: true,
+	})
+}
