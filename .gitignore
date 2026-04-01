@@ -20,8 +20,6 @@ dashboard/quarantine.db-wal
 !.tool-versions
 **/.claude/settings.local.json
 
-# Mutation testing
-.test-mutations.json
 
 # Secrets
 .env

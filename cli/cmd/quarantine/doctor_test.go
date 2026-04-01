@@ -289,6 +289,151 @@ framework: jest
 	})
 }
 
+// --- prComment lines 74–75: initial false default and nil-guard ---
+//
+// ApplyDefaults always sets GitHubPRComment to &true when it is nil, so the
+// nil branch on line 75 is never taken in practice. The tests below cover the
+// two observable states: explicit false and explicit true.
+
+func TestDoctorPRCommentExplicitFalseIsReflected(t *testing.T) {
+	// When github_pr_comment is explicitly false, the pointer is non-nil and
+	// its value (false) must be printed. If line 74 were mutated to
+	// `prComment := true` the if-branch on line 75–77 still overwrites with
+	// the pointer value (false), so the output is still correct. This test
+	// confirms the value flows through the non-nil branch unchanged.
+	path := writeTempConfig(t, `
+version: 1
+framework: jest
+notifications:
+  github_pr_comment: false
+`)
+
+	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a config with notifications.github_pr_comment: false",
+		Should:   "exit without error",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a config with GitHubPRComment set to false",
+		Should:   "print github_pr_comment: false",
+		Actual:   strings.Contains(stdout, "github_pr_comment: false"),
+		Expected: true,
+	})
+}
+
+func TestDoctorPRCommentNonNilEnabledValueIsUsed(t *testing.T) {
+	// When GitHubPRComment is non-nil, the if-branch (line 75) must fire and
+	// use *cfg.Notifications.GitHubPRComment. If line 75 were mutated to
+	// `== nil`, the condition is false for a non-nil pointer, so prComment
+	// stays at the line-74 initial value (false) instead of true — killing
+	// the mutation.
+	path := writeTempConfig(t, `
+version: 1
+framework: jest
+notifications:
+  github_pr_comment: true
+`)
+
+	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a config with notifications.github_pr_comment: true",
+		Should:   "exit without error",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a config with GitHubPRComment non-nil and set to true",
+		Should:   "print github_pr_comment: true",
+		Actual:   strings.Contains(stdout, "github_pr_comment: true"),
+		Expected: true,
+	})
+}
+
+// --- Exact error message when quarantine.yml is not found (line 20) ---
+
+func TestDoctorMissingConfigExactMessage(t *testing.T) {
+	stdout, _ := executeDoctorCmd(t, []string{"--config", "/nonexistent/quarantine.yml"}, nil)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no quarantine.yml at the given path",
+		Should:   "print exact guidance message including 'quarantine init'",
+		Actual:   strings.Contains(stdout, "quarantine.yml not found in the current directory.\nRun 'quarantine init' to create one."),
+		Expected: true,
+	})
+}
+
+// --- Exact error message when config has validation errors (line 44) ---
+
+func TestDoctorValidationErrorExactMessage(t *testing.T) {
+	path := writeTempConfig(t, `
+version: 1
+framework: jest
+retries: -1
+`)
+
+	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a quarantine.yml with a validation error",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a quarantine.yml with validation errors",
+		Should:   "print exact header 'quarantine.yml has errors.'",
+		Actual:   strings.Contains(stdout, "quarantine.yml has errors."),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a quarantine.yml with validation errors",
+		Should:   "return error with message 'quarantine.yml has errors'",
+		Actual:   err.Error() == "quarantine.yml has errors",
+		Expected: true,
+	})
+}
+
+func TestDoctorLabelsSingleDefaultInOutput(t *testing.T) {
+	// Confirms the labels field is rendered as [quarantine] in the resolved
+	// configuration output (exercises the surrounding format string).
+	path := writeTempConfig(t, `
+version: 1
+framework: jest
+`)
+
+	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a config with the default label",
+		Should:   "exit without error",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a config with the default label",
+		Should:   "print labels wrapped in brackets as [quarantine]",
+		Actual:   strings.Contains(stdout, "[quarantine]"),
+		Expected: true,
+	})
+}
+
 // --- Scenario 12 (no token warning) ---
 
 // --- Git remote detection failure (graceful degradation) ---

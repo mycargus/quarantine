@@ -1,0 +1,222 @@
+{
+  "version": "1.0",
+  "test_command": "go test ./cli/...",
+  "last_updated": "2026-04-01T01:00:00Z",
+  "modules": {
+    "cli/cmd/quarantine/run.go": {
+      "status": "pending",
+      "covering_tests": ["cli/cmd/quarantine/run_test.go", "cli/cmd/quarantine/run_pass_test.go", "cli/cmd/quarantine/run_signal_test.go", "cli/cmd/quarantine/run_xml_test.go", "cli/cmd/quarantine/run_retry_test.go", "cli/cmd/quarantine/run_quarantine_test.go", "cli/cmd/quarantine/run_quarantine_all_test.go", "cli/cmd/quarantine/run_mixed_test.go", "cli/cmd/quarantine/run_warnings_test.go", "cli/cmd/quarantine/run_degraded_test.go", "cli/cmd/quarantine/run_degraded_strict_test.go", "cli/cmd/quarantine/run_dryrun_test.go", "cli/cmd/quarantine/run_exclude_test.go", "cli/cmd/quarantine/run_flags_test.go", "cli/cmd/quarantine/run_write_state_test.go", "cli/cmd/quarantine/run_branch_protection_test.go", "cli/cmd/quarantine/run_rerun_failure_test.go", "cli/cmd/quarantine/run_retries_test.go", "cli/cmd/quarantine/run_pure_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/cmd/quarantine/run_notifications.go": {
+      "status": "pending",
+      "covering_tests": ["cli/cmd/quarantine/run_notifications_test.go", "cli/cmd/quarantine/run_notifications_build_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/cmd/quarantine/init.go": {
+      "status": "pending",
+      "covering_tests": ["cli/cmd/quarantine/init_test.go", "cli/cmd/quarantine/init_happy_test.go", "cli/cmd/quarantine/init_error_test.go", "cli/cmd/quarantine/init_overwrite_test.go", "cli/cmd/quarantine/init_pure_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/config/config.go": {
+      "status": "pending",
+      "covering_tests": ["cli/internal/config/config_test.go", "cli/internal/config/config_defaults_test.go", "cli/internal/config/config_validate_schema_test.go", "cli/internal/config/config_validate_unknown_keys_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/github/init_ops.go": {
+      "status": "pending",
+      "covering_tests": [],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/result/result.go": {
+      "status": "pending",
+      "covering_tests": ["cli/internal/result/result_test.go", "cli/internal/result/result_schema_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/github/issues_ops.go": {
+      "status": "pending",
+      "covering_tests": ["cli/internal/github/issues_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/parser/parser.go": {
+      "status": "pending",
+      "covering_tests": ["cli/internal/parser/parser_test.go", "cli/internal/parser/parser_jest_test.go", "cli/internal/parser/parser_rspec_test.go", "cli/internal/parser/parser_vitest_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/quarantine/state.go": {
+      "status": "pending",
+      "covering_tests": ["cli/internal/quarantine/state_test.go", "cli/internal/quarantine/state_merge_test.go", "cli/internal/quarantine/state_schema_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/runner/runner.go": {
+      "status": "pending",
+      "covering_tests": ["cli/internal/runner/runner_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/github/contents_ops.go": {
+      "status": "pending",
+      "covering_tests": ["cli/internal/github/contents_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/cmd/quarantine/main.go": {
+      "status": "pending",
+      "covering_tests": [],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/cas/cas.go": {
+      "status": "pending",
+      "covering_tests": ["cli/internal/cas/cas_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/cmd/quarantine/doctor.go": {
+      "status": "completed",
+      "covering_tests": ["cli/cmd/quarantine/doctor_test.go", "cli/cmd/quarantine/doctor_pure_test.go"],
+      "last_tested": "2026-04-01T01:00:00Z",
+      "mutations_by_type": {
+        "relational": {
+          "total": 14,
+          "killed": 13,
+          "survived": 1,
+          "examples": [
+            {"line": 75, "original": "!= nil", "mutated": "== nil", "result": "killed", "test_that_caught_it": "TestDoctorPRCommentNonNilEnabledValueIsUsed"}
+          ]
+        },
+        "constant": {
+          "total": 7,
+          "killed": 5,
+          "survived": 2,
+          "examples": [
+            {"line": 74, "original": "false", "mutated": "true", "result": "survived", "test_that_caught_it": null},
+            {"line": 72, "original": "\", \"", "mutated": "\"\"", "result": "survived", "test_that_caught_it": null}
+          ]
+        },
+        "statement": {
+          "total": 5,
+          "killed": 5,
+          "survived": 0,
+          "examples": []
+        },
+        "string": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": [
+            {"line": 20, "original": "full error message", "mutated": "truncated", "result": "killed", "test_that_caught_it": "TestDoctorMissingConfigExactMessage"},
+            {"line": 44, "original": "quarantine.yml has errors", "mutated": "", "result": "killed", "test_that_caught_it": "TestDoctorValidationErrorExactMessage"}
+          ]
+        },
+        "logical": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": []
+        }
+      },
+      "mutation_score": 90.3,
+      "insights": ["Line 74 is an equivalent mutant — ApplyDefaults always sets the pointer, making the initial value irrelevant", "Line 72 separator is untestable in v1 because validation only permits a single label"]
+    },
+    "cli/cmd/quarantine/run_pr_scope.go": {
+      "status": "pending",
+      "covering_tests": ["cli/cmd/quarantine/run_pr_scope_test.go", "cli/cmd/quarantine/run_pr_scope_pure_test.go", "cli/cmd/quarantine/run_pr_scope_new_to_pr_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/github/client.go": {
+      "status": "pending",
+      "covering_tests": ["cli/internal/github/client_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/github/search_ops.go": {
+      "status": "pending",
+      "covering_tests": ["cli/internal/github/search_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/runner/exclude_pattern.go": {
+      "status": "pending",
+      "covering_tests": ["cli/internal/runner/exclude_pattern_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/git/remote.go": {
+      "status": "pending",
+      "covering_tests": ["cli/internal/git/remote_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/runner/exclusion.go": {
+      "status": "pending",
+      "covering_tests": ["cli/internal/runner/exclusion_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    },
+    "cli/internal/quarantine/filter.go": {
+      "status": "pending",
+      "covering_tests": ["cli/internal/quarantine/filter_test.go"],
+      "last_tested": null,
+      "mutations_by_type": {},
+      "mutation_score": null,
+      "insights": []
+    }
+  },
+  "global_statistics": {
+    "total_modules": 21,
+    "completed_modules": 1,
+    "total_mutations": 31,
+    "total_killed": 28,
+    "total_survived": 3,
+    "overall_score": 90.3
+  }
+}
