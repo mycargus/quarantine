@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "test_command": "go test ./cli/...",
-  "last_updated": "2026-04-01T02:00:00Z",
+  "last_updated": "2026-04-01T03:00:00Z",
   "modules": {
     "cli/cmd/quarantine/run.go": {
       "status": "completed",
@@ -22,12 +22,20 @@
       "insights": ["Core retry logic and exit code handling well-tested", "Complex compound conditions in state-write and issue-creation paths have gaps", "Pure helper functions (allTestsQuarantined, parseJUnitXML, mergeParseResults) now covered"]
     },
     "cli/cmd/quarantine/run_notifications.go": {
-      "status": "pending",
-      "covering_tests": ["cli/cmd/quarantine/run_notifications_test.go", "cli/cmd/quarantine/run_notifications_build_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "status": "completed",
+      "covering_tests": ["cli/cmd/quarantine/run_notifications_test.go", "cli/cmd/quarantine/run_notifications_build_test.go", "cli/cmd/quarantine/run_notifications_issues_test.go"],
+      "last_tested": "2026-04-01T03:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 24, "killed": 10, "survived": 14, "examples": [
+          {"line": 131, "original": "len(data.Retries) > 0", "mutated": ">= 0", "result": "killed", "test_that_caught_it": "TestRenderIssueBodyOmitsRetryResultsWhenEmpty"},
+          {"line": 364, "original": "StatusCode == 410", "mutated": "!= 410", "result": "survived", "test_that_caught_it": null}
+        ]},
+        "logical": {"total": 8, "killed": 0, "survived": 8, "examples": [
+          {"line": 272, "original": "client == nil || prNumber == 0", "mutated": "&& ", "result": "survived", "test_that_caught_it": null}
+        ]}
+      },
+      "mutation_score": 31.3,
+      "insights": ["Pure rendering functions now tested for empty-section omission", "Issue creation and PR detection logic tested", "Complex compound conditions in postPRComment still untested", "Some issue creation mutations require more sophisticated fake servers"]
     },
     "cli/cmd/quarantine/init.go": {
       "status": "completed",
@@ -244,10 +252,10 @@
   },
   "global_statistics": {
     "total_modules": 21,
-    "completed_modules": 4,
-    "total_mutations": 103,
-    "total_killed": 75,
-    "total_survived": 27,
-    "overall_score": 72.8
+    "completed_modules": 5,
+    "total_mutations": 135,
+    "total_killed": 85,
+    "total_survived": 49,
+    "overall_score": 63.0
   }
 }
