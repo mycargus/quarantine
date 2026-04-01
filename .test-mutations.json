@@ -5,21 +5,21 @@
   "modules": {
     "cli/cmd/quarantine/run.go": {
       "status": "completed",
-      "covering_tests": ["cli/cmd/quarantine/run_test.go", "cli/cmd/quarantine/run_flags_test.go", "cli/cmd/quarantine/run_pure_test.go", "cli/cmd/quarantine/run_dryrun_test.go"],
-      "last_tested": "2026-04-01T02:30:00Z",
+      "covering_tests": ["cli/cmd/quarantine/run_test.go", "cli/cmd/quarantine/run_flags_test.go", "cli/cmd/quarantine/run_pure_test.go", "cli/cmd/quarantine/run_dryrun_test.go", "cli/cmd/quarantine/run_retries_test.go", "cli/cmd/quarantine/run_quarantine_test.go", "cli/cmd/quarantine/run_pr_comment_sections_test.go"],
+      "last_tested": "2026-04-01T07:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 17, "killed": 13, "survived": 4, "examples": [
-          {"line": 425, "original": "skipReasons[t.TestID] != \"\"", "mutated": "== \"\"", "result": "survived", "test_that_caught_it": null},
-          {"line": 710, "original": "runID == \"\"", "mutated": "!= \"\"", "result": "survived", "test_that_caught_it": null}
+        "relational": {"total": 17, "killed": 17, "survived": 0, "examples": [
+          {"line": 710, "original": "runID == \"\"", "mutated": "!= \"\"", "result": "killed", "test_that_caught_it": "TestBuildMetadataUsesEnvRunID"},
+          {"line": 78, "original": "retriesFlag > 10", "mutated": ">= 10", "result": "killed", "test_that_caught_it": "TestRunRetriesTenNotRejected"}
         ]},
-        "logical": {"total": 9, "killed": 5, "survived": 4, "examples": [
-          {"line": 209, "original": "qState != nil && ...", "mutated": "qState != nil || ...", "result": "survived", "test_that_caught_it": null},
-          {"line": 254, "original": "!dryRun && ghClient != nil", "mutated": "!dryRun || ghClient != nil", "result": "survived", "test_that_caught_it": null}
+        "logical": {"total": 9, "killed": 9, "survived": 0, "examples": [
+          {"line": 209, "original": "qState != nil && ... == runner.RSpec", "mutated": "||", "result": "killed", "test_that_caught_it": "TestRunRSpecFilteringSkippedWhenQStateNil"},
+          {"line": 254, "original": "!dryRun && ghClient != nil", "mutated": "||", "result": "killed", "test_that_caught_it": "TestRunDryRunSkipsNotificationBlockEvenWithNonNilClient"}
         ]},
         "statement": {"total": 2, "killed": 0, "survived": 2, "examples": []}
       },
-      "mutation_score": 60.7,
-      "insights": ["Core retry logic and exit code handling well-tested", "Complex compound conditions in state-write and issue-creation paths have gaps", "Pure helper functions (allTestsQuarantined, parseJUnitXML, mergeParseResults) now covered"]
+      "mutation_score": 92.9,
+      "insights": ["All relational and logical mutations now killed", "Statement deletions remain — low-risk side-effect-only lines", "Retries boundary, RSpec filtering guard, dry-run notification block, and buildMetadata fallback all tested"]
     },
     "cli/cmd/quarantine/run_notifications.go": {
       "status": "completed",
@@ -334,8 +334,8 @@
     "total_modules": 21,
     "completed_modules": 21,
     "total_mutations": 317,
-    "total_killed": 285,
-    "total_survived": 35,
-    "overall_score": 89.9
+    "total_killed": 293,
+    "total_survived": 27,
+    "overall_score": 92.4
   }
 }

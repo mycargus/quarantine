@@ -686,3 +686,45 @@ func TestAllTestsQuarantinedPartialReturnsFalse(t *testing.T) {
 	})
 }
 
+// --- Mutation guard: line 710 runID == "" ---
+
+// TestBuildMetadataUsesEnvRunID kills the mutation runID != "" on line 710.
+// When GITHUB_RUN_ID is set, buildMetadata must use it as-is (not generate a
+// local fallback). With the mutation the condition is flipped: a non-empty env
+// value would be overwritten by the local-... fallback.
+func TestBuildMetadataUsesEnvRunID(t *testing.T) {
+	t.Setenv("GITHUB_RUN_ID", "12345678")
+	// Unset branch / SHA env vars so they fall back to git (or empty) — we
+	// only care about RunID here.
+	t.Setenv("GITHUB_REF_NAME", "")
+	t.Setenv("GITHUB_SHA", "")
+
+	cfg := &config.Config{Framework: "jest", Retries: 3}
+	meta := buildMetadata(cfg)
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "GITHUB_RUN_ID=12345678 is set in the environment",
+		Should:   "use the env value as RunID without generating a local fallback",
+		Actual:   meta.RunID,
+		Expected: "12345678",
+	})
+}
+
+// TestBuildMetadataGeneratesFallbackWhenRunIDNotSet kills the same mutation
+// from the other direction: when GITHUB_RUN_ID is empty, a local-... fallback
+// must be generated. With the mutation the condition is `runID != ""`, so an
+// empty env value would leave RunID as "" instead of generating the fallback.
+func TestBuildMetadataGeneratesFallbackWhenRunIDNotSet(t *testing.T) {
+	t.Setenv("GITHUB_RUN_ID", "")
+
+	cfg := &config.Config{Framework: "jest", Retries: 3}
+	meta := buildMetadata(cfg)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "GITHUB_RUN_ID is not set",
+		Should:   "generate a local-... fallback run ID",
+		Actual:   strings.HasPrefix(meta.RunID, "local-"),
+		Expected: true,
+	})
+}
+

@@ -211,6 +211,74 @@ framework: jest
 // Tests run from cli/ inside the quarantine git repo (origin: mycargus/quarantine),
 // so git.ParseRemote returns "mycargus"/"quarantine" as the detected values.
 
+// --- Mutation guard: line 78 retriesFlag > 10 ---
+
+// TestRunRetriesTenNotRejected kills the mutation retriesFlag >= 10 on line 78.
+// The upper bound check is `retriesFlag > 10` (exclusive), so 10 is a valid
+// value and must NOT produce a "retries out of range" error.
+// The test uses a nonexistent command so execution exits at LookPath — this is
+// enough to confirm that the retries validation passed (the error is about the
+// command, not the flag value).
+func TestRunRetriesTenNotRejected(t *testing.T) {
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+`)
+
+	output, err := executeRunCmd(t, []string{
+		"--config", configPath,
+		"--retries", "10",
+		"--", "nonexistent-command-xyz",
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--retries 10 (the maximum valid value, boundary is > 10 exclusive)",
+		Should:   "fail on command-not-found, not on retries-out-of-range",
+		Actual:   err != nil && strings.Contains(err.Error(), "command not found"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--retries 10 (maximum valid value)",
+		Should:   "not print 'out of range' error",
+		Actual:   strings.Contains(output, "out of range"),
+		Expected: false,
+	})
+}
+
+// TestRunRetriesElevenIsRejected is the complementary boundary check:
+// 11 must be rejected so the test above has a meaningful contrast.
+func TestRunRetriesElevenIsRejected(t *testing.T) {
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+`)
+
+	output, err := executeRunCmd(t, []string{
+		"--config", configPath,
+		"--retries", "11",
+		"--", "echo", "hi",
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--retries 11 (above maximum of 10)",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--retries 11 (above maximum of 10)",
+		Should:   "print 'out of range' error",
+		Actual:   strings.Contains(output, "out of range"),
+		Expected: true,
+	})
+}
+
 // TestRunGitDetectionFillsMissingRepo: config has owner but no repo.
 // The || condition means detection fires to supply the repo.
 // Kills mutation: `owner == "" || repo == ""` → `owner == "" || repo != ""`.

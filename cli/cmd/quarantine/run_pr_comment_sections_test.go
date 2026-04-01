@@ -240,3 +240,122 @@ github:
 		Expected: true,
 	})
 }
+
+// --- Mutation guard: line 234 reason != "" ---
+
+// TestRunIssueSkippedReasonAnnotatedWhenReasonNonEmpty kills the mutation
+// `reason == ""` on line 234.
+//
+// The original condition is `if reason != ""` — IssueSkippedReason is set only
+// when the test has a non-empty skip reason (e.g. "new_file_in_pr").
+// With the mutation the condition flips: only empty-reason tests are annotated,
+// so a test with reason "new_file_in_pr" would NOT get IssueSkippedReason set.
+//
+// This test overrides checkPRScopeForTests to inject a "new_file_in_pr" reason
+// for a flaky test, then verifies results.json contains issue_skipped_reason.
+func TestRunIssueSkippedReasonAnnotatedWhenReasonNonEmpty(t *testing.T) {
+	// Inject a non-empty skip reason for the flaky test.
+	origCheck := checkPRScopeForTests
+	checkPRScopeForTests = func(_ string, tests []prScopeInput) map[string]string {
+		reasons := make(map[string]string)
+		for _, inp := range tests {
+			if inp.Name == "should handle charge timeout" {
+				reasons[inp.TestID] = "new_file_in_pr"
+			}
+		}
+		return reasons
+	}
+	t.Cleanup(func() { checkPRScopeForTests = origCheck })
+
+	dir := t.TempDir()
+
+	// Flaky XML: test fails initially.
+	failXML := `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="1">
+  <testsuite name="src/payment.test.js" tests="1" failures="1">
+    <testcase classname="PaymentService" name="should handle charge timeout"
+              file="src/payment.test.js" time="0.5">
+      <failure message="timeout">timeout</failure>
+    </testcase>
+  </testsuite>
+</testsuites>`
+
+	xmlPath := filepath.Join(dir, "junit.xml")
+	rerunScriptPath := filepath.Join(dir, "rerun")
+	if err := os.WriteFile(rerunScriptPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write rerun script: %v", err)
+	}
+	scriptPath := writeTestScript(t, dir, xmlPath, failXML, 1)
+
+	configPath := writeTempConfig(t, fmt.Sprintf(`
+version: 1
+framework: jest
+retries: 1
+rerun_command: %s
+github:
+  owner: test-owner
+  repo: test-repo
+`, rerunScriptPath))
+
+	server := fakeM4GitHubAPI(t, quarantine.NewEmptyState(), []int{})
+	defer server.Close()
+
+	resultsPath := filepath.Join(dir, "results.json")
+	exitCode := executeRunCmdWithExitCode(t, []string{
+		"--config", configPath,
+		"--junitxml", xmlPath,
+		"--output", resultsPath,
+		"--", scriptPath,
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "flaky test with a non-empty skip reason injected via checkPRScopeForTests",
+		Should:   "exit with code 0 (flaky test passes on retry)",
+		Actual:   exitCode,
+		Expected: 0,
+	})
+
+	resultsData, readErr := os.ReadFile(resultsPath)
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "flaky test with skip reason",
+		Should:   "write results.json",
+		Actual:   readErr == nil,
+		Expected: true,
+	})
+
+	if readErr != nil {
+		return
+	}
+
+	var results map[string]interface{}
+	if err := json.Unmarshal(resultsData, &results); err != nil {
+		t.Fatalf("unmarshal results.json: %v", err)
+	}
+
+	tests, _ := results["tests"].([]interface{})
+	var found bool
+	for _, tRaw := range tests {
+		tMap, _ := tRaw.(map[string]interface{})
+		if tMap["name"] == "should handle charge timeout" {
+			found = true
+			// Original: reason != "" is true for "new_file_in_pr" → IssueSkippedReason set.
+			// Mutation: reason == "" is false for "new_file_in_pr" → IssueSkippedReason NOT set.
+			riteway.Assert(t, riteway.Case[interface{}]{
+				Given:    "flaky test with injected non-empty skip reason 'new_file_in_pr'",
+				Should:   "have issue_skipped_reason set to 'new_file_in_pr' in results.json",
+				Actual:   tMap["issue_skipped_reason"],
+				Expected: "new_file_in_pr",
+			})
+		}
+	}
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "results.json test entries",
+		Should:   "include the flaky test entry",
+		Actual:   found,
+		Expected: true,
+	})
+}
