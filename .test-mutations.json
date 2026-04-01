@@ -194,12 +194,17 @@
       "insights": ["Line 74 is an equivalent mutant — ApplyDefaults always sets the pointer, making the initial value irrelevant", "Line 72 separator is untestable in v1 because validation only permits a single label"]
     },
     "cli/cmd/quarantine/run_pr_scope.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/cmd/quarantine/run_pr_scope_test.go", "cli/cmd/quarantine/run_pr_scope_pure_test.go", "cli/cmd/quarantine/run_pr_scope_new_to_pr_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T03:15:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 11, "killed": 10, "survived": 1, "examples": [
+          {"line": 70, "original": "f == inp.FilePath", "mutated": "f != inp.FilePath", "result": "survived", "test_that_caught_it": null}
+        ]},
+        "logical": {"total": 2, "killed": 2, "survived": 0, "examples": []}
+      },
+      "mutation_score": 92.3,
+      "insights": ["Line 70 new-file detection loop comparison survives — tests dont validate the exact matching logic with multiple files in newFiles list"]
     },
     "cli/internal/github/client.go": {
       "status": "pending",
@@ -252,10 +257,10 @@
   },
   "global_statistics": {
     "total_modules": 21,
-    "completed_modules": 5,
-    "total_mutations": 135,
-    "total_killed": 85,
-    "total_survived": 49,
-    "overall_score": 63.0
+    "completed_modules": 6,
+    "total_mutations": 148,
+    "total_killed": 97,
+    "total_survived": 50,
+    "overall_score": 65.5
   }
 }
