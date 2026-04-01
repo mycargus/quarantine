@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "test_command": "go test ./cli/...",
-  "last_updated": "2026-04-01T03:00:00Z",
+  "last_updated": "2026-04-01T04:30:00Z",
   "modules": {
     "cli/cmd/quarantine/run.go": {
       "status": "completed",
@@ -69,20 +69,28 @@
       "insights": ["Validation logic excellent — 13/13 relational killed", "Default value constants now tested", "YAML parsing loop boundaries survive — edge case only"]
     },
     "cli/internal/github/init_ops.go": {
-      "status": "pending",
-      "covering_tests": [],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": ["Tested indirectly through cmd/quarantine/init tests — no direct unit tests"]
+      "status": "completed",
+      "covering_tests": ["cli/cmd/quarantine/init_test.go"],
+      "last_tested": "2026-04-01T04:30:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 6, "killed": 6, "survived": 0, "examples": []},
+        "arithmetic": {"total": 1, "killed": 1, "survived": 0, "examples": []},
+        "logical": {"total": 1, "killed": 0, "survived": 0, "examples": []}
+      },
+      "mutation_score": 100.0,
+      "insights": ["Tested indirectly through init command — all 8 valid mutations killed"]
     },
     "cli/internal/result/result.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/internal/result/result_test.go", "cli/internal/result/result_schema_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T04:30:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 2, "killed": 2, "survived": 0, "examples": []},
+        "constant": {"total": 2, "killed": 2, "survived": 0, "examples": []},
+        "arithmetic": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+      },
+      "mutation_score": 100.0,
+      "insights": ["Perfect score — all 5 mutations killed"]
     },
     "cli/internal/github/issues_ops.go": {
       "status": "completed",
@@ -96,28 +104,49 @@
       "insights": ["Perfect score — all 7 mutations killed"]
     },
     "cli/internal/parser/parser.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/internal/parser/parser_test.go", "cli/internal/parser/parser_jest_test.go", "cli/internal/parser/parser_rspec_test.go", "cli/internal/parser/parser_vitest_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T04:30:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 8, "killed": 8, "survived": 0, "examples": []},
+        "logical": {"total": 1, "killed": 0, "survived": 1, "examples": [
+          {"line": 104, "original": "&& len(suite.TestCases) > 0", "mutated": "|| len(suite.TestCases) > 0", "result": "survived", "test_that_caught_it": null}
+        ]},
+        "arithmetic": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+      },
+      "mutation_score": 90.0,
+      "insights": ["Line 104 logical op survives — no test for successful unmarshal with zero TestCases"]
     },
     "cli/internal/quarantine/state.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/internal/quarantine/state_test.go", "cli/internal/quarantine/state_merge_test.go", "cli/internal/quarantine/state_schema_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T04:30:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 4, "killed": 2, "survived": 2, "examples": [
+          {"line": 136, "original": "<", "mutated": "<=", "result": "survived", "test_that_caught_it": null},
+          {"line": 140, "original": "<", "mutated": "<=", "result": "survived", "test_that_caught_it": null}
+        ]},
+        "constant": {"total": 2, "killed": 2, "survived": 0, "examples": []},
+        "logical": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+      },
+      "mutation_score": 71.4,
+      "insights": ["Timestamp comparison boundary mutations survive — < vs <= equivalent when timestamps never equal in tests"]
     },
     "cli/internal/runner/runner.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/internal/runner/runner_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T04:30:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 11, "killed": 11, "survived": 0, "examples": []},
+        "constant": {"total": 3, "killed": 2, "survived": 1, "examples": [
+          {"line": 61, "original": "return -1", "mutated": "return 1", "result": "survived", "test_that_caught_it": null}
+        ]},
+        "logical": {"total": 3, "killed": 2, "survived": 1, "examples": [
+          {"line": 50, "original": "cmd.Process != nil", "mutated": "== nil", "result": "survived", "test_that_caught_it": null}
+        ]}
+      },
+      "mutation_score": 88.2,
+      "insights": ["Signal forwarding guard not tested", "Error exit code -1 vs 1 not distinguished by tests"]
     },
     "cli/internal/github/contents_ops.go": {
       "status": "completed",
@@ -249,12 +278,20 @@
       "insights": ["Perfect score — all 8 mutations killed, including pagination boundaries"]
     },
     "cli/internal/runner/exclude_pattern.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/internal/runner/exclude_pattern_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T04:30:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 4, "killed": 3, "survived": 1, "examples": [
+          {"line": 48, "original": "i <= len(s)", "mutated": "i < len(s)", "result": "survived", "test_that_caught_it": null}
+        ]},
+        "logical": {"total": 2, "killed": 2, "survived": 0, "examples": []},
+        "constant": {"total": 1, "killed": 0, "survived": 1, "examples": [
+          {"line": 44, "original": "return true", "mutated": "return false", "result": "survived", "test_that_caught_it": null}
+        ]}
+      },
+      "mutation_score": 71.4,
+      "insights": ["Glob pattern edge cases — empty rest after ** and loop boundary"]
     },
     "cli/internal/git/remote.go": {
       "status": "completed",
@@ -270,28 +307,34 @@
       "insights": ["Perfect score — all 14 mutations killed"]
     },
     "cli/internal/runner/exclusion.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/internal/runner/exclusion_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T04:30:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 2, "killed": 2, "survived": 0, "examples": []},
+        "constant": {"total": 3, "killed": 3, "survived": 0, "examples": []},
+        "arithmetic": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+      },
+      "mutation_score": 100.0,
+      "insights": ["Perfect score — all 6 mutations killed"]
     },
     "cli/internal/quarantine/filter.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/internal/quarantine/filter_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T04:30:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 2, "killed": 2, "survived": 0, "examples": []}
+      },
+      "mutation_score": 100.0,
+      "insights": ["Perfect score — all 2 mutations killed"]
     }
   },
   "global_statistics": {
     "total_modules": 21,
-    "completed_modules": 13,
-    "total_mutations": 241,
-    "total_killed": 178,
-    "total_survived": 53,
-    "overall_score": 73.9
+    "completed_modules": 21,
+    "total_mutations": 314,
+    "total_killed": 260,
+    "total_survived": 57,
+    "overall_score": 82.8
   }
 }
