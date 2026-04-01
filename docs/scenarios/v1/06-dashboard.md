@@ -157,3 +157,74 @@ artifacts: `quarantine-results-100` (valid JSON), `quarantine-results-101`
    (strict greater-than — not yet stale).
 
 ---
+
+### Scenario 86: Dashboard triggers on-demand sync on first page load and displays real data [M7]
+
+**Risk:** The dashboard shows an empty state on first visit because no sync has ever run — the on-demand sync must fire automatically on page load to populate the database and display real data. (FR-1.5.2, FR-1.5.3)
+
+**Given** the dashboard is running with `dashboard.yml` configured as:
+```yaml
+source: manual
+repos:
+  - owner: mycargus
+    repo: my-app
+```
+and `QUARANTINE_GITHUB_TOKEN` is set in the environment, and SQLite contains no data for
+`mycargus/my-app` (`last_pulled_at` is `null`), and GitHub has 3 artifacts named
+`quarantine-results-1`, `quarantine-results-2`, `quarantine-results-3` for `mycargus/my-app`,
+each containing valid test result JSON
+
+**When** the user navigates to the home page (`/`)
+
+**Then:**
+1. The dashboard detects `last_pulled_at` is `null` → `shouldPull` returns `true`.
+2. The dashboard calls the GitHub Artifacts API for `mycargus/my-app`.
+3. All 3 artifacts matching the `quarantine-results` prefix are downloaded and ingested into SQLite (both `test_runs` and `quarantined_tests` populated).
+4. `last_pulled_at` is updated to the current time after a successful sync.
+5. The home page renders with the ingested data (test run counts, last synced time, quarantined test totals).
+6. A second page load within 5 minutes does NOT re-trigger a GitHub API call (`shouldPull` returns `false`).
+
+---
+
+### Scenario 87: Artifact ingestion populates quarantined_tests from test entries [M7]
+
+**Risk:** Dashboard analytics show zero quarantined tests even when artifacts contain quarantine data, because the ingest pipeline only stores run-level summaries and never extracts the per-test quarantine entries. (FR-1.5.1)
+
+**Given** an artifact for `mycargus/my-app` is being ingested with `run_id: "run-abc123"` and `timestamp: "2026-02-10T14:00:00Z"`, containing these test entries:
+- `test_id: "spec/payments_spec.rb::PaymentsService::processes_payment"`, `status: "quarantined"`, `original_status: "failed"`, `issue_number: 42`
+- `test_id: "spec/auth_spec.rb::Auth::login"`, `status: "quarantined"`, `original_status: "passed"`, `issue_number: 43`
+- `test_id: "spec/cart_spec.rb::Cart::checkout"`, `status: "quarantined"`, `original_status: null` (excluded pre-execution by Jest/Vitest), `issue_number: 44`
+
+**When** the ingestion pipeline processes this artifact
+
+**Then:**
+1. All 3 entries are upserted into `quarantined_tests`.
+2. `quarantined_at` is set to `"2026-02-10T14:00:00Z"` (the artifact's `timestamp`) for all new entries.
+3. The entry with `original_status: "failed"` has `last_run_status: "failing"`.
+4. The entry with `original_status: "passed"` has `last_run_status: "passing"`.
+5. The entry with `original_status: null` has `last_run_status: null`.
+6. `issue_url` is `https://github.com/mycargus/my-app/issues/42` for issue_number 42 (and similarly for 43, 44).
+7. The `test_runs` row for `run-abc123` is also inserted (existing M6 behavior is unchanged).
+
+---
+
+### Scenario 88: Subsequent artifact ingestion updates last_run_status but preserves quarantined_at [M7]
+
+**Risk:** Re-ingesting a later artifact overwrites the original quarantine date, destroying the history of when a test was first quarantined and breaking the "date first quarantined" display. (FR-1.5.1)
+
+**Given** `quarantined_tests` already contains an entry for
+`spec/payments_spec.rb::PaymentsService::processes_payment` in project `mycargus/my-app`
+with `quarantined_at: "2026-01-15T09:00:00Z"` and `last_run_status: "failing"` (set by an
+earlier artifact), and a new artifact is ingested with
+`timestamp: "2026-03-01T10:00:00Z"` containing the same test entry with
+`status: "quarantined"` and `original_status: "passed"` (the test is still quarantined
+but now passing in this run)
+
+**When** the ingestion pipeline processes the new artifact
+
+**Then:**
+1. `last_run_status` is updated to `"passing"` (reflecting the most recent run).
+2. `quarantined_at` remains `"2026-01-15T09:00:00Z"` (the original quarantine date is preserved — not overwritten).
+3. No duplicate row is created — the existing row is updated in place.
+
+---
