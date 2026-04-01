@@ -74,7 +74,7 @@
       "last_tested": null,
       "mutations_by_type": {},
       "mutation_score": null,
-      "insights": []
+      "insights": ["Tested indirectly through cmd/quarantine/init tests — no direct unit tests"]
     },
     "cli/internal/result/result.go": {
       "status": "pending",
@@ -85,12 +85,15 @@
       "insights": []
     },
     "cli/internal/github/issues_ops.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/internal/github/issues_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T04:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 5, "killed": 5, "survived": 0, "examples": []},
+        "logical": {"total": 2, "killed": 2, "survived": 0, "examples": []}
+      },
+      "mutation_score": 100.0,
+      "insights": ["Perfect score — all 7 mutations killed"]
     },
     "cli/internal/parser/parser.go": {
       "status": "pending",
@@ -117,12 +120,16 @@
       "insights": []
     },
     "cli/internal/github/contents_ops.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/internal/github/contents_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T04:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 3, "killed": 3, "survived": 0, "examples": []},
+        "logical": {"total": 1, "killed": 1, "survived": 0, "examples": []},
+        "constant": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+      },
+      "mutation_score": 100.0,
+      "insights": ["All 5 mutations killed (1 skipped due to linter)"]
     },
     "cli/cmd/quarantine/main.go": {
       "status": "completed",
@@ -220,20 +227,26 @@
       "insights": ["Line 70 new-file detection loop comparison survives — tests dont validate the exact matching logic with multiple files in newFiles list"]
     },
     "cli/internal/github/client.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/internal/github/client_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T04:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 3, "killed": 3, "survived": 0, "examples": []},
+        "constant": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+      },
+      "mutation_score": 100.0,
+      "insights": ["Perfect score — all 4 mutations killed"]
     },
     "cli/internal/github/search_ops.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/internal/github/search_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T04:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 5, "killed": 5, "survived": 0, "examples": []},
+        "constant": {"total": 3, "killed": 3, "survived": 0, "examples": []}
+      },
+      "mutation_score": 100.0,
+      "insights": ["Perfect score — all 8 mutations killed, including pagination boundaries"]
     },
     "cli/internal/runner/exclude_pattern.go": {
       "status": "pending",
@@ -244,12 +257,17 @@
       "insights": []
     },
     "cli/internal/git/remote.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/internal/git/remote_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T04:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 8, "killed": 8, "survived": 0, "examples": []},
+        "logical": {"total": 1, "killed": 1, "survived": 0, "examples": []},
+        "constant": {"total": 3, "killed": 3, "survived": 0, "examples": []},
+        "control_flow": {"total": 2, "killed": 2, "survived": 0, "examples": []}
+      },
+      "mutation_score": 100.0,
+      "insights": ["Perfect score — all 14 mutations killed"]
     },
     "cli/internal/runner/exclusion.go": {
       "status": "pending",
@@ -270,10 +288,10 @@
   },
   "global_statistics": {
     "total_modules": 21,
-    "completed_modules": 8,
-    "total_mutations": 194,
-    "total_killed": 140,
+    "completed_modules": 13,
+    "total_mutations": 241,
+    "total_killed": 178,
     "total_survived": 53,
-    "overall_score": 72.2
+    "overall_score": 73.9
   }
 }
