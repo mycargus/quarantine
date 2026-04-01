@@ -4,17 +4,16 @@
 # GitHub Actions release workflow triggered by the tag push.
 set -euo pipefail
 
-VERSION="${1:-}"
+INPUT="${1:-}"
 
-# 1. Validate version format
-if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+# 1. Strip leading v if present, then validate
+VERSION_NUM="${INPUT#v}"
+if [[ ! "$VERSION_NUM" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "Usage: $0 <version>"
-  echo "Example: $0 v0.1.0"
+  echo "Example: $0 0.1.0"
   exit 1
 fi
-
-# 2. Extract version without v prefix
-VERSION_NUM="${VERSION#v}"
+TAG="v${VERSION_NUM}"
 
 # 3. Verify CHANGELOG.md has entry for this version
 if ! grep -q "^## \[${VERSION_NUM}\]" CHANGELOG.md; then
@@ -34,8 +33,8 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 
 # 6. Verify tag doesn't already exist
-if git rev-parse "$VERSION" >/dev/null 2>&1; then
-  echo "Error: Tag $VERSION already exists."
+if git rev-parse "$TAG" >/dev/null 2>&1; then
+  echo "Error: Tag $TAG already exists."
   exit 1
 fi
 
@@ -63,7 +62,7 @@ fi
 # 11. Print summary
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Release: $VERSION"
+echo "  Release: $TAG"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "Release notes:"
@@ -71,22 +70,22 @@ echo "$RELEASE_NOTES"
 echo ""
 
 # 12. Prompt for confirmation
-read -r -p "Create and push tag $VERSION? [y/N] " confirm
+read -r -p "Create and push tag $TAG? [y/N] " confirm
 if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
   echo "Aborted."
   exit 0
 fi
 
 # 13. Create annotated tag
-git tag -a "$VERSION" -m "Release $VERSION"
+git tag -a "$TAG" -m "Release $TAG"
 
 # 14. Push tag
-git push origin "$VERSION"
+git push origin "$TAG"
 
 REMOTE_URL=$(git remote get-url origin)
 REPO_URL=$(echo "$REMOTE_URL" | sed -E 's|git@github\.com:|https://github.com/|; s|\.git$||')
 
 echo ""
-echo "Tag $VERSION pushed."
+echo "Tag $TAG pushed."
 echo "Monitor the release workflow at:"
 echo "${REPO_URL}/actions"
