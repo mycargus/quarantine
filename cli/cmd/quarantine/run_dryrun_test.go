@@ -296,3 +296,84 @@ rerun_command: %s
 		Expected: true,
 	})
 }
+
+// --- Mutation guard: line 243 qState != nil && !dryRun ---
+
+// TestRunDryRunWithExistingQStateDoesNotWriteState kills the mutation
+// qState != nil || !dryRun on line 243.
+//
+// The condition controls whether quarantine state is written:
+//   Original:  qState != nil && !dryRun  →  true && false  = false  (no write)
+//   Mutation:  qState != nil || !dryRun  →  true || false  = true   (write!)
+//
+// This test supplies a non-nil quarantine state (one pre-existing quarantined
+// test) and a flaky test result so stateChanged=true. With --dry-run, the PUT
+// must still not be called.
+func TestRunDryRunWithExistingQStateDoesNotWriteState(t *testing.T) {
+	dir := t.TempDir()
+
+	// Non-nil quarantine state with one existing entry.
+	qs := quarantine.NewEmptyState()
+	qs.AddTest(makeQuarantineEntry(
+		"src/existing.test.js::Existing::is stable",
+		"is stable",
+		"src/existing.test.js",
+		10,
+	))
+
+	// JUnit XML: a different test fails → becomes flaky on retry.
+	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="1">
+  <testsuite name="__tests__/new.test.js" tests="1" failures="1">
+    <testcase classname="New" name="should be flaky"
+              file="__tests__/new.test.js" time="0.5">
+      <failure message="timeout">timeout</failure>
+    </testcase>
+  </testsuite>
+</testsuites>`
+
+	xmlPath := filepath.Join(dir, "junit.xml")
+
+	rerunScriptPath := filepath.Join(dir, "rerun")
+	if err := os.WriteFile(rerunScriptPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write rerun script: %v", err)
+	}
+	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 1)
+
+	configPath := writeTempConfig(t, fmt.Sprintf(`
+version: 1
+framework: jest
+retries: 1
+rerun_command: %s
+`, rerunScriptPath))
+
+	var putCalled int32
+	server := fakeM4GitHubAPIWithPUTTracking(t, qs, []int{}, &putCalled)
+	defer server.Close()
+
+	resultsPath := filepath.Join(dir, "results.json")
+	_, err := executeRunCmdCaptureBoth(t, []string{
+		"--config", configPath,
+		"--junitxml", xmlPath,
+		"--output", resultsPath,
+		"--dry-run",
+		"--", scriptPath,
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "--dry-run with non-nil qState and a newly flaky test",
+		Should:   "exit without error",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[int32]{
+		Given:    "--dry-run with non-nil qState (stateChanged would be true without dry-run)",
+		Should:   "not write quarantine state (PUT call count is 0)",
+		Actual:   atomic.LoadInt32(&putCalled),
+		Expected: 0,
+	})
+}

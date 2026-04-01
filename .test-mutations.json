@@ -4,12 +4,22 @@
   "last_updated": "2026-04-01T02:00:00Z",
   "modules": {
     "cli/cmd/quarantine/run.go": {
-      "status": "pending",
-      "covering_tests": ["cli/cmd/quarantine/run_test.go", "cli/cmd/quarantine/run_pass_test.go", "cli/cmd/quarantine/run_signal_test.go", "cli/cmd/quarantine/run_xml_test.go", "cli/cmd/quarantine/run_retry_test.go", "cli/cmd/quarantine/run_quarantine_test.go", "cli/cmd/quarantine/run_quarantine_all_test.go", "cli/cmd/quarantine/run_mixed_test.go", "cli/cmd/quarantine/run_warnings_test.go", "cli/cmd/quarantine/run_degraded_test.go", "cli/cmd/quarantine/run_degraded_strict_test.go", "cli/cmd/quarantine/run_dryrun_test.go", "cli/cmd/quarantine/run_exclude_test.go", "cli/cmd/quarantine/run_flags_test.go", "cli/cmd/quarantine/run_write_state_test.go", "cli/cmd/quarantine/run_branch_protection_test.go", "cli/cmd/quarantine/run_rerun_failure_test.go", "cli/cmd/quarantine/run_retries_test.go", "cli/cmd/quarantine/run_pure_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "status": "completed",
+      "covering_tests": ["cli/cmd/quarantine/run_test.go", "cli/cmd/quarantine/run_flags_test.go", "cli/cmd/quarantine/run_pure_test.go", "cli/cmd/quarantine/run_dryrun_test.go"],
+      "last_tested": "2026-04-01T02:30:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 17, "killed": 13, "survived": 4, "examples": [
+          {"line": 425, "original": "skipReasons[t.TestID] != \"\"", "mutated": "== \"\"", "result": "survived", "test_that_caught_it": null},
+          {"line": 710, "original": "runID == \"\"", "mutated": "!= \"\"", "result": "survived", "test_that_caught_it": null}
+        ]},
+        "logical": {"total": 9, "killed": 5, "survived": 4, "examples": [
+          {"line": 209, "original": "qState != nil && ...", "mutated": "qState != nil || ...", "result": "survived", "test_that_caught_it": null},
+          {"line": 254, "original": "!dryRun && ghClient != nil", "mutated": "!dryRun || ghClient != nil", "result": "survived", "test_that_caught_it": null}
+        ]},
+        "statement": {"total": 2, "killed": 0, "survived": 2, "examples": []}
+      },
+      "mutation_score": 60.7,
+      "insights": ["Core retry logic and exit code handling well-tested", "Complex compound conditions in state-write and issue-creation paths have gaps", "Pure helper functions (allTestsQuarantined, parseJUnitXML, mergeParseResults) now covered"]
     },
     "cli/cmd/quarantine/run_notifications.go": {
       "status": "pending",
@@ -234,10 +244,10 @@
   },
   "global_statistics": {
     "total_modules": 21,
-    "completed_modules": 3,
-    "total_mutations": 75,
-    "total_killed": 58,
-    "total_survived": 16,
-    "overall_score": 77.3
+    "completed_modules": 4,
+    "total_mutations": 103,
+    "total_killed": 75,
+    "total_survived": 27,
+    "overall_score": 72.8
   }
 }
