@@ -20,12 +20,21 @@
       "insights": []
     },
     "cli/cmd/quarantine/init.go": {
-      "status": "pending",
+      "status": "completed",
       "covering_tests": ["cli/cmd/quarantine/init_test.go", "cli/cmd/quarantine/init_happy_test.go", "cli/cmd/quarantine/init_error_test.go", "cli/cmd/quarantine/init_overwrite_test.go", "cli/cmd/quarantine/init_pure_test.go"],
-      "last_tested": null,
-      "mutations_by_type": {},
-      "mutation_score": null,
-      "insights": []
+      "last_tested": "2026-04-01T01:30:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 11, "killed": 11, "survived": 0, "examples": []},
+        "logical": {"total": 6, "killed": 6, "survived": 0, "examples": []},
+        "control_flow": {"total": 4, "killed": 3, "survived": 1, "examples": [
+          {"line": 219, "original": "} else if", "mutated": "} if", "result": "survived", "test_that_caught_it": null}
+        ]},
+        "string": {"total": 2, "killed": 2, "survived": 0, "examples": []},
+        "constant": {"total": 1, "killed": 1, "survived": 0, "examples": []},
+        "statement": {"total": 2, "killed": 1, "survived": 0, "examples": []}
+      },
+      "mutation_score": 92.3,
+      "insights": ["Line 219 else-if to if is an equivalent mutant — preceding block returns, so else is redundant", "All relational and logical operator mutations killed — excellent error handling coverage"]
     },
     "cli/internal/config/config.go": {
       "status": "pending",
@@ -213,10 +222,10 @@
   },
   "global_statistics": {
     "total_modules": 21,
-    "completed_modules": 1,
-    "total_mutations": 31,
-    "total_killed": 28,
-    "total_survived": 3,
-    "overall_score": 90.3
+    "completed_modules": 2,
+    "total_mutations": 57,
+    "total_killed": 52,
+    "total_survived": 4,
+    "overall_score": 91.2
   }
 }
