@@ -179,6 +179,8 @@ function createWorkDir() {
     cwd: dir,
     stdio: "pipe",
   })
+  // Create an initial commit so that `git rev-parse HEAD` produces a real SHA.
+  execSync("git commit --allow-empty -m 'initial commit'", { cwd: dir, stdio: "pipe" })
   return dir
 }
 
