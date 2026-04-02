@@ -65,7 +65,7 @@ cd "${REPO_ROOT}/cli"
 # PRISM_URL is read by newPrismClient(t), which calls t.Setenv for QUARANTINE_GITHUB_API_BASE_URL
 # and GITHUB_TOKEN per-test. Do NOT set QUARANTINE_GITHUB_API_BASE_URL globally here — it
 # would break non-contract tests like TestInitAPIUnreachable that run in the same invocation.
-PRISM_URL="${PRISM_URL}" go test -tags contract -count=1 ./internal/github/...
+PRISM_URL="${PRISM_URL}" go test -tags contract -run '^TestContract' -count=1 ./...
 
 # ── Run JS contract tests ────────────────────────────────────────────────────
 echo "[contract] Running JS contract tests..."
