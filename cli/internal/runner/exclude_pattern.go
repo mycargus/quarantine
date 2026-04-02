@@ -39,10 +39,6 @@ func globMatch(pattern, s string) bool {
 	// Handle ** at the start.
 	if strings.HasPrefix(pattern, "**") {
 		rest := pattern[2:]
-		// ** followed by nothing — match anything.
-		if rest == "" {
-			return true
-		}
 		// ** followed by a separator then more pattern.
 		// Try matching the rest against every suffix of s.
 		for i := 0; i <= len(s); i++ {
