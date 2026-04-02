@@ -308,6 +308,7 @@ func TestRunTestFailuresExitOne(t *testing.T) {
 	configPath := writeTempConfig(t, `
 version: 1
 framework: jest
+rerun_command: "false"
 `)
 
 	server := fakeGitHubAPI(t, true)
