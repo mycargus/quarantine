@@ -159,15 +159,16 @@ export function buildIssueUrl(owner: string, repo: string, issueNumber: number):
 
 /**
  * I/O: upserts a test run into SQLite, keyed by run_id for idempotency.
+ * Returns true if a new row was inserted, false if the run_id already existed.
  */
 export async function upsertTestRun(
   db: Database,
   projectId: number,
   result: TestResult,
-): Promise<void> {
+): Promise<boolean> {
   const record = buildTestRunRecord(result, projectId)
   const existing = await db.query(testRuns).where({ run_id: record.runId }).first()
-  if (existing) return
+  if (existing) return false
 
   await db.create(testRuns, {
     project_id: record.projectId,
@@ -181,6 +182,7 @@ export async function upsertTestRun(
     failed_tests: record.failedTests,
     flaky_tests: record.flakyTests,
   })
+  return true
 }
 
 /**
@@ -226,6 +228,26 @@ export function upsertQuarantinedTest(
 }
 
 /**
+ * I/O: increments flaky_count by 1, updates last_flaky_at to timestamp, and sets
+ * last_run_status to 'passing' for the given test. A flaky test always ultimately
+ * passed on retry, so last_run_status is hardcoded to 'passing'.
+ */
+export function incrementFlakyCount(
+  raw: RawDatabase,
+  projectId: number,
+  testId: string,
+  timestamp: string,
+): void {
+  raw
+    .prepare(
+      `UPDATE quarantined_tests
+       SET flaky_count = flaky_count + 1, last_flaky_at = ?, last_run_status = 'passing'
+       WHERE project_id = ? AND test_id = ?`,
+    )
+    .run(timestamp, projectId, testId)
+}
+
+/**
  * I/O Orchestrator: parses and validates a JSON string, then upserts into SQLite.
  * If parsing or validation fails, logs a warning and returns 'skipped'.
  * Never throws — callers can process remaining artifacts safely.
@@ -262,10 +284,14 @@ export async function ingestArtifact(
 
   try {
     const result = parsed as TestResult
-    await upsertTestRun(db, projectId, result)
-    for (const entry of result.tests) {
-      if (entry.status === "quarantined") {
-        upsertQuarantinedTest(raw, projectId, owner, repo, entry, result.timestamp)
+    const isNew = await upsertTestRun(db, projectId, result)
+    if (isNew) {
+      for (const entry of result.tests) {
+        if (entry.status === "quarantined") {
+          upsertQuarantinedTest(raw, projectId, owner, repo, entry, result.timestamp)
+        } else if (entry.status === "flaky") {
+          incrementFlakyCount(raw, projectId, entry.test_id, result.timestamp)
+        }
       }
     }
   } catch {
