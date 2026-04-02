@@ -43,6 +43,7 @@ func TestRunUnquarantinedTestFailsExits1(t *testing.T) {
 version: 1
 framework: jest
 retries: 1
+rerun_command: "false"
 `)
 
 	// Issue #42 closed — test runs but fails all retries.
