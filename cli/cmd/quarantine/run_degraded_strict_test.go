@@ -94,7 +94,7 @@ github:
 		"--", scriptPath,
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(),
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
 	})
 
 	riteway.Assert(t, riteway.Case[int]{
@@ -130,7 +130,7 @@ github:
 		"--", scriptPath,
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(),
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
 	})
 
 	_, statErr := os.Stat(markerPath)
@@ -159,7 +159,7 @@ github:
 		"--", scriptPath,
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(),
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{

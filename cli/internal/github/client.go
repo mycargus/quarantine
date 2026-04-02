@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -55,8 +56,21 @@ func NewClient(owner, repo string) (*Client, error) {
 		token:      token,
 		owner:      owner,
 		repo:       repo,
-		retryDelay: 2 * time.Second,
+		retryDelay: resolveRetryDelay(),
 	}, nil
+}
+
+// resolveRetryDelay returns the retry delay. Defaults to 2 seconds; overridable
+// via QUARANTINE_RETRY_DELAY_SECONDS (e.g. "0" or "0.1") for tests that simulate
+// unreachable servers without waiting.
+func resolveRetryDelay() time.Duration {
+	seconds := 2.0
+	if s := os.Getenv("QUARANTINE_RETRY_DELAY_SECONDS"); s != "" {
+		if n, err := strconv.ParseFloat(s, 64); err == nil {
+			seconds = n
+		}
+	}
+	return time.Duration(seconds * float64(time.Second))
 }
 
 // SetRetryDelay overrides the retry delay (used in tests to eliminate sleeps).

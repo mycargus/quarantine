@@ -11,7 +11,9 @@ import (
 // fakeUnreachableAPI returns an httptest server URL that always returns 503.
 // The server is started, then closed immediately so all connections fail.
 // We use a fake URL instead so no TCP connection is even attempted.
-func fakeUnreachableAPIURL() string {
+func fakeUnreachableAPIURL(t *testing.T) string {
+	t.Helper()
+	t.Setenv("QUARANTINE_RETRY_DELAY_SECONDS", "0")
 	// Use a port that is not listening — TCP connection refused.
 	return "http://127.0.0.1:19999"
 }
@@ -99,7 +101,7 @@ github:
 		"--", scriptPath,
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(),
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
 	})
 
 	riteway.Assert(t, riteway.Case[int]{
@@ -143,7 +145,7 @@ github:
 		"--", scriptPath,
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(),
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
@@ -181,7 +183,7 @@ github:
 		"--", scriptPath,
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(),
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
@@ -219,7 +221,7 @@ github:
 		"--", scriptPath,
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(),
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
 		"GITHUB_ACTIONS":                 "true",
 	})
 
@@ -264,7 +266,7 @@ github:
 		"--", scriptPath,
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(),
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
 	})
 
 	riteway.Assert(t, riteway.Case[int]{
@@ -302,7 +304,7 @@ github:
 		"--", scriptPath,
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(),
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{

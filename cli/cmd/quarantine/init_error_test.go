@@ -205,6 +205,7 @@ func TestInitAPIUnreachable(t *testing.T) {
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 			"QUARANTINE_GITHUB_API_BASE_URL": serverURL,
+			"QUARANTINE_RETRY_DELAY_SECONDS": "0",
 		},
 	)
 
