@@ -33,6 +33,15 @@ func fakeRerunFailureAPI(t *testing.T, issueCreated *bool) *httptest.Server {
 				"items":       []interface{}{},
 			})
 
+		case strings.Contains(r.URL.Path, "/comments"):
+			// PR comment endpoint — handle without triggering issueCreated.
+			if r.Method == "GET" {
+				_ = json.NewEncoder(w).Encode([]interface{}{})
+			} else {
+				w.WriteHeader(http.StatusCreated)
+				_, _ = fmt.Fprint(w, `{"id":1,"body":"comment"}`)
+			}
+
 		case r.Method == "POST" && strings.Contains(r.URL.Path, "/issues"):
 			if issueCreated != nil {
 				*issueCreated = true
