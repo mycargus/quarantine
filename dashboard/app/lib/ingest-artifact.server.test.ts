@@ -58,6 +58,7 @@ describe("ingestArtifact()", async (assert) => {
 
     const result = await ingestArtifact(
       db,
+      raw,
       "mycargus",
       "my-app",
       "quarantine-results-100",
@@ -107,6 +108,7 @@ describe("ingestArtifact()", async (assert) => {
 
     const result = await ingestArtifact(
       db,
+      raw,
       "mycargus",
       "my-app",
       "quarantine-results-101",
@@ -162,6 +164,7 @@ describe("ingestArtifact()", async (assert) => {
 
     const result = await ingestArtifact(
       db,
+      raw,
       "mycargus",
       "my-app",
       "quarantine-results-101",
@@ -214,6 +217,7 @@ describe("ingestArtifact()", async (assert) => {
 
     await ingestArtifact(
       db,
+      raw,
       "mycargus",
       "my-app",
       "quarantine-results-100",
@@ -223,6 +227,7 @@ describe("ingestArtifact()", async (assert) => {
     )
     const secondResult = await ingestArtifact(
       db,
+      raw,
       "mycargus",
       "my-app",
       "quarantine-results-100",
@@ -260,6 +265,7 @@ describe("ingestArtifact()", async (assert) => {
 
     const r = await ingestArtifact(
       db,
+      raw,
       "mycargus",
       "my-app",
       "quarantine-results-101",
@@ -287,6 +293,7 @@ describe("ingestArtifact()", async (assert) => {
 
     const r = await ingestArtifact(
       db,
+      raw,
       "mycargus",
       "my-app",
       "quarantine-results-101",
@@ -315,6 +322,7 @@ describe("ingestArtifact()", async (assert) => {
 
     const r = await ingestArtifact(
       db,
+      raw,
       "mycargus",
       "my-app",
       "quarantine-results-101",
@@ -343,6 +351,7 @@ describe("ingestArtifact()", async (assert) => {
 
     const r = await ingestArtifact(
       db,
+      raw,
       "mycargus",
       "my-app",
       "quarantine-results-101",
@@ -370,6 +379,7 @@ describe("ingestArtifact()", async (assert) => {
 
     const result = await ingestArtifact(
       db,
+      raw,
       "mycargus",
       "my-app",
       "quarantine-results-103",
@@ -403,6 +413,7 @@ describe("ingestArtifact()", async (assert) => {
       should: "return 'ingested' and insert one row",
       actual: await ingestArtifact(
         db,
+        raw,
         "mycargus",
         "my-app",
         "quarantine-results-104",
@@ -416,11 +427,12 @@ describe("ingestArtifact()", async (assert) => {
 
   {
     // G8: invalid projectId → upsertTestRun fails; must not throw, must return 'skipped'
-    const { db } = initDb(":memory:")
+    const { db, raw } = initDb(":memory:")
     const warnings: string[] = []
 
     const r = await ingestArtifact(
       db,
+      raw,
       "mycargus",
       "my-app",
       "quarantine-results-101",
@@ -456,6 +468,7 @@ describe("ingestArtifact()", async (assert) => {
     const results = await Promise.all([
       ingestArtifact(
         db,
+        raw,
         "mycargus",
         "my-app",
         "quarantine-results-100",
@@ -465,6 +478,7 @@ describe("ingestArtifact()", async (assert) => {
       ),
       ingestArtifact(
         db,
+        raw,
         "mycargus",
         "my-app",
         "quarantine-results-101",
@@ -474,6 +488,7 @@ describe("ingestArtifact()", async (assert) => {
       ),
       ingestArtifact(
         db,
+        raw,
         "mycargus",
         "my-app",
         "quarantine-results-102",

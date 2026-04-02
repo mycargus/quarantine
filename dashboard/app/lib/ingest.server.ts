@@ -8,6 +8,7 @@
 
 import Ajv2020 from "ajv/dist/2020"
 import addFormats from "ajv-formats"
+import type { Database as RawDatabase } from "better-sqlite3"
 import schema from "../../../schemas/test-result.schema.json" with { type: "json" }
 import type { Database } from "./db.server.js"
 import { testRuns } from "./db.server.js"
@@ -141,6 +142,22 @@ export function buildTestRunRecord(result: TestResult, projectId: number): TestR
 }
 
 /**
+ * Pure: maps an original_status value to the last_run_status enum.
+ */
+export function mapOriginalStatus(originalStatus: string | null): "failing" | "passing" | null {
+  if (originalStatus === "failed") return "failing"
+  if (originalStatus === "passed") return "passing"
+  return null
+}
+
+/**
+ * Pure: builds a GitHub issue URL from owner, repo, and issue number.
+ */
+export function buildIssueUrl(owner: string, repo: string, issueNumber: number): string {
+  return `https://github.com/${owner}/${repo}/issues/${issueNumber}`
+}
+
+/**
  * I/O: upserts a test run into SQLite, keyed by run_id for idempotency.
  */
 export async function upsertTestRun(
@@ -167,6 +184,48 @@ export async function upsertTestRun(
 }
 
 /**
+ * I/O: upserts a quarantined test entry into SQLite using INSERT OR IGNORE + UPDATE.
+ * - INSERT OR IGNORE preserves the original quarantined_at on conflict.
+ * - UPDATE always refreshes last_run_status to the latest value.
+ */
+export function upsertQuarantinedTest(
+  raw: RawDatabase,
+  projectId: number,
+  owner: string,
+  repo: string,
+  entry: TestEntry,
+  timestamp: string,
+): void {
+  const lastRunStatus = mapOriginalStatus(entry.original_status)
+  const issueUrl =
+    entry.issue_number != null ? buildIssueUrl(owner, repo, entry.issue_number) : null
+
+  raw
+    .prepare(
+      `INSERT OR IGNORE INTO quarantined_tests
+         (project_id, test_id, name, issue_number, issue_url, quarantined_at, last_run_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      projectId,
+      entry.test_id,
+      entry.name,
+      entry.issue_number,
+      issueUrl,
+      timestamp,
+      lastRunStatus,
+    )
+
+  raw
+    .prepare(
+      `UPDATE quarantined_tests
+       SET last_run_status = ?
+       WHERE project_id = ? AND test_id = ?`,
+    )
+    .run(lastRunStatus, projectId, entry.test_id)
+}
+
+/**
  * I/O Orchestrator: parses and validates a JSON string, then upserts into SQLite.
  * If parsing or validation fails, logs a warning and returns 'skipped'.
  * Never throws — callers can process remaining artifacts safely.
@@ -175,6 +234,7 @@ export async function upsertTestRun(
  */
 export async function ingestArtifact(
   db: Database,
+  raw: RawDatabase,
   owner: string,
   repo: string,
   artifactName: string,
@@ -201,7 +261,13 @@ export async function ingestArtifact(
   }
 
   try {
-    await upsertTestRun(db, projectId, parsed as TestResult)
+    const result = parsed as TestResult
+    await upsertTestRun(db, projectId, result)
+    for (const entry of result.tests) {
+      if (entry.status === "quarantined") {
+        upsertQuarantinedTest(raw, projectId, owner, repo, entry, result.timestamp)
+      }
+    }
   } catch {
     warn(
       `[ingest] WARNING: skipping artifact ${artifactName} for ${owner}/${repo}: validation failed`,
