@@ -227,6 +227,10 @@ func TestBuildPRScopeInputs(t *testing.T) {
 }
 
 func TestDefaultCheckPRScopeForTestsFallback(t *testing.T) {
+	// Run in a non-git directory so git commands fail immediately without
+	// attempting a network fetch to the real remote.
+	cdTo(t, t.TempDir())
+
 	flakyInputs := []prScopeInput{
 		{TestID: "t1", FilePath: "src/a.test.js", Name: "test A"},
 	}
@@ -246,9 +250,9 @@ func TestDefaultCheckPRScopeForTestsFallback(t *testing.T) {
 	})
 
 	riteway.Assert(t, riteway.Case[int]{
-		Given:    "git commands fail (invalid base ref that does not exist on the remote)",
+		Given:    "git commands fail (not a git repo)",
 		Should:   "return empty map (fallback to pre-existing — do not break the build)",
-		Actual:   len(defaultCheckPRScopeForTests("__nonexistent_branch__", flakyInputs)),
+		Actual:   len(defaultCheckPRScopeForTests("main", flakyInputs)),
 		Expected: 0,
 	})
 }
