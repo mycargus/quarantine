@@ -2,9 +2,11 @@ import { describe } from "riteway"
 import { initDb } from "./db.server.js"
 import type { Artifact, TestResult } from "./ingest.server.js"
 import {
+  buildIssueUrl,
   buildTestRunRecord,
   filterArtifactsByPrefix,
   filterArtifactsSince,
+  mapOriginalStatus,
   sortArtifactsChronologically,
   upsertTestRun,
   validateTestResult,
@@ -45,15 +47,6 @@ const validFixture: TestResult = {
       issue_number: null,
     },
   ],
-}
-
-const _throwsSync = (fn: () => unknown): string | null => {
-  try {
-    fn()
-    return null
-  } catch (e) {
-    return e instanceof Error ? e.message : String(e)
-  }
 }
 
 describe("filterArtifactsByPrefix()", async (assert) => {
@@ -402,5 +395,77 @@ describe("upsertTestRun()", async (assert) => {
     should: "store NULL in the pr_number column",
     actual: nullPrRow?.pr_number,
     expected: null,
+  })
+})
+
+describe("mapOriginalStatus()", async (assert) => {
+  assert({
+    given: 'original_status "failed"',
+    should: 'return "failing"',
+    actual: mapOriginalStatus("failed"),
+    expected: "failing",
+  })
+
+  assert({
+    given: 'original_status "passed"',
+    should: 'return "passing"',
+    actual: mapOriginalStatus("passed"),
+    expected: "passing",
+  })
+
+  assert({
+    given: "original_status null",
+    should: "return null",
+    actual: mapOriginalStatus(null),
+    expected: null,
+  })
+
+  assert({
+    given: 'an unknown original_status string "skipped"',
+    should: "return null",
+    actual: mapOriginalStatus("skipped"),
+    expected: null,
+  })
+})
+
+describe("buildIssueUrl()", async (assert) => {
+  assert({
+    given: "owner mycargus, repo my-app, issue_number 42",
+    should: "return the correct GitHub issue URL",
+    actual: buildIssueUrl("mycargus", "my-app", 42),
+    expected: "https://github.com/mycargus/my-app/issues/42",
+  })
+
+  assert({
+    given: "issue_number 0 (falsy but valid)",
+    should: "still return a correct URL with /issues/0",
+    actual: buildIssueUrl("owner", "repo", 0),
+    expected: "https://github.com/owner/repo/issues/0",
+  })
+})
+
+describe("filterArtifactsSince() — empty string lastSynced", async (assert) => {
+  const artifacts: Artifact[] = [
+    {
+      id: 1,
+      name: "run-1",
+      archive_download_url: "u",
+      created_at: "2026-03-15T10:00:00Z",
+      expires_at: "t",
+    },
+    {
+      id: 2,
+      name: "run-2",
+      archive_download_url: "u",
+      created_at: "2026-03-15T12:00:00Z",
+      expires_at: "t",
+    },
+  ]
+
+  assert({
+    given: "lastSynced is an empty string",
+    should: "return all artifacts (empty string sorts before all ISO timestamps)",
+    actual: filterArtifactsSince(artifacts, "").map((a) => a.id),
+    expected: [1, 2],
   })
 })

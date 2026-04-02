@@ -43,7 +43,16 @@ export async function syncRepo(
 
     for (const artifact of sorted) {
       const jsonString = await downloadAndExtractJson(artifact.archive_download_url, token, fetchFn)
-      await ingestArtifact(handle.db, owner, repo, artifact.name, jsonString, projectId, warn)
+      await ingestArtifact(
+        handle.db,
+        handle.raw,
+        owner,
+        repo,
+        artifact.name,
+        jsonString,
+        projectId,
+        warn,
+      )
     }
 
     await updateLastPulledAt(handle.db, projectId, now.toISOString())
