@@ -253,6 +253,117 @@ describe("ingestArtifact() — artifact with no quarantined test entries", async
   })
 })
 
+describe("ingestArtifact() — updating an existing quarantined_tests row (Scenario 88)", async (assert) => {
+  const { db, raw } = initDb(":memory:")
+  raw.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
+  const project = raw
+    .prepare("SELECT id FROM projects WHERE owner = ? AND repo = ?")
+    .get("mycargus", "my-app") as { id: number }
+  const projectId = project.id
+
+  // Manually insert the pre-existing row (simulates state left by earlier artifacts)
+  raw
+    .prepare(
+      `INSERT INTO quarantined_tests
+           (project_id, test_id, name, issue_number, issue_url, quarantined_at, last_run_status, flaky_count)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      projectId,
+      "spec/payments_spec.rb::PaymentsService::processes_payment",
+      "processes_payment",
+      42,
+      "https://github.com/mycargus/my-app/issues/42",
+      "2026-01-15T09:00:00Z",
+      "failing",
+      1,
+    )
+
+  const updateFixture: TestResult = {
+    version: 1,
+    run_id: "run-sc88",
+    repo: "mycargus/my-app",
+    branch: "main",
+    commit_sha: "abc1234567890def1234567890abcdef12345678",
+    pr_number: null,
+    timestamp: "2026-03-01T10:00:00Z",
+    cli_version: "0.1.0",
+    framework: "rspec",
+    config: { retry_count: 3 },
+    summary: {
+      total: 1,
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+      quarantined: 1,
+      flaky_detected: 0,
+    },
+    tests: [
+      {
+        test_id: "spec/payments_spec.rb::PaymentsService::processes_payment",
+        file_path: "spec/payments_spec.rb",
+        classname: "PaymentsService",
+        name: "processes_payment",
+        status: "quarantined",
+        original_status: "passed",
+        duration_ms: 110,
+        failure_message: null,
+        issue_number: 42,
+      },
+    ],
+  }
+
+  await ingestArtifact(
+    db,
+    raw,
+    "mycargus",
+    "my-app",
+    "quarantine-results-run-sc88",
+    JSON.stringify(updateFixture),
+    projectId,
+  )
+
+  const rows = raw
+    .prepare("SELECT * FROM quarantined_tests WHERE project_id = ? AND test_id = ?")
+    .all(projectId, "spec/payments_spec.rb::PaymentsService::processes_payment") as {
+    test_id: string
+    quarantined_at: string
+    last_run_status: string | null
+    flaky_count: number | null
+  }[]
+
+  assert({
+    given:
+      "a pre-existing quarantined_tests row and a new artifact for the same test with original_status 'passed'",
+    should: "update last_run_status to 'passing'",
+    actual: rows[0]?.last_run_status,
+    expected: "passing",
+  })
+
+  assert({
+    given:
+      "a pre-existing quarantined_tests row with quarantined_at '2026-01-15T09:00:00Z' and a new artifact with timestamp '2026-03-01T10:00:00Z'",
+    should: "preserve the original quarantined_at (not overwrite with the new artifact timestamp)",
+    actual: rows[0]?.quarantined_at,
+    expected: "2026-01-15T09:00:00Z",
+  })
+
+  assert({
+    given:
+      "a pre-existing quarantined_tests row with flaky_count 1 and a new artifact with status 'quarantined' (not flaky)",
+    should: "leave flaky_count unchanged at 1",
+    actual: rows[0]?.flaky_count,
+    expected: 1,
+  })
+
+  assert({
+    given: "a pre-existing quarantined_tests row updated by a new artifact for the same test",
+    should: "result in exactly one row (no duplicate created)",
+    actual: rows.length,
+    expected: 1,
+  })
+})
+
 describe("ingestArtifact() — idempotency: same artifact ingested twice", async (assert) => {
   const { db, raw } = initDb(":memory:")
   raw.prepare("INSERT INTO projects (owner, repo) VALUES (?, ?)").run("mycargus", "my-app")
