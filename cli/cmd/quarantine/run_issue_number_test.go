@@ -202,8 +202,10 @@ func fakeDedupExistingIssueGitHubAPI(t *testing.T, existingIssueNumber int, exis
 			w.WriteHeader(http.StatusOK)
 
 		// Batch closed-issue search (unquarantine check).
+		// Use r.URL.Query() (decoded) rather than r.URL.RawQuery for robustness
+		// across Go versions that may encode ':' differently.
 		case r.Method == "GET" && strings.Contains(r.URL.Path, "/search/issues") &&
-			strings.Contains(r.URL.RawQuery, "is%3Aclosed"):
+			strings.Contains(r.URL.Query().Get("q"), "is:closed"):
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"total_count": 0,
 				"items":       []interface{}{},
@@ -211,7 +213,7 @@ func fakeDedupExistingIssueGitHubAPI(t *testing.T, existingIssueNumber int, exis
 
 		// Dedup search — returns existing open issue (no new issue needed).
 		case r.Method == "GET" && strings.Contains(r.URL.Path, "/search/issues") &&
-			strings.Contains(r.URL.RawQuery, "is%3Aopen"):
+			strings.Contains(r.URL.Query().Get("q"), "is:open"):
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"total_count": 1,
 				"items": []interface{}{
