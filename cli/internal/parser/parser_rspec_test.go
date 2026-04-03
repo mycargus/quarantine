@@ -54,6 +54,58 @@ func TestParseSinglePassRSpec(t *testing.T) {
 	})
 }
 
+func TestParseRSpecSharedExamples(t *testing.T) {
+	f, err := os.Open("../../../testdata/junit-xml/rspec/shared-examples.xml")
+	if err != nil {
+		t.Fatalf("failed to open fixture: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	results, err := parser.Parse(f)
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "a valid RSpec shared-examples JUnit XML fixture",
+		Should:   "parse without error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "an RSpec XML with 2 shared-example test cases",
+		Should:   "return 2 test results",
+		Actual:   len(results),
+		Expected: 2,
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "the first shared-example test case with classname 'User when admin'",
+		Should:   "construct a test_id incorporating the classname",
+		Actual:   results[0].TestID,
+		Expected: "./spec/models/user_spec.rb::User when admin::has admin privileges",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "the second shared-example test case with classname 'ServiceAccount when admin'",
+		Should:   "construct a test_id incorporating the classname",
+		Actual:   results[1].TestID,
+		Expected: "./spec/models/user_spec.rb::ServiceAccount when admin::has admin privileges",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a shared-example test case",
+		Should:   "extract the file path from the file attribute",
+		Actual:   results[0].FilePath,
+		Expected: "./spec/models/user_spec.rb",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a shared-example test case with no failure element",
+		Should:   "have status 'passed'",
+		Actual:   results[0].Status,
+		Expected: "passed",
+	})
+}
+
 func TestParseSingleFailureRSpec(t *testing.T) {
 	f, err := os.Open("../../../testdata/junit-xml/rspec/single-failure.xml")
 	if err != nil {
@@ -84,10 +136,14 @@ func TestParseSingleFailureRSpec(t *testing.T) {
 		Expected: "failed",
 	})
 
-	riteway.Assert(t, riteway.Case[bool]{
+	if results[1].FailureMessage == nil {
+		t.Fatal("FailureMessage is nil for the failing test case")
+	}
+
+	riteway.Assert(t, riteway.Case[string]{
 		Given:    "the second RSpec test case with a <failure> element",
-		Should:   "have a non-nil FailureMessage",
-		Actual:   results[1].FailureMessage != nil,
-		Expected: true,
+		Should:   "populate FailureMessage from the failure message attribute",
+		Actual:   *results[1].FailureMessage,
+		Expected: "expected: 503\n     got: 500\n\n(compared using ==)",
 	})
 }
