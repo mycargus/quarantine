@@ -24,9 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - id: go-version
+        run: echo "version=$(grep golang .tool-versions | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: ${{ steps.go-version.outputs.version }}
           cache-dependency-path: go.sum
 
       - name: Build
@@ -77,9 +80,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - id: go-version
+        run: echo "version=$(grep golang .tool-versions | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: ${{ steps.go-version.outputs.version }}
           cache-dependency-path: go.sum
 
       - name: Build CLI binary
