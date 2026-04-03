@@ -43,8 +43,9 @@ func fakeNewIssueGitHubAPI(t *testing.T, issueNumber int) *httptest.Server {
 				"items":       []interface{}{},
 			})
 
-		// Create issue — POST /repos/.../issues (not a PR comment path).
-		case r.Method == "POST" && strings.Contains(r.URL.Path, "/issues"):
+		// Create issue — POST /repos/.../issues (exclude PR comment paths).
+		case r.Method == "POST" && strings.Contains(r.URL.Path, "/issues") &&
+			!strings.Contains(r.URL.Path, "/comments"):
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"number":   issueNumber,
 				"html_url": fmt.Sprintf("https://github.com/test-owner/test-repo/issues/%d", issueNumber),
@@ -215,7 +216,8 @@ func fakeDedupExistingIssueGitHubAPI(t *testing.T, existingIssueNumber int, exis
 			}
 
 		// Issue creation — should NOT be called when dedup finds an existing issue.
-		case r.Method == "POST" && strings.Contains(r.URL.Path, "/issues"):
+		case r.Method == "POST" && strings.Contains(r.URL.Path, "/issues") &&
+			!strings.Contains(r.URL.Path, "/comments"):
 			t.Fatal("unexpected issue creation call — dedup should have found existing issue")
 			w.WriteHeader(http.StatusUnprocessableEntity)
 
@@ -347,8 +349,9 @@ func fakeIssue503GitHubAPI(t *testing.T) *httptest.Server {
 				"items":       []interface{}{},
 			})
 
-		// Create issue — returns 503 Service Unavailable.
-		case r.Method == "POST" && strings.Contains(r.URL.Path, "/issues"):
+		// Create issue — returns 503 Service Unavailable (exclude PR comment paths).
+		case r.Method == "POST" && strings.Contains(r.URL.Path, "/issues") &&
+			!strings.Contains(r.URL.Path, "/comments"):
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"message": "Service Unavailable",

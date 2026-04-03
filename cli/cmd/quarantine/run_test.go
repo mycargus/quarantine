@@ -19,6 +19,11 @@ import (
 func executeRunCmd(t *testing.T, args []string, env map[string]string) (output string, exitErr error) {
 	t.Helper()
 
+	// Clear GITHUB_EVENT_PATH by default so CI's event payload doesn't
+	// cause unexpected PR-comment requests during unit tests.
+	if _, ok := env["GITHUB_EVENT_PATH"]; !ok {
+		t.Setenv("GITHUB_EVENT_PATH", "")
+	}
 	for k, v := range env {
 		t.Setenv(k, v)
 	}
@@ -75,6 +80,11 @@ func writeTestScript(t *testing.T, dir, xmlPath, xmlContent string, exitCode int
 // code. Returns 0 for no error, 1 for exitCodeError(1), 2 for other errors.
 func executeRunCmdWithExitCode(t *testing.T, args []string, env map[string]string) int {
 	t.Helper()
+	// Clear GITHUB_EVENT_PATH by default so CI's event payload doesn't
+	// cause unexpected PR-comment requests during unit tests.
+	if _, ok := env["GITHUB_EVENT_PATH"]; !ok {
+		t.Setenv("GITHUB_EVENT_PATH", "")
+	}
 	for k, v := range env {
 		t.Setenv(k, v)
 	}
