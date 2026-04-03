@@ -18,13 +18,14 @@ const (
 
 // Client is a GitHub API client for quarantine operations.
 type Client struct {
-	httpClient          *http.Client
-	baseURL             string
-	token               string
-	owner               string
-	repo                string
-	retryDelay          time.Duration
-	rateLimitWarningFn  func(msg string)
+	httpClient         *http.Client
+	baseURL            string
+	token              string
+	owner              string
+	repo               string
+	retryDelay         time.Duration
+	rateLimitWarningFn func(msg string)
+	verboseLogFn       func(msg string)
 }
 
 // SetRateLimitWarningFunc sets a callback that is called when the GitHub API
@@ -32,6 +33,12 @@ type Client struct {
 // warning message.
 func (c *Client) SetRateLimitWarningFunc(fn func(msg string)) {
 	c.rateLimitWarningFn = fn
+}
+
+// SetVerboseLogFunc sets a callback that is called for each API response to
+// log rate limit header details in verbose mode.
+func (c *Client) SetVerboseLogFunc(fn func(msg string)) {
+	c.verboseLogFn = fn
 }
 
 // NewClient creates a new GitHub API client. The token is resolved from

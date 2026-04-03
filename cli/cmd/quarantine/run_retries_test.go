@@ -89,7 +89,7 @@ framework: jest
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "--retries 0 treated as unset",
 		Should:   "use default retries (3) reported as default source in verbose output",
-		Actual:   strings.Contains(output, "retries   = 3") && strings.Contains(output, "source: default"),
+		Actual:   strings.Contains(output, "retries=3") && strings.Contains(output, "from default"),
 		Expected: true,
 	})
 }

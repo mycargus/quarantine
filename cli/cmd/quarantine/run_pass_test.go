@@ -492,8 +492,8 @@ github:
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "no GitHub token and --verbose flag",
-		Should:   "print verbose API call skipped message",
-		Actual:   strings.Contains(output, "[verbose] API call: skipped (no token)"),
+		Should:   "print verbose API skipped message",
+		Actual:   strings.Contains(output, "[quarantine] API: skipped (no token)"),
 		Expected: true,
 	})
 }

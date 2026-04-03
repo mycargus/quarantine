@@ -173,22 +173,22 @@ framework: jest
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "--verbose flag set",
-		Should:   "print config resolution block",
-		Actual:   strings.Contains(output, "[verbose] Config resolution:"),
+		Should:   "print config resolution lines with [quarantine] prefix",
+		Actual:   strings.Contains(output, "[quarantine] config:"),
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "--verbose flag set with jest framework from config",
-		Should:   "include framework in resolution output",
-		Actual:   strings.Contains(output, "framework = jest"),
+		Should:   "include framework=jest in resolution output",
+		Actual:   strings.Contains(output, "framework=jest"),
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "--verbose flag set",
 		Should:   "print total time even on error exit",
-		Actual:   strings.Contains(output, "[verbose] Total time:"),
+		Actual:   strings.Contains(output, "[quarantine] total time:"),
 		Expected: true,
 	})
 }
@@ -463,8 +463,8 @@ framework: jest
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "--verbose flag set",
-		Should:   "print API call with GET /repos/ endpoint",
-		Actual:   strings.Contains(output, "[verbose] API call: GET /repos/"),
+		Should:   "print API call with [quarantine] prefix and GET /repos/ path",
+		Actual:   strings.Contains(output, "[quarantine] GET /repos/"),
 		Expected: true,
 	})
 
@@ -477,15 +477,15 @@ framework: jest
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "--verbose flag set",
-		Should:   "print config resolution",
-		Actual:   strings.Contains(output, "[verbose] Config resolution:"),
+		Should:   "print config resolution with [quarantine] prefix",
+		Actual:   strings.Contains(output, "[quarantine] config:"),
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "--verbose flag set",
-		Should:   "print total time",
-		Actual:   strings.Contains(output, "[verbose] Total time:"),
+		Should:   "print total time with [quarantine] prefix",
+		Actual:   strings.Contains(output, "[quarantine] total time:"),
 		Expected: true,
 	})
 }

@@ -209,12 +209,10 @@ func (c *Client) doWithRetry(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// checkRateLimit inspects X-RateLimit-* headers and fires the warning callback
-// if the remaining quota is below 10% of the total limit.
+// checkRateLimit inspects X-RateLimit-* headers. It logs rate limit details
+// via verboseLogFn on every response (when set), and fires the rateLimitWarningFn
+// callback when the remaining quota is below 10% of the total limit.
 func (c *Client) checkRateLimit(resp *http.Response) {
-	if c.rateLimitWarningFn == nil {
-		return
-	}
 	limitStr := resp.Header.Get("X-RateLimit-Limit")
 	remainingStr := resp.Header.Get("X-RateLimit-Remaining")
 	resetStr := resp.Header.Get("X-RateLimit-Reset")
@@ -227,6 +225,21 @@ func (c *Client) checkRateLimit(resp *http.Response) {
 	}
 	remaining, err := strconv.Atoi(remainingStr)
 	if err != nil {
+		return
+	}
+
+	// Log rate limit headers in verbose mode on every response.
+	if c.verboseLogFn != nil {
+		var resetTime string
+		if ts, parseErr := strconv.ParseInt(resetStr, 10, 64); parseErr == nil {
+			resetTime = time.Unix(ts, 0).UTC().Format("15:04 UTC")
+		} else {
+			resetTime = resetStr
+		}
+		c.verboseLogFn(fmt.Sprintf("[quarantine] X-RateLimit-Remaining: %d, resets at %s", remaining, resetTime))
+	}
+
+	if c.rateLimitWarningFn == nil {
 		return
 	}
 	if remaining*10 < limit {
