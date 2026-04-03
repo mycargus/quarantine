@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="1" failures="0" errors="0" time="0.012">
+  <testsuite name="src/api.test.js" tests="1" errors="0" failures="0" skipped="0"
+             timestamp="2026-01-15T10:00:00" time="0.012">
+    <testcase classname="api" name="handles URL: https://api.example.com::v2"
+              file="src/api.test.js" time="0.012">
+    </testcase>
+  </testsuite>
+</testsuites>
