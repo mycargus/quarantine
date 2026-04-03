@@ -14,7 +14,7 @@
  */
 
 import { execSync, spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { assert } from "riteway/vitest"
@@ -149,25 +149,35 @@ async function createBranchWithEmptyState() {
 
 // --- Label helpers ---
 
-async function ensureQuarantineLabelExists() {
-  const res = await ghRequest("GET", "/labels/quarantine")
+const E2E_TEST_LABEL = "e2e-test"
+
+async function ensureLabelExists(name, color, description) {
+  const res = await ghRequest("GET", `/labels/${encodeURIComponent(name)}`)
   if (res.status === 200) return
   if (res.status === 404) {
-    const createRes = await ghRequest("POST", "/labels", {
-      name: "quarantine",
-      color: "e11d48",
-      description: "Flaky test quarantine",
-    })
+    const createRes = await ghRequest("POST", "/labels", { name, color, description })
     if (createRes.status !== 201) {
       const text = await createRes.text()
       throw new Error(
-        `ensureQuarantineLabelExists: create label failed ${createRes.status}: ${text}`,
+        `ensureLabelExists(${name}): create label failed ${createRes.status}: ${text}`,
       )
     }
   } else {
     const text = await res.text()
-    throw new Error(`ensureQuarantineLabelExists: unexpected ${res.status}: ${text}`)
+    throw new Error(`ensureLabelExists(${name}): unexpected ${res.status}: ${text}`)
   }
+}
+
+async function ensureQuarantineLabelExists() {
+  await ensureLabelExists("quarantine", "e11d48", "Flaky test quarantine")
+}
+
+async function ensureE2ETestLabelExists() {
+  await ensureLabelExists(E2E_TEST_LABEL, "1d76db", "Created by e2e tests — safe to close")
+}
+
+async function addLabelToIssue(issueNumber, label) {
+  await ghRequest("POST", `/issues/${issueNumber}/labels`, { labels: [label] })
 }
 
 // --- Issue helpers ---
@@ -176,6 +186,7 @@ async function createProxyIssue(title) {
   const res = await ghRequest("POST", "/issues", {
     title,
     body: "Proxy issue used as PR stand-in for e2e testing.",
+    labels: [E2E_TEST_LABEL],
   })
   if (res.status !== 201) {
     const text = await res.text()
@@ -196,7 +207,7 @@ async function findOpenIssueByTitle(title) {
     if (attempt > 0) {
       await new Promise((r) => setTimeout(r, 2000))
     }
-    const res = await ghRequest("GET", "/issues?state=open&per_page=50")
+    const res = await ghRequest("GET", "/issues?state=open&per_page=100")
     if (res.status !== 200) {
       const text = await res.text()
       throw new Error(`findOpenIssueByTitle: unexpected ${res.status}: ${text}`)
@@ -270,28 +281,58 @@ function runCLI(dir, args, extraEnv = {}) {
   return result
 }
 
+// --- Results helpers ---
+
+// Read quarantine issue numbers from the CLI's results.json output.
+// This is a local file read — no API call, no propagation delay.
+function readResultsIssueNumbers(dir) {
+  const resultsPath = join(dir, ".quarantine", "results.json")
+  if (!existsSync(resultsPath)) return []
+  try {
+    const data = JSON.parse(readFileSync(resultsPath, "utf8"))
+    return (data.tests ?? []).filter((t) => t.issue_number != null).map((t) => t.issue_number)
+  } catch {
+    return []
+  }
+}
+
+// Label quarantine issues created by the CLI with e2e-test for cleanup,
+// and return the first issue number found (for afterEach tracking).
+// Uses results.json as the source of truth — independent of the Issues
+// list API, so it works even when findOpenIssueByTitle can't find the issue.
+async function labelAndTrackQuarantineIssues(dir) {
+  const issueNumbers = readResultsIssueNumbers(dir)
+  for (const num of issueNumbers) {
+    await addLabelToIssue(num, E2E_TEST_LABEL).catch(() => {})
+  }
+  return issueNumbers[0] ?? null
+}
+
 // ---
 
 if (!token) throw new Error("QUARANTINE_GITHUB_TOKEN is required")
 if (!owner) throw new Error("QUARANTINE_TEST_OWNER is required")
 if (!repo) throw new Error("QUARANTINE_TEST_REPO is required")
 
-// Close any issues left open by previous test runs before starting.
-// Issues with the 'quarantine' label belong to the fixture repo's own CI
-// workflow (quarantine-test-fixture) and must never be closed here.
+// Close any issues left open by previous e2e test runs before starting.
+// All e2e-created issues (proxy and quarantine) are tagged with the e2e-test
+// label, so we close everything with that label. Without this cleanup, stale
+// quarantine issues cause the CLI's dedup search (GitHub Search API, eventually
+// consistent) to find a recently-closed issue and skip creation, while
+// findOpenIssueByTitle (Issues list API, consistent) correctly finds nothing.
 async function closeStaleE2EIssues() {
-  const res = await ghRequest("GET", "/issues?state=open&per_page=100")
+  const res = await ghRequest("GET", `/issues?state=open&labels=${E2E_TEST_LABEL}&per_page=100`)
   if (res.status !== 200) return
   const issues = await res.json()
-  const stale = issues.filter((issue) => !issue.labels.some((label) => label.name === "quarantine"))
   await Promise.all(
-    stale.map((issue) =>
+    issues.map((issue) =>
       ghRequest("PATCH", `/issues/${issue.number}`, { state: "closed" }).catch(() => {}),
     ),
   )
 }
 
 beforeAll(async () => {
+  await ensureE2ETestLabelExists()
   await closeStaleE2EIssues()
 })
 
@@ -399,13 +440,12 @@ exit 1`,
         expected: 0,
       })
 
+      // Label quarantine issues with e2e-test for cleanup and track for afterEach.
+      // Uses results.json — works even if findOpenIssueByTitle can't find the issue.
+      quarantineIssueNumber = await labelAndTrackQuarantineIssues(dir)
+
       // Find the quarantine issue created by the CLI.
       const createdIssue = await findOpenIssueByTitle("[Quarantine] should handle charge timeout")
-
-      // Track it for cleanup in afterEach.
-      if (createdIssue) {
-        quarantineIssueNumber = createdIssue.number
-      }
 
       assert({
         given: "a newly detected flaky test with no prior issue",
@@ -530,12 +570,11 @@ exit 1`,
         expected: 0,
       })
 
+      quarantineIssueNumber = await labelAndTrackQuarantineIssues(dir)
+
       // Find the issue created by the first run.
       const issueTitle = "[Quarantine] should not duplicate"
       const createdIssue = await findOpenIssueByTitle(issueTitle)
-      if (createdIssue) {
-        quarantineIssueNumber = createdIssue.number
-      }
 
       assert({
         given: "first run with a new flaky test",
@@ -713,11 +752,7 @@ exit 1`,
         expected: 0,
       })
 
-      // Track the quarantine issue for cleanup.
-      const createdIssue = await findOpenIssueByTitle("[Quarantine] should update comment")
-      if (createdIssue) {
-        quarantineIssueNumber = createdIssue.number
-      }
+      quarantineIssueNumber = await labelAndTrackQuarantineIssues(dir)
 
       // Verify first comment was created.
       const firstComment = await findQuarantineBotComment(proxyIssueNumber)

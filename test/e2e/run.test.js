@@ -214,33 +214,88 @@ function runCLI(dir, args, extraEnv = {}) {
   return result
 }
 
+// --- Label helpers ---
+
+const E2E_TEST_LABEL = "e2e-test"
+
+async function ensureLabelExists(name, color, description) {
+  const res = await ghRequest("GET", `/labels/${encodeURIComponent(name)}`)
+  if (res.status === 200) return
+  if (res.status === 404) {
+    const createRes = await ghRequest("POST", "/labels", { name, color, description })
+    if (createRes.status !== 201) {
+      const text = await createRes.text()
+      throw new Error(
+        `ensureLabelExists(${name}): create label failed ${createRes.status}: ${text}`,
+      )
+    }
+  } else {
+    const text = await res.text()
+    throw new Error(`ensureLabelExists(${name}): unexpected ${res.status}: ${text}`)
+  }
+}
+
+async function ensureE2ETestLabelExists() {
+  await ensureLabelExists(E2E_TEST_LABEL, "1d76db", "Created by e2e tests — safe to close")
+}
+
+async function addLabelToIssue(issueNumber, label) {
+  await ghRequest("POST", `/issues/${issueNumber}/labels`, { labels: [label] })
+}
+
+async function closeIssue(issueNumber) {
+  if (!issueNumber) return
+  await ghRequest("PATCH", `/issues/${issueNumber}`, { state: "closed" })
+}
+
+// --- Results helpers ---
+
+function readResultsIssueNumbers(dir) {
+  const resultsPath = join(dir, ".quarantine", "results.json")
+  if (!existsSync(resultsPath)) return []
+  try {
+    const data = JSON.parse(readFileSync(resultsPath, "utf8"))
+    return (data.tests ?? []).filter((t) => t.issue_number != null).map((t) => t.issue_number)
+  } catch {
+    return []
+  }
+}
+
+async function labelAndTrackQuarantineIssues(dir) {
+  const issueNumbers = readResultsIssueNumbers(dir)
+  for (const num of issueNumbers) {
+    await addLabelToIssue(num, E2E_TEST_LABEL).catch(() => {})
+  }
+  return issueNumbers[0] ?? null
+}
+
 // ---
 
 if (!token) throw new Error("QUARANTINE_GITHUB_TOKEN is required")
 if (!owner) throw new Error("QUARANTINE_TEST_OWNER is required")
 if (!repo) throw new Error("QUARANTINE_TEST_REPO is required")
 
-// Close any issues left open by previous test runs before starting.
-// Issues with the 'quarantine' label belong to the fixture repo's own CI
-// workflow (quarantine-test-fixture) and must never be closed here.
+// Close any issues left open by previous e2e test runs before starting.
+// All e2e-created issues are tagged with the e2e-test label.
 async function closeStaleE2EIssues() {
-  const res = await ghRequest("GET", "/issues?state=open&per_page=100")
+  const res = await ghRequest("GET", `/issues?state=open&labels=${E2E_TEST_LABEL}&per_page=100`)
   if (res.status !== 200) return
   const issues = await res.json()
-  const stale = issues.filter((issue) => !issue.labels.some((label) => label.name === "quarantine"))
   await Promise.all(
-    stale.map((issue) =>
+    issues.map((issue) =>
       ghRequest("PATCH", `/issues/${issue.number}`, { state: "closed" }).catch(() => {}),
     ),
   )
 }
 
 beforeAll(async () => {
+  await ensureE2ETestLabelExists()
   await closeStaleE2EIssues()
 })
 
 describe("quarantine run — E2E against real GitHub", () => {
   let dir
+  let quarantineIssueNumber = null
 
   beforeAll(async () => {
     if (!(await branchExists())) {
@@ -255,6 +310,10 @@ describe("quarantine run — E2E against real GitHub", () => {
   })
 
   afterEach(async () => {
+    // Close the quarantine issue created by the CLI (if any).
+    await closeIssue(quarantineIssueNumber)
+    quarantineIssueNumber = null
+
     // The CLI may have written quarantine.json (changing the SHA),
     // so invalidate the tracked SHA to force a fresh read.
     lastKnownStateSHA = null
@@ -399,6 +458,9 @@ exit 1`,
         actual: result.status,
         expected: 0,
       })
+
+      // Label quarantine issues with e2e-test for cleanup and track for afterEach.
+      quarantineIssueNumber = await labelAndTrackQuarantineIssues(dir)
 
       // Verify quarantine.json was updated on GitHub with the flaky test.
       // GitHub's CDN may briefly serve stale content after a write.

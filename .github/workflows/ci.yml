@@ -75,6 +75,9 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     environment: CI
+    concurrency:
+      group: e2e-quarantine-test-fixture
+      cancel-in-progress: false
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
 
     steps:
