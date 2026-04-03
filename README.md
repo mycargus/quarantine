@@ -1,7 +1,5 @@
 # Quarantine
 
-> *Still under construction!*
-
 Quarantine automatically detects, quarantines, and tracks flaky (non-deterministic) tests in CI pipelines.
 
 > "A test is non-deterministic when it passes sometimes and fails sometimes,
@@ -45,9 +43,40 @@ framework: jest  # or rspec or vitest
 
 3. Wrap your test command in CI:
 
+**Jest** (install `jest-junit` first: `npm install --save-dev jest-junit`):
 ```yaml
 - name: Run tests
   run: quarantine run -- jest --ci --reporters=default --reporters=jest-junit
+  env:
+    QUARANTINE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+- name: Upload quarantine results
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: quarantine-results-${{ github.run_id }}
+    path: .quarantine/results.json
+```
+
+**RSpec** (install `rspec_junit_formatter` first: `gem 'rspec_junit_formatter'`):
+```yaml
+- name: Run tests
+  run: quarantine run -- bundle exec rspec --format RspecJunitFormatter --out rspec.xml
+  env:
+    QUARANTINE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+- name: Upload quarantine results
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: quarantine-results-${{ github.run_id }}
+    path: .quarantine/results.json
+```
+
+**Vitest** (built-in JUnit support — no extra dependencies):
+```yaml
+- name: Run tests
+  run: quarantine run -- vitest run --reporter=junit --outputFile=junit-report.xml
   env:
     QUARANTINE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -137,6 +166,80 @@ Zero-friction adoption for teams already on GitHub Actions. Everything runs thro
 - Multi-org support
 - Jira ticket integration
 - AI-assisted flaky test remediation suggestions
+
+## Troubleshooting
+
+### "GitHub API returned 401 (unauthorized). Check QUARANTINE_GITHUB_TOKEN or GITHUB_TOKEN."
+
+The token is missing or invalid. Quarantine enters degraded mode (tests still run, quarantine state is not updated).
+
+**Fix:** Set `QUARANTINE_GITHUB_TOKEN` in your CI environment. Your repo's `GITHUB_TOKEN` secret works for most setups:
+
+```yaml
+env:
+  QUARANTINE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+If you need higher rate limits or cross-repo access, create a PAT with `repo` scope and add it as a secret.
+
+---
+
+### "No JUnit XML found at 'junit.xml'. Cannot determine test results."
+
+Quarantine could not find the JUnit XML output. This means either the test runner did not produce XML, or it wrote it to a different path.
+
+**Fix — Jest:** Install `jest-junit` and add to your Jest config:
+```json
+{ "reporters": ["default", "jest-junit"] }
+```
+Or pass `--reporters=jest-junit` on the command line.
+
+**Fix — RSpec:** Add `rspec_junit_formatter` to your Gemfile and pass `--format RspecJunitFormatter --out rspec.xml`. Set `junitxml: rspec.xml` in `quarantine.yml`.
+
+**Fix — Vitest:** Pass `--reporter=junit --outputFile=junit-report.xml`. Set `junitxml: junit-report.xml` in `quarantine.yml`.
+
+**Fix — wrong path:** Run `quarantine doctor` to see the resolved `junitxml` path. Override it with `--junitxml`:
+```sh
+quarantine run --junitxml path/to/output.xml -- <your test command>
+```
+
+---
+
+### "branch not found: quarantine/state"
+
+The `quarantine/state` branch has not been created. This happens when `quarantine init` was never run, or the branch was deleted.
+
+**Fix:** Run `quarantine init` to recreate the branch:
+```sh
+quarantine init
+```
+
+---
+
+### "GitHub API rate limit low (N remaining, resets at HH:MM UTC)"
+
+Your CI runs are consuming API quota. Quarantine uses approximately 3–5 API calls per run.
+
+**Fix:** Use a PAT instead of `GITHUB_TOKEN` to get 5,000 req/hr instead of 1,000 req/hr:
+1. Create a PAT with `repo` scope at <https://github.com/settings/tokens>
+2. Add it to your repo secrets: **Settings → Secrets → Actions → New secret**
+3. Reference it in your workflow:
+   ```yaml
+   env:
+     QUARANTINE_GITHUB_TOKEN: ${{ secrets.QUARANTINE_PAT }}
+   ```
+
+---
+
+### Tests fail to retry / flaky tests not detected
+
+If the default rerun command doesn't work in your setup (e.g., you use pnpm, bun, or a non-standard path), set `rerun_command` in `quarantine.yml`:
+
+```yaml
+rerun_command: "pnpm exec jest --testNamePattern '{name}'"
+```
+
+Run `quarantine run --verbose` to see the exact rerun commands being used and any errors.
 
 ## Development
 
