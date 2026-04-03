@@ -55,7 +55,7 @@ func TestStateSchemaConformance_EntryWithoutIssueFields(t *testing.T) {
 	// issue_url. The schema uses dependentRequired (not required) for those
 	// fields, so omitting both is valid.
 	if _, err := os.Stat(quarantineSchemaPath(t)); err != nil {
-		t.Skipf("schema file not found: %v", err)
+		t.Fatalf("schema file not found: %v", err)
 	}
 
 	sch := loadQuarantineSchema(t)
@@ -82,5 +82,151 @@ func TestStateSchemaConformance_EntryWithoutIssueFields(t *testing.T) {
 		Should:   "conform to quarantine-state.schema.json (Scenario 66)",
 		Actual:   err,
 		Expected: nil,
+	})
+}
+
+func TestStateSchemaRejectsInvalidData_DependentRequiredViolation(t *testing.T) {
+	// Scenario 66 negative case: if issue_number is present, the schema's
+	// dependentRequired constraint mandates that issue_url must also be
+	// present. An entry with only issue_number must fail validation.
+	sch := loadQuarantineSchema(t)
+
+	v := map[string]any{
+		"version":    1,
+		"updated_at": "2026-01-01T00:00:00Z",
+		"tests": map[string]any{
+			"src/foo.test.js::Suite::test": map[string]any{
+				"test_id":        "src/foo.test.js::Suite::test",
+				"file_path":      "src/foo.test.js",
+				"classname":      "Suite",
+				"name":           "test",
+				"suite":          "Suite",
+				"first_flaky_at": "2026-01-01T00:00:00Z",
+				"last_flaky_at":  "2026-01-01T00:00:00Z",
+				"flaky_count":    1,
+				"quarantined_at": "2026-01-01T00:00:00Z",
+				"quarantined_by": "cli-auto",
+				"issue_number":   42,
+				// issue_url intentionally absent — violates dependentRequired
+			},
+		},
+	}
+
+	validationErr := sch.Validate(v)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a quarantine state JSON entry with issue_number set but issue_url absent",
+		Should:   "fail schema validation (dependentRequired)",
+		Actual:   validationErr != nil,
+		Expected: true,
+	})
+}
+
+func TestStateSchemaRejectsInvalidData_DependentRequiredViolation_ReverseDirection(t *testing.T) {
+	// The schema's dependentRequired is bidirectional: issue_url requires
+	// issue_number, and issue_number requires issue_url. This test covers the
+	// reverse direction: issue_url present without issue_number must fail.
+	sch := loadQuarantineSchema(t)
+
+	v := map[string]any{
+		"version":    1,
+		"updated_at": "2026-01-01T00:00:00Z",
+		"tests": map[string]any{
+			"src/foo.test.js::Suite::test": map[string]any{
+				"test_id":        "src/foo.test.js::Suite::test",
+				"file_path":      "src/foo.test.js",
+				"classname":      "Suite",
+				"name":           "test",
+				"suite":          "Suite",
+				"first_flaky_at": "2026-01-01T00:00:00Z",
+				"last_flaky_at":  "2026-01-01T00:00:00Z",
+				"flaky_count":    1,
+				"quarantined_at": "2026-01-01T00:00:00Z",
+				"quarantined_by": "cli-auto",
+				// issue_number intentionally absent — violates dependentRequired
+				"issue_url": "https://github.com/owner/repo/issues/42",
+			},
+		},
+	}
+
+	validationErr := sch.Validate(v)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a quarantine state JSON entry with issue_url set but issue_number absent",
+		Should:   "fail schema validation (dependentRequired reverse direction)",
+		Actual:   validationErr != nil,
+		Expected: true,
+	})
+}
+
+func TestStateSchemaConformance_EntryWithBothIssueFields(t *testing.T) {
+	// A fully-populated entry (with both issue_number and issue_url) must pass
+	// schema validation. This positive conformance test confirms that the
+	// dependentRequired constraint does not block valid entries.
+	sch := loadQuarantineSchema(t)
+
+	v := map[string]any{
+		"version":    1,
+		"updated_at": "2026-01-01T00:00:00Z",
+		"tests": map[string]any{
+			"src/foo.test.js::Suite::test": map[string]any{
+				"test_id":        "src/foo.test.js::Suite::test",
+				"file_path":      "src/foo.test.js",
+				"classname":      "Suite",
+				"name":           "test",
+				"suite":          "Suite",
+				"first_flaky_at": "2026-01-01T00:00:00Z",
+				"last_flaky_at":  "2026-01-01T00:00:00Z",
+				"flaky_count":    1,
+				"quarantined_at": "2026-01-01T00:00:00Z",
+				"quarantined_by": "cli-auto",
+				"issue_number":   42,
+				"issue_url":      "https://github.com/owner/repo/issues/42",
+			},
+		},
+	}
+
+	validationErr := sch.Validate(v)
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "a quarantine state JSON entry with both issue_number and issue_url present",
+		Should:   "pass schema validation",
+		Actual:   validationErr,
+		Expected: nil,
+	})
+}
+
+func TestStateSchemaRejectsInvalidData_MissingTestID(t *testing.T) {
+	// Scenario 78: the schema must enforce the required test_id field in each
+	// quarantined test entry. This is a regression test — if a future schema
+	// change makes test_id optional, this test will catch it.
+	sch := loadQuarantineSchema(t)
+
+	v := map[string]any{
+		"version":    1,
+		"updated_at": "2026-01-01T00:00:00Z",
+		"tests": map[string]any{
+			"src/foo.test.js::Suite::test": map[string]any{
+				// "test_id": INTENTIONALLY ABSENT,
+				"file_path":      "src/foo.test.js",
+				"classname":      "Suite",
+				"name":           "test",
+				"suite":          "Suite",
+				"first_flaky_at": "2026-01-01T00:00:00Z",
+				"last_flaky_at":  "2026-01-01T00:00:00Z",
+				"flaky_count":    1,
+				"quarantined_at": "2026-01-01T00:00:00Z",
+				"quarantined_by": "cli-auto",
+			},
+		},
+	}
+
+	validationErr := sch.Validate(v)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a quarantine state JSON with an entry missing the required test_id field",
+		Should:   "fail schema validation",
+		Actual:   validationErr != nil,
+		Expected: true,
 	})
 }

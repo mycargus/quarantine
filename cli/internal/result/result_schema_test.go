@@ -349,3 +349,33 @@ func TestResultSchemaConformance_QuarantinedTest(t *testing.T) {
 		Expected: nil,
 	})
 }
+
+func TestResultSchemaRejectsInvalidData_MissingRunID(t *testing.T) {
+	// Scenario 78: the schema must enforce the required run_id field.
+	// This is a regression test — if a future schema change makes run_id
+	// optional, this test will catch it.
+	sch := loadSchema(t)
+
+	v := map[string]any{
+		"version": 1,
+		// "run_id": INTENTIONALLY ABSENT,
+		"repo":        "owner/repo",
+		"branch":      "main",
+		"commit_sha":  "abc123",
+		"timestamp":   "2026-01-15T10:00:00Z",
+		"cli_version": "0.1.0",
+		"framework":   "jest",
+		"config":      map[string]any{"retry_count": 3},
+		"summary":     map[string]any{"total": 0, "passed": 0, "failed": 0, "skipped": 0, "quarantined": 0, "flaky_detected": 0},
+		"tests":       []any{},
+	}
+
+	validationErr := sch.Validate(v)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a test result JSON missing the required run_id field",
+		Should:   "fail schema validation",
+		Actual:   validationErr != nil,
+		Expected: true,
+	})
+}
