@@ -552,15 +552,17 @@ func TestRunRSpecFilteringSkippedWhenQStateNil(t *testing.T) {
 
 	xmlPath := filepath.Join(dir, "rspec.xml")
 	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 1)
+	rerunScript := writeAlwaysFailScript(t, dir, "rerun-rspec-filtering")
 
 	// Config: framework=rspec, but NO token → ghClient=nil → qState=nil.
-	configPath := writeTempConfig(t, `
+	configPath := writeTempConfig(t, fmt.Sprintf(`
 version: 1
 framework: rspec
 github:
   owner: testowner
   repo: testrepo
-`)
+rerun_command: %s
+`, rerunScript))
 
 	resultsPath := filepath.Join(dir, "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
@@ -618,11 +620,13 @@ func TestRunJestFilteringSkippedEvenWhenQStateNonNil(t *testing.T) {
 
 	xmlPath := filepath.Join(dir, "junit.xml")
 	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 1)
+	rerunScript := writeAlwaysFailScript(t, dir, "rerun-jest-filtering")
 
-	configPath := writeTempConfig(t, `
+	configPath := writeTempConfig(t, fmt.Sprintf(`
 version: 1
 framework: jest
-`)
+rerun_command: %s
+`, rerunScript))
 
 	// Issue #55 is open.
 	server := fakeM4GitHubAPI(t, qs, []int{})
