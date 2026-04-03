@@ -150,11 +150,14 @@ function ErrorPage(_handle: Handle, message: string) {
 
 interface HomeOptions {
   fetchFn?: typeof fetch
+  configPath?: string
+  dbPath?: string
+  token?: string
 }
 
 export async function home(options: HomeOptions = {}): Promise<Response> {
-  const configPath = process.env.DASHBOARD_CONFIG ?? "./dashboard.yml"
-  const dbPath = process.env.DATABASE_URL ?? "./quarantine.db"
+  const configPath = options.configPath ?? process.env.DASHBOARD_CONFIG ?? "./dashboard.yml"
+  const dbPath = options.dbPath ?? process.env.DATABASE_URL ?? "./quarantine.db"
 
   let config: ReturnType<typeof loadConfig>
   try {
@@ -174,7 +177,7 @@ export async function home(options: HomeOptions = {}): Promise<Response> {
 
   try {
     const handle = initDb(dbPath)
-    const token = process.env.QUARANTINE_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN
+    const token = options.token ?? process.env.QUARANTINE_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN
 
     if (token) {
       const now = new Date()
