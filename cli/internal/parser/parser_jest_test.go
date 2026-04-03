@@ -196,6 +196,44 @@ func TestParseJestParameterized(t *testing.T) {
 	})
 }
 
+func TestParseJestDoubleColonInName(t *testing.T) {
+	f, err := os.Open("../../../testdata/junit-xml/jest/double-colon-in-name.xml")
+	if err != nil {
+		t.Fatalf("failed to open fixture: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	results, err := parser.Parse(f)
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "a Jest JUnit XML fixture with '::' embedded in the test name",
+		Should:   "parse without error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a Jest XML with 1 test case",
+		Should:   "return 1 test result",
+		Actual:   len(results),
+		Expected: 1,
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a test case whose name contains '::'",
+		Should:   "preserve the raw name including '::' characters",
+		Actual:   results[0].Name,
+		Expected: "handles URL: https://api.example.com::v2",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a test case whose name contains '::'",
+		Should:   "preserve the '::' within the name component of the test_id",
+		Actual:   results[0].TestID,
+		Expected: "src/api.test.js::api::handles URL: https://api.example.com::v2",
+	})
+}
+
 func TestParseMultipleSuitesJest(t *testing.T) {
 	f, err := os.Open("../../../testdata/junit-xml/jest/multiple-suites.xml")
 	if err != nil {
