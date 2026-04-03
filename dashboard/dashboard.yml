@@ -1,4 +1,4 @@
 source: manual
 repos:
   - owner: mycargus
-    repo: my-app
+    repo: quarantine-test-fixture

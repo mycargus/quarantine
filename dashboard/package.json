@@ -14,7 +14,8 @@
     "lint:ci": "biome ci --error-on-warnings",
     "lint:fix": "biome check --write",
     "lint:fix:unsafe": "biome check --write --unsafe",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed": "node --import tsx/esm scripts/seed.ts"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
