@@ -59,4 +59,4 @@ Remix 3 is at `3.0.0-alpha.4` (released 2026-03-25). This is accepted for the da
 - Alpha software — APIs may change before stable release. Mitigated by low stakes (read-only, non-critical).
 - Non-React component model — `remix/component` uses manual state updates (`handle.update()`) rather than reactive rendering. Steeper learning curve for developers familiar with React.
 - Two languages in the project (Go CLI + TypeScript dashboard). Mitigated by a clean boundary — the shared data contract is a JSON schema, no shared types needed.
-- Requires Node.js runtime (no single binary). Can be deployed directly with Node.js or via Docker.
+- Requires Node.js runtime (no single binary).

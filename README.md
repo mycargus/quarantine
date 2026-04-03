@@ -119,7 +119,7 @@ Zero-friction adoption for teams already on GitHub Actions. Everything runs thro
 - PR comment summaries
 - Result artifacts for dashboard ingestion
 - Web dashboard with trend analytics
-- CLI + dashboard Docker images, cross-compiled binaries (6 targets)
+- Cross-compiled binaries (4 targets: linux/darwin x amd64/arm64)
 
 ### v2 — Expanded Integrations
 

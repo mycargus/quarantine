@@ -195,3 +195,58 @@ through unmodified. No `[quarantine] Reading quarantine state... OK` lines.
 Exits with code 2.
 
 ---
+
+### Scenario 90: QUARANTINE_DEBUG env var enables debug output without --verbose [M8]
+
+**Risk:** Teams that hard-code `quarantine run` in a shared CI config cannot pass `--verbose` to debug issues without modifying the shared config.
+
+**Given** the CLI is configured in CI with a valid `quarantine.yml` and valid GitHub token, and `QUARANTINE_DEBUG=1` is set in the environment but `--verbose` is not passed as a flag
+
+**When** the developer runs `QUARANTINE_DEBUG=1 quarantine run -- jest --ci ...`
+
+**Then** the CLI writes debug-level output to stderr equivalent to what `--verbose` produces: GitHub API call URLs and HTTP status codes, response timing, config resolution trace, and retry attempt details. Test runner stdout passes through unmodified.
+
+---
+
+### Scenario 91: --verbose output includes GitHub API timing and request details [M8]
+
+**Risk:** `--verbose` prints only generic summaries, not enough detail to diagnose rate limiting, slow API calls, or request shape issues.
+
+**Given** the CLI is configured in CI with a valid `quarantine.yml` and GitHub token
+
+**When** the developer runs `quarantine run --verbose -- jest --ci ...`
+
+**Then** stderr includes one line per GitHub API call:
+`[quarantine] GET /repos/{owner}/{repo}/contents/quarantine.json -> 200 (143ms)`
+
+And for each response the relevant rate limit headers are logged:
+`[quarantine] X-RateLimit-Remaining: 987, resets at 14:30 UTC`
+
+Config resolution is traced with the source of each value:
+`[quarantine] config: retries=3 (from quarantine.yml)`
+
+---
+
+### Scenario 92: QUARANTINE_DEBUG with --quiet suppresses debug output [M8]
+
+**Risk:** Setting `QUARANTINE_DEBUG=1` in a shared environment overrides `--quiet` on runs that need minimal output, flooding CI logs.
+
+**Given** the CLI is configured in CI and `QUARANTINE_DEBUG=1` is set in the environment, but `--quiet` is passed as a CLI flag
+
+**When** the developer runs `QUARANTINE_DEBUG=1 quarantine run --quiet -- jest --ci ...`
+
+**Then** the CLI suppresses debug-level output. Only ERROR-level messages are written to stderr. `--quiet` takes precedence over `QUARANTINE_DEBUG`. Test runner stdout passes through unmodified.
+
+---
+
+### Scenario 93: All CLI log output goes to stderr, not stdout [M8]
+
+**Risk:** `[quarantine]` log messages contaminate stdout, corrupting test runner output consumed by downstream tools (log parsers, artifact processors).
+
+**Given** the CLI is configured in CI and the test runner writes its summary to stdout
+
+**When** the developer runs `quarantine run -- jest --ci ...` and quarantine emits warnings and info messages
+
+**Then** every `[quarantine]` message (warnings, errors, info, debug) is written to stderr. stdout contains only the test runner's own output. Running `quarantine run 2>/dev/null -- jest --ci ...` produces clean test runner output with no quarantine lines intermixed.
+
+---

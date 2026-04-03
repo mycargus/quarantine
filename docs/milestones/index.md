@@ -181,7 +181,7 @@ Phase 1 is sequential. Each milestone builds on the prior one. A single agent
 - Flags implemented in this milestone: `--config`, `--junitxml`, `--verbose`,
   `--quiet`. Mutual exclusion enforced for `--verbose`/`--quiet`.
 - Signal handling: forwards SIGINT/SIGTERM to the child test process.
-- Golden test fixtures (`testdata/`) used for parser unit tests.
+- Test fixtures (`testdata/`) used for parser unit tests.
 
 **Scope -- explicitly excluded:**
 
@@ -203,7 +203,7 @@ Phase 1 is sequential. Each milestone builds on the prior one. A single agent
 5. Exit 2 when `quarantine init` has not been run.
 6. Glob patterns for `junitxml` resolve multiple files and merge results.
 7. Malformed XML produces a warning and the CLI exits with the runner's code.
-8. Unit tests cover: JUnit XML parsing for all three frameworks (using golden
+8. Unit tests cover: JUnit XML parsing for all three frameworks (using test
    fixtures), test_id construction, result JSON serialization, exit code
    determination.
 
@@ -212,7 +212,7 @@ Phase 1 is sequential. Each milestone builds on the prior one. A single agent
 - The branch existence check is a lightweight `GET /repos/{owner}/{repo}/
   git/ref/heads/quarantine/state`. A 404 means not initialized.
 - JUnit XML has no official schema. Test against real framework output using
-  golden fixtures from `testdata/`.
+  fixtures from `testdata/`.
 - `file_path` extraction is framework-specific. See `docs/specs/cli-spec.md`
   "Framework-Specific `file_path` Extraction" table.
 - Result JSON must include all metadata needed for dashboard ingestion
@@ -288,7 +288,7 @@ Phase 1 is sequential. Each milestone builds on the prior one. A single agent
 
 Phase 2 enables two agents to work independently. Agent A (`cli-dev`)
 continues CLI development with GitHub integration. Agent B (`dashboard-dev`)
-starts dashboard development using golden test fixtures and the shared JSON
+starts dashboard development using test fixtures and the shared JSON
 schema contract.
 
 **Why this works:** Agent B develops against fixture data from `testdata/` and
@@ -531,7 +531,7 @@ ensures compatibility when integrated.
 **Owner:** `dashboard-dev`
 
 **Dependencies:** JSON schema contract (`schemas/test-result.schema.json`,
-`schemas/quarantine-state.schema.json`) and golden test fixtures (`testdata/`).
+`schemas/quarantine-state.schema.json`) and test fixtures (`testdata/`).
 No dependency on a working CLI.
 
 **Scope -- included:**
@@ -572,7 +572,7 @@ No dependency on a working CLI.
 - Basic project listing page: shows configured repos with test run count and
   last sync timestamp.
 - Makefile targets: `dash-test`, `dash-lint`.
-- Developed against golden test fixtures from `testdata/expected/`. No real
+- Developed against test fixtures from `testdata/expected/`. No real
   CLI or GitHub artifacts needed.
 - Contract validation: artifact JSON parsing tested against
   `schemas/test-result.schema.json`.
@@ -583,7 +583,6 @@ No dependency on a working CLI.
 - No quarantined test list.
 - No filters or search.
 - No cross-repo overview.
-- No Docker image.
 - No authentication (network-level access only in v1).
 
 **Acceptance criteria:**
@@ -591,7 +590,7 @@ No dependency on a working CLI.
 1. `pnpm dev` starts the dashboard and shows a project listing page.
 2. `pnpm build` produces a production build.
 3. SQLite schema is created via migrations on first run.
-4. Artifact polling ingests golden test fixtures into SQLite correctly.
+4. Artifact polling ingests test fixtures into SQLite correctly.
 5. Project listing page shows repo names, test run counts, and last sync time.
 6. `dashboard.yml` with `source: manual` is parsed and repos are configured.
 7. ETag-based conditional requests avoid re-downloading unchanged data.
@@ -650,7 +649,6 @@ hardens and documents the entire system.
 **Scope -- explicitly excluded:**
 
 - No manual quarantine/unquarantine from the dashboard UI (read-only in v1).
-- No Docker image (M8).
 - No authentication beyond network-level.
 - No export or API endpoints.
 - No background polling daemon (M8).
@@ -706,10 +704,6 @@ hardens and documents the entire system.
   `docs/specs/error-handling.md` have corresponding tests (CLI and dashboard).
 - Degraded mode testing: simulate GitHub API failures and verify correct
   behavior across all degraded scenarios.
-- CLI Docker image: minimal image with the Go binary, published alongside
-  GitHub Release binaries.
-- Dashboard Docker image: Node.js image with built app and SQLite, volume
-  mount for database persistence.
 - Documentation:
   - README.md: project overview, quick start, CI integration guide.
   - Setup guide: step-by-step for GitHub Actions with all three frameworks.
@@ -721,7 +715,7 @@ hardens and documents the entire system.
   - RSpec shared examples: verify `test_id` construction handles shared
     context names.
   - Vitest parameterized tests: verify `test_id` construction.
-  - Golden fixtures added to `testdata/` for parameterized test output.
+  - Fixtures added to `testdata/` for parameterized test output.
 - CLI binary cross-compilation: linux/darwin x amd64/arm64 (4 targets).
 - Release automation: GitHub Actions workflow for building, checksumming
   (SHA256), and publishing release assets.
@@ -737,9 +731,7 @@ hardens and documents the entire system.
    test.
 2. Degraded mode scenarios pass: no quarantine state, API timeout, CAS
    conflict exhaustion, token expired.
-3. CLI Docker image runs `quarantine version` successfully.
-4. Dashboard Docker image starts and serves the UI.
-5. README includes: quick start (< 5 minutes to first run), CI integration
+3. README includes: quick start (< 5 minutes to first run), CI integration
    for all three frameworks, troubleshooting for common errors.
 6. Parameterized test fixtures parse correctly and produce valid `test_id`
    values.
@@ -754,7 +746,6 @@ hardens and documents the entire system.
   edge cases. Jest `test.each` generates names like
   `addition > adds 1 + 2 to equal 3`. RSpec shared examples generate names
   like `User when admin has admin privileges`.
-- Docker images should use multi-stage builds to minimize image size.
 - Release checksums use SHA-256, published as a separate file per ADR-014.
 
 ---

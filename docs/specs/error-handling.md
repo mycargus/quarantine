@@ -602,7 +602,7 @@ httpClient := &http.Client{
 ### Testing error handling
 
 Every error path described in this document must have a corresponding test.
-Use the golden fixture approach (pre-implementation task 10) for XML parse
+Use test fixtures from `testdata/` (pre-implementation task 10) for XML parse
 errors. Use HTTP mocks (e.g., `net/http/httptest`) for GitHub API errors.
 
 Key test scenarios:
