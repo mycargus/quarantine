@@ -109,7 +109,7 @@ runs may race; CAS with retry on 409 resolves conflicts.
 
 **Current validation:**
 - No runtime schema validation. CLI trusts its own output.
-- Golden fixtures in `testdata/quarantine-state/` are not validated against the
+- Fixtures in `testdata/quarantine-state/` are not validated against the
   schema.
 - Scenario 66 in `docs/scenarios/v1/10-github-api-edge-cases.md` covers a
   struct-schema mismatch (not yet tested).
@@ -140,7 +140,7 @@ consumes it during artifact polling.
 **Current validation:**
 - Dashboard validates incoming JSON against the schema at runtime via ajv.
 - CLI does not validate its own output against the schema.
-- Golden fixtures in `testdata/expected/` represent expected output but are not
+- Fixtures in `testdata/expected/` represent expected output but are not
   validated against the schema.
 - Scenario 72 in `docs/scenarios/v1/09-test-runner-edge-cases.md` covers a
   parser status value not in the schema enum (not yet tested).

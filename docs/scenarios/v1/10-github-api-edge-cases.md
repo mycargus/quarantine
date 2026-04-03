@@ -165,3 +165,118 @@ treats it as an empty quarantine state (no tests quarantined), not as a branch
 error.
 
 ---
+
+### Scenario 95: 401 Unauthorized enters degraded mode with actionable warning [M8]
+
+**Risk:** A revoked or expired token silently breaks quarantine without identifying which token to check, causing confusing degraded-mode CI runs.
+
+**Given** the CLI is configured in CI and the GitHub API returns 401 Unauthorized when the CLI reads `quarantine.json`
+
+**When** the CLI executes `quarantine run -- jest --ci ...`
+
+**Then** the CLI:
+1. Does not retry (a 401 will not resolve by retrying).
+2. Logs to stderr: `[quarantine] WARNING: GitHub API returned 401 (unauthorized). Check QUARANTINE_GITHUB_TOKEN or GITHUB_TOKEN.`
+3. Enters degraded mode: runs all tests without quarantine exclusions.
+4. Skips state update, issue creation, and PR comment (each logs its own skipped warning).
+5. Writes results to disk.
+6. Exits based on test results only (exit 0 if tests pass).
+
+When `GITHUB_ACTIONS=true`, also emits:
+`::warning title=Quarantine Degraded Mode::GitHub API returned 401 unauthorized. Check QUARANTINE_GITHUB_TOKEN or GITHUB_TOKEN.`
+
+---
+
+### Scenario 96: 403 Forbidden without Retry-After enters degraded mode [M8]
+
+**Risk:** A token with insufficient scopes causes the CLI to crash instead of degrading, breaking builds when token permissions change.
+
+**Given** the CLI is configured in CI and the GitHub API returns 403 Forbidden without a `Retry-After` header (e.g., token lacks `repo` scope), including an `X-GitHub-Request-Id` header in the response
+
+**When** the CLI reads `quarantine.json`
+
+**Then** the CLI:
+1. Logs a warning including the request ID: `[quarantine] WARNING: GitHub API returned 403 (forbidden). Request ID: abc123def456. Ensure your token has 'repo' scope.`
+2. Enters degraded mode.
+3. Does not retry.
+4. Exits based on test results only.
+
+---
+
+### Scenario 97: 403 Forbidden with Retry-After treated as secondary rate limit [M8]
+
+**Risk:** GitHub's secondary rate limit (403 with `Retry-After`) is treated as a permanent permission failure instead of a temporary limit, causing unnecessary degraded mode.
+
+**Given** the CLI is configured in CI and the GitHub API returns 403 Forbidden with a `Retry-After: 10` header
+
+**When** the CLI reads `quarantine.json`
+
+**Then** the CLI treats the response identically to a 429 with `Retry-After: 10`: waits 10 seconds and retries once. If the retry succeeds, operation continues normally. If the retry also fails, the CLI enters degraded mode with a warning.
+
+---
+
+### Scenario 98: 5xx Server Error retries once then enters degraded mode [M8]
+
+**Risk:** A transient GitHub server error that resolves in seconds permanently blocks the run if not retried, while retrying indefinitely blocks CI for minutes.
+
+**Given** the CLI is configured in CI and the GitHub API returns 500 (or 502 or 503) when the CLI reads `quarantine.json`
+
+**When** the CLI handles the 5xx response
+
+**Then** the CLI:
+1. Waits 2 seconds.
+2. Retries the request once.
+3. If the retry succeeds: continues normally.
+4. If the retry also returns 5xx: logs `[quarantine] WARNING: GitHub API server error (502). Running in degraded mode.` and enters degraded mode.
+
+Does not retry more than once.
+
+---
+
+### Scenario 99: Network timeout retries once then enters degraded mode [M8]
+
+**Risk:** A transient network timeout causes permanent degraded mode when a single retry would succeed, but a permanent outage blocks CI for more than the 10-second HTTP timeout.
+
+**Given** the CLI is configured with a 10-second HTTP timeout and the GitHub API request times out
+
+**When** the CLI attempts to read `quarantine.json`
+
+**Then** the CLI:
+1. Waits 2 seconds.
+2. Retries the request once.
+3. If the retry also times out: logs `[quarantine] WARNING: GitHub API request timed out. Running in degraded mode.` and enters degraded mode.
+4. If the retry succeeds: continues normally.
+
+Total maximum wait before degraded mode: 10s (initial timeout) + 2s (wait) + 10s (retry timeout) = 22 seconds.
+
+---
+
+### Scenario 100: 429 with short Retry-After waits and retries [M8]
+
+**Risk:** A transient rate limit causes immediate degraded mode when waiting a few seconds would allow the request to succeed.
+
+**Given** the CLI is configured in CI and the GitHub API returns 429 Too Many Requests with `Retry-After: 8` (and `X-RateLimit-Remaining: 0`)
+
+**When** the CLI reads `quarantine.json`
+
+**Then** the CLI:
+1. Logs: `[quarantine] WARNING: GitHub API rate limited. Remaining: 0. Resets at: {time}.`
+2. Reads the `Retry-After: 8` header and waits 8 seconds.
+3. Retries the request once.
+4. If the retry succeeds: continues normally (not degraded mode).
+5. If the retry also fails: enters degraded mode.
+
+---
+
+### Scenario 101: 429 with long Retry-After enters degraded mode immediately [M8]
+
+**Risk:** The CLI blocks CI for minutes waiting on a rate limit reset, causing builds to time out.
+
+**Given** the CLI is configured in CI and the GitHub API returns 429 Too Many Requests with `Retry-After: 120`
+
+**When** the CLI reads `quarantine.json`
+
+**Then** the CLI determines the wait exceeds 30 seconds and does not wait. It immediately enters degraded mode and logs:
+`[quarantine] WARNING: GitHub API rate limited (120s wait exceeds 30s threshold). Running in degraded mode.`
+
+---

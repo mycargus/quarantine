@@ -43,7 +43,7 @@ sequenceDiagram
 | Language        | Go (ADR-004)                                                           |
 | Artifact        | Single statically-linked binary, no runtime dependencies               |
 | Targets         | linux/darwin x amd64/arm64 (cross-compiled) [v1]              |
-| Distribution    | GitHub Releases (direct binary download) [v1], Docker image [v1]      |
+| Distribution    | GitHub Releases (direct binary download) [v1]                         |
 | Config          | `quarantine.yml` in repo root (YAML) (ADR-010)                        |
 
 For CLI commands, flags, execution flow, and framework-specific behavior, see `docs/specs/cli-spec.md`. For config schema, see `docs/specs/config-schema.md`.
@@ -55,7 +55,7 @@ For CLI commands, flags, execution flow, and framework-specific behavior, see `d
 | Framework       | Remix 3 (TypeScript) (ADR-005)                                         |
 | Database        | SQLite (WAL mode)                                                      |
 | Styling         | Tailwind CSS                                                           |
-| Deployment      | Single Docker container [v1]                                           |
+| Deployment      | Node.js server (direct or containerized) [v1]                          |
 | Network         | Internal-only (behind employer's network) [v1], public [v2+]          |
 
 **Responsibilities:**
@@ -102,9 +102,6 @@ Dashboard SQLite schema will be defined during M6 implementation.
 - Published as GitHub Release assets on each tagged version.
 - Checksum file (SHA256) published alongside binaries (ADR-014).
 
-**[v1] Docker image:**
-- CLI packaged as a minimal Docker image for environments that prefer containers.
-
 **Example CI usage (GitHub Actions) [v1]:**
 
 ```yaml
@@ -122,22 +119,11 @@ Dashboard SQLite schema will be defined during M6 implementation.
 
 ### 5.2 Dashboard Deployment
 
-**[v1] Single Docker container:**
-
-```mermaid
-flowchart TD
-    subgraph docker["Docker container"]
-        server["Node.js server"]
-        sqlite["SQLite database (WAL mode, volume-mounted)"]
-        poller["Background polling worker"]
-    end
-    vol[("Volume mount:<br/>/data/quarantine.db")]
-    docker -.-> vol
-```
+**[v1] Node.js server:**
 
 - Deploy behind a reverse proxy (nginx, Caddy, or cloud LB).
 - Internal-only access [v1] -- no public exposure.
-- SQLite database stored on a persistent volume mount.
+- SQLite database stored on a persistent disk.
 - Single process handles both web requests and background artifact polling.
 - **[v2+]:** Public deployment with GitHub OAuth authentication.
 

@@ -32,7 +32,7 @@ Key principle: the CLI never needs to know the dashboard exists. The dashboard d
 - Dashboard outage is invisible to CI.
 - Clean separation of concerns.
 - Dashboard can be deployed later without changing CI integration.
-- Self-hosted by customer as a Docker container.
+- Self-hosted by customer (Node.js server).
 
 **Negative:**
 - Two separate systems to develop and maintain.

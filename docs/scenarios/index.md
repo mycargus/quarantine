@@ -14,11 +14,12 @@ Each v1 scenario is tagged with the milestone where it first becomes testable.
 | [Degraded Mode](v1/05-degraded-mode.md) | M4, M6
 | [Dashboard](v1/06-dashboard.md) | M6–M7
 | [Branch Protection](v1/07-branch-protection.md) | M4
-| [CLI Flags & Configuration](v1/08-cli-flags.md) | M2–M5
-| [Test Runner Edge Cases](v1/09-test-runner-edge-cases.md) | M2–M4
-| [GitHub API Edge Cases](v1/10-github-api-edge-cases.md) | M4–M5
+| [CLI Flags & Configuration](v1/08-cli-flags.md) | M2–M8
+| [Test Runner Edge Cases](v1/09-test-runner-edge-cases.md) | M2–M8
+| [GitHub API Edge Cases](v1/10-github-api-edge-cases.md) | M4–M8
 | [Configuration Edge Cases](v1/11-config-edge-cases.md) | M1–M2
 | [Schema Validation](v1/12-schema-validation.md) | M8
+| [Parameterized Tests](v1/13-parameterized-tests.md) | M8
 
 ## v2+ Scenarios
 

@@ -278,3 +278,17 @@ The CLI continues processing remaining tests. Exit code reflects the genuine
 failure (1). No GitHub Issue is created for this test.
 
 ---
+
+### Scenario 94: No JUnit XML produced and test runner exited 0 [M8]
+
+**Risk:** The CLI exits non-zero when the test runner exits 0 without producing XML, breaking builds for commands that deliberately produce no XML output (e.g., custom reporters, early-exit test runners).
+
+**Given** the CLI is configured with `junitxml: junit.xml` and the test command exits 0 but produces no XML file at the configured path
+
+**When** the developer runs `quarantine run -- custom-test-runner` and the runner exits 0 without writing `junit.xml`
+
+**Then** the CLI logs:
+`[quarantine] WARNING: No JUnit XML found at 'junit.xml'. Cannot determine test results.`
+Exits with code 0. No quarantine processing occurs (no state update, no issue creation, no PR comment). This is distinct from Scenario 54 where the runner exits non-zero.
+
+---

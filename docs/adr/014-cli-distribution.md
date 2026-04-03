@@ -5,7 +5,7 @@
 
 ## Context
 
-The Go CLI needs to be distributed to CI environments and developer machines. Options evaluated include Homebrew, direct binary downloads, Docker images, and language-ecosystem package managers.
+The Go CLI needs to be distributed to CI environments and developer machines. Options evaluated include Homebrew, direct binary downloads, and language-ecosystem package managers.
 
 ## Decision
 
@@ -32,14 +32,12 @@ Or download directly with checksum verification:
     chmod +x /usr/local/bin/quarantine
 ```
 
-Additionally provide Docker usage instructions for CI environments that prefer containerized tools, and consider a Docker image of the CLI for v1.
-
 v2 additions: Homebrew tap, GitHub Action (`uses: org/quarantine-action@v1` with auto-download), possibly npm/pip wrappers for ecosystem familiarity.
 
 ## Alternatives Considered
 
 - **Homebrew:** Useful for developer machines, not CI environments (CI does not use Homebrew). Low value for v1 target (CI integration). Deferred.
-- **Docker image only:** Adds docker pull overhead, more verbose invocation (`docker run --rm -v $(pwd):/work quarantine run ...`). Offered as an option but not primary.
+- **Docker image:** The CLI wraps test runners and needs access to the user's test suite, dependencies, and framework binaries. A Docker image would require mounting the entire project workspace and test infrastructure, negating the simplicity of a single binary. Not viable.
 - **GitHub Action:** Convenient for GitHub Actions users, but limits portability. Good v2 addition.
 
 ## Consequences

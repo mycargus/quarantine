@@ -15,7 +15,7 @@ Three JSON schemas exist in `schemas/`:
 
 The `schemas-validate` Makefile target is a TODO stub that prints a message and
 exits successfully. `test-all` includes it, so CI appears to validate schemas
-but does not. Twelve golden fixtures exist in `testdata/` but no test reads
+but does not. Twelve test fixtures exist in `testdata/` but no test reads
 them.
 
 A planning exercise (now removed) analyzed the gap and found:
