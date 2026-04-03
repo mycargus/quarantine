@@ -46,6 +46,12 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("verbose and quiet are mutually exclusive")
 	}
 
+	// QUARANTINE_DEBUG=1 enables debug output equivalent to --verbose.
+	// --quiet takes precedence over QUARANTINE_DEBUG.
+	if os.Getenv("QUARANTINE_DEBUG") == "1" && !quiet {
+		verbose = true
+	}
+
 	runStart := time.Now()
 	defer func() {
 		if verbose {
