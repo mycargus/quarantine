@@ -127,6 +127,43 @@ rerun_command: "npx jest --config jest.ci.config.js --testNamePattern '{name}'"
 | `quarantine doctor` | Validate `quarantine.yml` and print the resolved configuration |
 | `quarantine version` | Print the CLI version |
 
+## Debugging
+
+### --verbose
+
+Shows one line per GitHub API call, rate limit info, and config resolution:
+
+```
+[quarantine] GET /repos/owner/repo/git/ref/heads/quarantine/state -> 200 (84ms)
+[quarantine] X-RateLimit-Remaining: 987, resets at 14:30 UTC
+[quarantine] config: framework=jest (from quarantine.yml)
+[quarantine] config: retries=3 (from default)
+```
+
+```sh
+quarantine run --verbose -- jest --ci
+```
+
+### --quiet
+
+Suppresses all informational output. Only errors are printed.
+
+```sh
+quarantine run --quiet -- jest --ci
+```
+
+`--verbose` and `--quiet` are mutually exclusive.
+
+### QUARANTINE_DEBUG
+
+Enables the same output as `--verbose` without modifying your CI config. Useful when `quarantine run` is embedded in a shared script you can't easily change.
+
+```sh
+QUARANTINE_DEBUG=1 quarantine run -- jest --ci
+```
+
+`--quiet` takes precedence over `QUARANTINE_DEBUG`.
+
 ## Architecture
 
 Quarantine follows a GitHub-native architecture. The CLI handles the CI-critical path with no dependencies beyond GitHub. The dashboard is non-critical and discovers data autonomously by polling GitHub Artifacts.
@@ -213,6 +250,30 @@ The `quarantine/state` branch has not been created. This happens when `quarantin
 ```sh
 quarantine init
 ```
+
+---
+
+### "GitHub API returned 403 (forbidden). Ensure your token has 'repo' scope."
+
+Your token does not have sufficient permissions. Quarantine enters degraded mode.
+
+**Fix:** Create a PAT with `repo` scope (not just `public_repo`) and set it as `QUARANTINE_GITHUB_TOKEN`.
+
+---
+
+### "GitHub API server error (5xx). Running in degraded mode."
+
+GitHub returned a server error. Quarantine waited 2 seconds, retried once, and still got an error. Tests still ran — quarantine state was not updated for this run.
+
+This is usually transient. If it persists, check [githubstatus.com](https://www.githubstatus.com/).
+
+---
+
+### "GitHub API rate limited (Ns wait exceeds 30s threshold). Running in degraded mode."
+
+Quarantine hit the secondary rate limit and the `Retry-After` header specifies a wait longer than 30 seconds. Rather than block CI, it entered degraded mode.
+
+**Fix:** If this happens frequently, reduce how often your CI runs or switch to a PAT with higher limits.
 
 ---
 
