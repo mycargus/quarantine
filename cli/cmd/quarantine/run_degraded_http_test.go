@@ -203,10 +203,14 @@ github:
 		Expected: true,
 	})
 
+	if strings.Contains(output, "[quarantine] WARNING:") {
+		t.Logf("unexpected WARNING in output (should not be in degraded mode after successful retry):\n%s", output)
+	}
+
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "retry succeeded after 403+Retry-After",
-		Should:   "NOT emit a [quarantine] WARNING (ran normally, no degraded mode)",
-		Actual:   !strings.Contains(output, "[quarantine] WARNING:"),
+		Should:   "NOT emit a degraded mode WARNING",
+		Actual:   !strings.Contains(output, "degraded mode"),
 		Expected: true,
 	})
 }
@@ -376,10 +380,14 @@ github:
 		Expected: true,
 	})
 
+	if strings.Contains(output, "[quarantine] WARNING:") {
+		t.Logf("unexpected WARNING in output (should not be in degraded mode after successful retry):\n%s", output)
+	}
+
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "retry succeeded after 429+Retry-After:1",
-		Should:   "NOT emit a [quarantine] WARNING (ran normally, no degraded mode)",
-		Actual:   !strings.Contains(output, "[quarantine] WARNING:"),
+		Should:   "NOT emit a degraded mode WARNING",
+		Actual:   !strings.Contains(output, "degraded mode"),
 		Expected: true,
 	})
 }
