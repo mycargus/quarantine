@@ -55,7 +55,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	runStart := time.Now()
 	defer func() {
 		if verbose {
-			cmd.PrintErrf("[verbose] Total time: %dms\n", time.Since(runStart).Milliseconds())
+			cmd.PrintErrf("[quarantine] total time: %dms\n", time.Since(runStart).Milliseconds())
 		}
 	}()
 
@@ -113,15 +113,15 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 	if verbose {
 		if check.skipped {
-			cmd.PrintErrf("[verbose] API call: skipped (no token)\n")
+			cmd.PrintErrf("[quarantine] API: skipped (no token)\n")
 		} else if check.endpoint != "" {
 			elapsedMs := check.elapsed.Milliseconds()
 			if check.apiErr != nil {
-				cmd.PrintErrf("[verbose] API call: %s -> error (%dms)\n", check.endpoint, elapsedMs)
+				cmd.PrintErrf("[quarantine] %s -> error (%dms)\n", check.endpoint, elapsedMs)
 			} else if check.exists {
-				cmd.PrintErrf("[verbose] API call: %s -> 200 (%dms)\n", check.endpoint, elapsedMs)
+				cmd.PrintErrf("[quarantine] %s -> 200 (%dms)\n", check.endpoint, elapsedMs)
 			} else {
-				cmd.PrintErrf("[verbose] API call: %s -> 404 (%dms)\n", check.endpoint, elapsedMs)
+				cmd.PrintErrf("[quarantine] %s -> 404 (%dms)\n", check.endpoint, elapsedMs)
 			}
 		}
 	}
@@ -140,6 +140,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 	if owner, repo := resolveOwnerRepo(cfg); owner != "" && repo != "" {
 		if c, clientErr := gh.NewClient(owner, repo); clientErr == nil {
 			c.SetRateLimitWarningFunc(func(msg string) { cmd.PrintErrln(msg) })
+			if verbose {
+				c.SetVerboseLogFunc(func(msg string) { cmd.PrintErrln(msg) })
+			}
 			ghClient = c
 		} else {
 			// Detect missing token specifically for a clearer message.
@@ -803,25 +806,24 @@ func writeResults(res result.Result, path string) error {
 //   - junitxmlFlag: value from --junitxml flag ("" = not set)
 //   - cfgJUnitXML: cfg.JUnitXML before ApplyDefaults ("" = not set in file)
 func configResolutionTrace(cfg *config.Config, retriesFlag, cfgRetries int, junitxmlFlag, cfgJUnitXML string) []string {
-	retriesSource := "default"
+	retriesSource := "from default"
 	if retriesFlag != 0 {
-		retriesSource = "flag"
+		retriesSource = "from cli flag"
 	} else if cfgRetries != 0 {
-		retriesSource = "config"
+		retriesSource = "from quarantine.yml"
 	}
 
-	junitxmlSource := "default"
+	junitxmlSource := "from default"
 	if junitxmlFlag != "" {
-		junitxmlSource = "flag"
+		junitxmlSource = "from cli flag"
 	} else if cfgJUnitXML != "" {
-		junitxmlSource = "config"
+		junitxmlSource = "from quarantine.yml"
 	}
 
 	return []string{
-		"[verbose] Config resolution:",
-		fmt.Sprintf("[verbose]   framework = %s (source: config)", cfg.Framework),
-		fmt.Sprintf("[verbose]   retries   = %d (source: %s)", cfg.Retries, retriesSource),
-		fmt.Sprintf("[verbose]   junitxml  = %s (source: %s)", cfg.JUnitXML, junitxmlSource),
+		fmt.Sprintf("[quarantine] config: framework=%s (from quarantine.yml)", cfg.Framework),
+		fmt.Sprintf("[quarantine] config: retries=%d (%s)", cfg.Retries, retriesSource),
+		fmt.Sprintf("[quarantine] config: junitxml=%s (%s)", cfg.JUnitXML, junitxmlSource),
 	}
 }
 

@@ -26,27 +26,27 @@ func TestConfigResolutionTrace(t *testing.T) {
 
 	riteway.Assert(t, riteway.Case[int]{
 		Given:    "jest config with all values at defaults",
-		Should:   "return 4 trace lines",
+		Should:   "return 3 trace lines (no header line)",
 		Actual:   len(lines),
-		Expected: 4,
+		Expected: 3,
 	})
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "jest config with all values at defaults",
-		Should:   "include framework with config source",
-		Actual:   lines[1],
-		Expected: "[verbose]   framework = jest (source: config)",
+		Should:   "include framework with quarantine.yml source",
+		Actual:   lines[0],
+		Expected: "[quarantine] config: framework=jest (from quarantine.yml)",
 	})
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "retries not set in config file or flag",
 		Should:   "report retries as default source",
-		Actual:   lines[2],
-		Expected: "[verbose]   retries   = 3 (source: default)",
+		Actual:   lines[1],
+		Expected: "[quarantine] config: retries=3 (from default)",
 	})
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "junitxml not set in config file or flag",
 		Should:   "report junitxml as default source",
-		Actual:   lines[3],
-		Expected: "[verbose]   junitxml  = junit.xml (source: default)",
+		Actual:   lines[2],
+		Expected: "[quarantine] config: junitxml=junit.xml (from default)",
 	})
 }
 
@@ -61,30 +61,30 @@ func TestConfigResolutionTraceSourceAttribution(t *testing.T) {
 	linesFromFlag := configResolutionTrace(cfg, 5, 0, "override.xml", "")
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "retries set via --retries flag",
-		Should:   "report retries as flag source",
-		Actual:   linesFromFlag[2],
-		Expected: "[verbose]   retries   = 5 (source: flag)",
+		Should:   "report retries as cli flag source",
+		Actual:   linesFromFlag[1],
+		Expected: "[quarantine] config: retries=5 (from cli flag)",
 	})
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "junitxml set via --junitxml flag",
-		Should:   "report junitxml as flag source",
-		Actual:   linesFromFlag[3],
-		Expected: "[verbose]   junitxml  = override.xml (source: flag)",
+		Should:   "report junitxml as cli flag source",
+		Actual:   linesFromFlag[2],
+		Expected: "[quarantine] config: junitxml=override.xml (from cli flag)",
 	})
 
 	// Both values came from the config file (not overridden by flag).
 	linesFromConfig := configResolutionTrace(cfg, 0, 5, "", "override.xml")
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "retries set in config file (not flag)",
-		Should:   "report retries as config source",
-		Actual:   linesFromConfig[2],
-		Expected: "[verbose]   retries   = 5 (source: config)",
+		Should:   "report retries as quarantine.yml source",
+		Actual:   linesFromConfig[1],
+		Expected: "[quarantine] config: retries=5 (from quarantine.yml)",
 	})
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "junitxml set in config file (not flag)",
-		Should:   "report junitxml as config source",
-		Actual:   linesFromConfig[3],
-		Expected: "[verbose]   junitxml  = override.xml (source: config)",
+		Should:   "report junitxml as quarantine.yml source",
+		Actual:   linesFromConfig[2],
+		Expected: "[quarantine] config: junitxml=override.xml (from quarantine.yml)",
 	})
 }
 

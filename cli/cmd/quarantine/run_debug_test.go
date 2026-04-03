@@ -28,7 +28,7 @@ framework: jest
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "QUARANTINE_DEBUG=1 set without --verbose flag",
 		Should:   "print config resolution trace (debug output equivalent to --verbose)",
-		Actual:   strings.Contains(output, "[verbose] Config resolution:"),
+		Actual:   strings.Contains(output, "[quarantine] config:"),
 		Expected: true,
 	})
 }
@@ -52,7 +52,7 @@ framework: jest
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "QUARANTINE_DEBUG=1 set AND --quiet flag passed",
 		Should:   "suppress config resolution trace (--quiet takes precedence over QUARANTINE_DEBUG)",
-		Actual:   strings.Contains(output, "[verbose] Config resolution:"),
+		Actual:   strings.Contains(output, "[quarantine] config:"),
 		Expected: false,
 	})
 }
