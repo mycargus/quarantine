@@ -438,3 +438,43 @@ fail)
 detected, etc.) render normally.
 
 ---
+
+### Scenario 107: results.json includes issue_number for a newly created GitHub Issue [M8]
+
+**Risk:** The dashboard displays "—" for the Issue column on every quarantined test, even when GitHub Issues exist, because the CLI never writes `issue_number` into `results.json`. The artifact is the only channel between the CLI and the dashboard — if issue_number is absent, the dashboard cannot reconstruct the link.
+
+**Given** the CLI detects `PaymentService > should handle charge timeout` as flaky (failed initially, passed on retry), and a new GitHub Issue is successfully created with number 42 and URL `https://github.com/owner/repo/issues/42`
+
+**When** the CLI writes `.quarantine/results.json` to disk
+
+**Then** the test entry for `PaymentService > should handle charge timeout` in `results.json` has `issue_number: 42`. All other test entries whose issues were not created or found in this run have `issue_number: null`.
+
+---
+
+### Scenario 108: results.json includes issue_number from a deduplicated existing issue [M8]
+
+**Risk:** A test that was quarantined in a previous run (issue already exists) shows "—" in the dashboard on subsequent re-detections, because the dedup search found an issue but the CLI still does not write its number into results.json.
+
+**Given** the CLI detects `AuthService > should validate expired token` as flaky, and the dedup search (`GET /search/issues?q=...`) finds an already-open issue with number 173 and URL `https://github.com/owner/repo/issues/173` (no new issue is created)
+
+**When** the CLI writes `.quarantine/results.json` to disk
+
+**Then** the test entry for `AuthService > should validate expired token` has `issue_number: 173` — the number from the existing issue, not null. The dedup path (found) and the create path (new) both produce an `issue_number` in the result.
+
+---
+
+### Scenario 109: results.json has null issue_number when issue creation fails [M8]
+
+**Risk:** A transient GitHub API failure during issue creation (e.g., 503) causes the CLI to crash or exit 2 and lose the test run results entirely, rather than writing a partial result and letting the next run retry issue creation.
+
+**Given** the CLI detects `CacheService > should handle eviction` as flaky, and the GitHub Issues API returns a 503 error when the CLI attempts to create the issue
+
+**When** the CLI handles the issue creation failure
+
+**Then:**
+1. The CLI logs a warning: `[quarantine] WARNING: Could not create issue for "should handle eviction": ...`
+2. The test entry for `CacheService > should handle eviction` in `results.json` has `issue_number: null` (no issue number to record).
+3. The CLI does NOT exit 2. It continues with the remaining flow (PR comment, results write) and exits 0 if tests passed.
+4. On the next CI run, the CLI will attempt issue creation again for the same test (since it is still in quarantine.json without an issue_number).
+
+---

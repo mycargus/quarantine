@@ -273,6 +273,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 		issueRefs := createIssuesForNewFlakyTests(ctx, cmd, ghClient, res, excludePatterns, branch, commitSHA, prNumber, skipReasons)
 
+		// Backfill issue numbers into result entries so results.json includes them.
+		backfillIssueNumbers(res.Tests, issueRefs)
+
 		prCommentEnabled := cfg.Notifications.GitHubPRComment == nil || *cfg.Notifications.GitHubPRComment
 		if prCommentEnabled {
 			flakyWithIssue, flakyNewToPR := buildFlakyEntries(res, issueRefs, skipReasons)

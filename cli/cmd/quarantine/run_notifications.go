@@ -380,6 +380,18 @@ type issueRef struct {
 	URL    string
 }
 
+// backfillIssueNumbers sets IssueNumber on test entries that have a matching issueRef.
+// Modifies the slice in place.
+// This is a pure function — no I/O.
+func backfillIssueNumbers(tests []result.TestEntry, refs map[string]issueRef) {
+	for i, t := range tests {
+		if ref, ok := refs[t.TestID]; ok {
+			n := ref.Number
+			tests[i].IssueNumber = &n
+		}
+	}
+}
+
 // buildFlakyEntries converts result tests + issue refs to PR comment flaky entries.
 // It splits into two lists: tests with issues (newly quarantined) and tests without
 // issues (new-to-PR per ADR-022, tracked in skipReasons).
