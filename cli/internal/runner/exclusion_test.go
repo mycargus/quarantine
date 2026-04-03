@@ -206,6 +206,42 @@ func TestBuildExclusionArgsJestPatternUsesExactlySinglePipe(t *testing.T) {
 	})
 }
 
+func TestBuildExclusionArgsJestParameterizedVariantsOnlyTargetQuarantinedName(t *testing.T) {
+	// Only one test.each variant is quarantined; BuildExclusionArgs must produce
+	// a single-exclusion pattern — no sibling variants added via expansion.
+	entries := []quarantine.Entry{
+		{
+			TestID:   "src/math.test.js::math::addition: 1 + 2 = 3",
+			Name:     "addition: 1 + 2 = 3",
+			FilePath: "src/math.test.js",
+		},
+	}
+
+	args := runner.BuildExclusionArgs(runner.Jest, entries)
+	pattern := argAfter(args, "--testNamePattern")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "one quarantined test.each variant with name 'addition: 1 + 2 = 3'",
+		Should:   "include the quarantined variant's name in the exclusion pattern",
+		Actual:   strings.Contains(pattern, "addition: 1 + 2 = 3"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "exactly one quarantined variant (no siblings quarantined)",
+		Should:   "produce a pattern with no '|' separator (single-exclusion, no expansion)",
+		Actual:   !strings.Contains(pattern, "|"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "one quarantined test.each variant",
+		Should:   "produce a valid negative lookahead pattern",
+		Actual:   strings.HasPrefix(pattern, "^(?!.*(") && strings.HasSuffix(pattern, ")).*$"),
+		Expected: true,
+	})
+}
+
 // TestBuildExclusionArgsJestMultipleEntriesNoTrailingPipe verifies that the
 // escaped slice has exactly len(entries) elements (not len(entries)+1).
 // Kills mutation: `make([]string, len(entries))` → `len(entries)+1`.
