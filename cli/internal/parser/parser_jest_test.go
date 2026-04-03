@@ -115,12 +115,9 @@ func TestParseSingleFailureJest(t *testing.T) {
 		Expected: "failed",
 	})
 
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "the second test case with a <failure> element",
-		Should:   "have a non-nil FailureMessage",
-		Actual:   results[1].FailureMessage != nil,
-		Expected: true,
-	})
+	if results[1].FailureMessage == nil {
+		t.Fatal("FailureMessage is nil for the failing test case")
+	}
 
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "the failing test case",
@@ -158,6 +155,44 @@ func TestParseMalformedXML(t *testing.T) {
 		Should:   "return an error",
 		Actual:   err != nil,
 		Expected: true,
+	})
+}
+
+func TestParseJestParameterized(t *testing.T) {
+	f, err := os.Open("../../../testdata/junit-xml/jest/parameterized.xml")
+	if err != nil {
+		t.Fatalf("failed to open fixture: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	results, err := parser.Parse(f)
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "a Jest JUnit XML fixture with two test.each variants",
+		Should:   "parse without error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a Jest XML with 2 parameterized test variants",
+		Should:   "return 2 test results",
+		Actual:   len(results),
+		Expected: 2,
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "the first test.each variant (1 + 2 = 3)",
+		Should:   "construct the correct test_id including variant parameters",
+		Actual:   results[0].TestID,
+		Expected: "src/math.test.js::math::addition: 1 + 2 = 3",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "the second test.each variant (4 + 5 = 9)",
+		Should:   "construct the correct test_id including variant parameters",
+		Actual:   results[1].TestID,
+		Expected: "src/math.test.js::math::addition: 4 + 5 = 9",
 	})
 }
 

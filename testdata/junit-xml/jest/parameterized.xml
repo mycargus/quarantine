@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="2" failures="0" errors="0" time="0.018">
+  <testsuite name="src/math.test.js" tests="2" errors="0" failures="0" skipped="0"
+             timestamp="2026-01-15T10:00:00" time="0.018">
+    <testcase classname="math" name="addition: 1 + 2 = 3"
+              file="src/math.test.js" time="0.010">
+    </testcase>
+    <testcase classname="math" name="addition: 4 + 5 = 9"
+              file="src/math.test.js" time="0.008">
+    </testcase>
+  </testsuite>
+</testsuites>
