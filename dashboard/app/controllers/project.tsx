@@ -136,9 +136,14 @@ function ProjectPage(_handle: Handle, data: ProjectPageData) {
   )
 }
 
-export async function project(owner: string, repo: string, url: string): Promise<Response> {
-  const dbPath = process.env.DATABASE_URL ?? "./quarantine.db"
-  const handle = initDb(dbPath)
+export async function project(
+  owner: string,
+  repo: string,
+  url: string,
+  dbPath?: string,
+): Promise<Response> {
+  const resolvedDbPath = dbPath ?? process.env.DATABASE_URL ?? "./quarantine.db"
+  const handle = initDb(resolvedDbPath)
 
   const projectRow = await getProjectByOwnerRepo(handle, owner, repo)
   if (projectRow === null) {

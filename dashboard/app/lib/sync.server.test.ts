@@ -1,21 +1,9 @@
-import AdmZip from "adm-zip"
 import { describe } from "riteway"
+import { makeZipBuffer, toArrayBuffer } from "../test-helpers.js"
 import { initDb } from "./db.server.js"
 import { syncRepo } from "./sync.server.js"
 
 type FetchFn = typeof fetch
-
-// Build a ZIP buffer containing a JSON string as the first entry.
-function makeZipBuffer(jsonContent: string): Buffer {
-  const zip = new AdmZip()
-  zip.addFile("results.json", Buffer.from(jsonContent, "utf8"))
-  return zip.toBuffer()
-}
-
-// Convert a Node.js Buffer to an ArrayBuffer (for the fake fetch response).
-function toArrayBuffer(buf: Buffer): ArrayBuffer {
-  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
-}
 
 const makeArtifactJson = (runId: string) =>
   JSON.stringify({
