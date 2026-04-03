@@ -18,7 +18,7 @@
     "seed": "node --import tsx/esm scripts/seed.ts"
   },
   "dependencies": {
-    "adm-zip": "^0.5.16",
+    "adm-zip": "^0.5.17",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
     "better-sqlite3": "^12.8.0",
@@ -28,11 +28,11 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.10",
     "@types/adm-zip": "^0.5.8",
-    "@types/better-sqlite3": "^7.6.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^25.5.0",
+    "@types/node": "^25.5.2",
     "riteway": "^9.2.0",
-    "tsx": "^4.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.2"
   }
 }
