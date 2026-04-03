@@ -50,10 +50,10 @@ func validateState(t *testing.T, sch *jsonschema.Schema, s *quarantine.State, ti
 }
 
 func TestStateSchemaConformance_EntryWithoutIssueFields(t *testing.T) {
-	// Scenario 66: an entry written before issue creation completes must
-	// conform to quarantine-state.schema.json even without issue_number or
-	// issue_url. The schema uses dependentRequired (not required) for those
-	// fields, so omitting both is valid.
+	// Scenario 66 + Scenario 79: an entry written before issue creation completes must
+	// conform to quarantine-state.schema.json even without issue_number or issue_url.
+	// The schema uses dependentRequired (not required) for those fields, so omitting
+	// both is valid. This aligns with the Go struct's omitempty behavior.
 	if _, err := os.Stat(quarantineSchemaPath(t)); err != nil {
 		t.Fatalf("schema file not found: %v", err)
 	}
