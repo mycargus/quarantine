@@ -290,6 +290,11 @@ export async function ingestArtifact(
         if (entry.status === "quarantined") {
           upsertQuarantinedTest(raw, projectId, owner, repo, entry, result.timestamp)
         } else if (entry.status === "flaky") {
+          // A flaky entry means the test was just detected this run. Ensure the
+          // quarantined_tests row exists before incrementing — for Jest/Vitest the
+          // test was excluded from execution on all prior runs and never appeared
+          // as "quarantined" in any result, so the row may not exist yet.
+          upsertQuarantinedTest(raw, projectId, owner, repo, entry, result.timestamp)
           incrementFlakyCount(raw, projectId, entry.test_id, result.timestamp)
         }
       }
