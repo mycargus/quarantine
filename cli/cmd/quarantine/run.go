@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -349,7 +351,7 @@ func loadQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *config.Co
 	branch := cfg.Storage.Branch
 	content, sha, err := client.GetContents(ctx, "quarantine.json", branch)
 	if err != nil {
-		emitDegradedWarning(cmd, fmt.Sprintf("Unable to reach GitHub API and no cached quarantine state available. Running without quarantine exclusions. (reason: %v)", err))
+		emitDegradedWarning(cmd, degradedMsg(err))
 		return nil, nil, ""
 	}
 
@@ -860,4 +862,41 @@ type exitCodeError int
 
 func (e exitCodeError) Error() string {
 	return fmt.Sprintf("exit code %d", int(e))
+}
+
+// degradedMsg formats a degraded-mode warning message based on the API error type.
+// This is a pure function — no I/O.
+func degradedMsg(err error) string {
+	var apiErr *gh.APIError
+	if errors.As(err, &apiErr) {
+		switch apiErr.StatusCode {
+		case http.StatusUnauthorized:
+			return "GitHub API returned 401 (unauthorized). Check QUARANTINE_GITHUB_TOKEN or GITHUB_TOKEN."
+		case http.StatusForbidden:
+			if apiErr.RequestID != "" {
+				return fmt.Sprintf("GitHub API returned 403 (forbidden). Request ID: %s. Ensure your token has 'repo' scope.", apiErr.RequestID)
+			}
+			return "GitHub API returned 403 (forbidden). Ensure your token has 'repo' scope."
+		case http.StatusTooManyRequests:
+			if apiErr.RetryAfter > 30 {
+				return fmt.Sprintf("GitHub API rate limited (%ds wait exceeds 30s threshold). Running in degraded mode.", apiErr.RetryAfter)
+			}
+			return "GitHub API rate limited. Running in degraded mode."
+		default:
+			if apiErr.StatusCode >= 500 {
+				return fmt.Sprintf("GitHub API server error (%d). Running in degraded mode.", apiErr.StatusCode)
+			}
+		}
+	}
+	if isTimeoutError(err) {
+		return "GitHub API request timed out. Running in degraded mode."
+	}
+	return fmt.Sprintf("Unable to reach GitHub API and no cached quarantine state available. Running without quarantine exclusions. (reason: %v)", err)
+}
+
+// isTimeoutError returns true if the error is a network timeout.
+// This is a pure function — no I/O.
+func isTimeoutError(err error) bool {
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
