@@ -204,14 +204,15 @@ func runRun(cmd *cobra.Command, args []string) error {
 		cmd.PrintErrf("[quarantine] WARNING: %s\n", w)
 	}
 
-	// If no XML found, warn and exit with runner's code.
-	if testResults == nil && exitCode != 0 {
-		cmd.PrintErrf("[quarantine] WARNING: No JUnit XML found at '%s'. Cannot determine test results. Suggest checking --junitxml flag or test runner configuration.\n", cfg.JUnitXML)
-		return exitCodeError(exitCode)
-	}
-
+	// If no XML found, log warning and exit early regardless of runner exit code.
 	if testResults == nil {
-		testResults = []parser.TestResult{}
+		if exitCode != 0 {
+			cmd.PrintErrf("[quarantine] WARNING: No JUnit XML found at '%s'. Cannot determine test results. Suggest checking --junitxml flag or test runner configuration.\n", cfg.JUnitXML)
+			return exitCodeError(exitCode)
+		}
+		// Runner exited 0 but no XML: warn and exit cleanly without quarantine processing.
+		cmd.PrintErrf("[quarantine] WARNING: No JUnit XML found at '%s'. Cannot determine test results.\n", cfg.JUnitXML)
+		return nil
 	}
 
 	// For RSpec, apply post-execution filtering to suppress quarantined failures.
@@ -706,6 +707,12 @@ func mergeParseResults(attempts []parseAttempt) ([]parser.TestResult, []string) 
 
 	if succeeded == 0 && total > 0 {
 		return nil, warnings
+	}
+	// Ensure a non-nil empty slice is returned when at least one file
+	// was successfully parsed (even if it contained 0 test cases), so
+	// callers can distinguish "file found, 0 tests" from "no file found".
+	if allResults == nil && succeeded > 0 {
+		allResults = []parser.TestResult{}
 	}
 	return allResults, warnings
 }

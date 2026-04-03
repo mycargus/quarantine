@@ -197,6 +197,54 @@ github:
 	})
 }
 
+// --- Scenario 94: No JUnit XML produced and test runner exited 0 ---
+
+func TestRunNoXMLProducedExitZero(t *testing.T) {
+	dir := t.TempDir()
+	// Script exits 0 and writes no XML.
+	scriptPath := writeTestScript(t, dir, "", "", 0)
+
+	configPath := writeTempConfig(t, `
+version: 1
+framework: jest
+`)
+
+	server := fakeGitHubAPI(t, true)
+	defer server.Close()
+
+	resultsPath := filepath.Join(dir, "results.json")
+	output, exitErr := executeRunCmd(t, []string{
+		"--config", configPath,
+		"--junitxml", filepath.Join(dir, "junit.xml"),
+		"--output", resultsPath,
+		"--", scriptPath,
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "test runner exits 0 with no JUnit XML produced",
+		Should:   "exit without error (exit code 0)",
+		Actual:   exitErr == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "test runner exits 0 with no JUnit XML produced",
+		Should:   "log a warning about missing XML",
+		Actual:   strings.Contains(output, "WARNING") && strings.Contains(output, "junit.xml"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "test runner exits 0 with no JUnit XML produced",
+		Should:   "not write a results file (no quarantine processing)",
+		Actual:   func() bool { _, err := os.Stat(resultsPath); return err != nil }(),
+		Expected: true,
+	})
+}
+
 // --- 2E: empty XML with non-zero exit code ---
 
 func TestRunEmptyXMLNonZeroExit(t *testing.T) {
