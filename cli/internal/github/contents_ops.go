@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -114,6 +115,15 @@ func (c *Client) GetContents(ctx context.Context, path, ref string) (content []b
 
 	case http.StatusUnauthorized:
 		return nil, "", &APIError{StatusCode: 401, Message: "GitHub token is invalid or expired"}
+
+	case http.StatusForbidden:
+		requestID := resp.Header.Get("X-GitHub-Request-Id")
+		return nil, "", &APIError{StatusCode: 403, Message: "forbidden", RequestID: requestID}
+
+	case http.StatusTooManyRequests:
+		retryAfterStr := resp.Header.Get("Retry-After")
+		n, _ := strconv.Atoi(retryAfterStr)
+		return nil, "", &APIError{StatusCode: 429, Message: "rate limited", RetryAfter: n}
 
 	default:
 		return nil, "", &APIError{

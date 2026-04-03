@@ -169,6 +169,8 @@ func (c *Client) PutContents(ctx context.Context, path, message string, content 
 type APIError struct {
 	StatusCode int
 	Message    string
+	RequestID  string // X-GitHub-Request-Id header (403 cases)
+	RetryAfter int    // Retry-After seconds (429 cases where wait > threshold)
 }
 
 func (e *APIError) Error() string {
@@ -192,6 +194,41 @@ func (c *Client) newRequestWithContext(ctx context.Context, method, path string,
 	return req, nil
 }
 
+// shouldRetryHTTP returns true if the HTTP response status warrants a retry.
+// This is a pure function — no I/O.
+func shouldRetryHTTP(resp *http.Response) bool {
+	if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+		return true
+	}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return true
+	}
+	if resp.StatusCode == http.StatusForbidden && resp.Header.Get("Retry-After") != "" {
+		return true
+	}
+	return false
+}
+
+// retryWaitDuration returns how long to wait before retrying.
+// Returns 0 to signal "do not retry" (Retry-After exceeds 30 seconds).
+// Uses defaultWait for responses with no Retry-After header.
+// This is a pure function — no I/O.
+func retryWaitDuration(resp *http.Response, defaultWait time.Duration) time.Duration {
+	retryAfterStr := resp.Header.Get("Retry-After")
+	if retryAfterStr == "" {
+		return defaultWait
+	}
+	n, err := strconv.Atoi(retryAfterStr)
+	if err != nil || n < 0 {
+		return defaultWait
+	}
+	wait := time.Duration(n) * time.Second
+	if wait > 30*time.Second {
+		return 0 // signal: don't retry — too long
+	}
+	return wait
+}
+
 // doWithRetry executes an HTTP request with retry-once-on-network-error behavior.
 // After a successful response, it checks rate limit headers and fires the warning
 // callback if remaining < 10% of limit.
@@ -205,6 +242,25 @@ func (c *Client) doWithRetry(req *http.Request) (*http.Response, error) {
 			return nil, fmt.Errorf("GitHub API request failed: %w", err)
 		}
 	}
+
+	// Retry once on transient HTTP errors (5xx, 429, 403+Retry-After).
+	if shouldRetryHTTP(resp) {
+		wait := retryWaitDuration(resp, c.retryDelay)
+		if wait > 0 {
+			// Close the retryable response body before retry.
+			_ = resp.Body.Close()
+			time.Sleep(wait)
+			resp2, err2 := c.httpClient.Do(req)
+			if err2 == nil {
+				c.checkRateLimit(resp2)
+				return resp2, nil
+			}
+			// Retry failed: return as network failure.
+			return nil, fmt.Errorf("GitHub API request failed after retry: %w", err2)
+		}
+		// wait == 0: Retry-After exceeds threshold, don't retry — fall through.
+	}
+
 	c.checkRateLimit(resp)
 	return resp, nil
 }
