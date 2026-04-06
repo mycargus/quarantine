@@ -837,6 +837,40 @@ M5 (issues + PR comments) M7 (dashboard analytics)
 (init UX)
 ```
 
+---
+
+## v2 -- GitHub App Integration
+
+v2 adds GitHub App support for org-wide installation, fine-grained permissions,
+higher rate limits, dashboard OAuth login, and automatic repository discovery.
+v2 targets GitHub Actions only.
+
+**Plan:** `docs/plans/github-app.md` -- full requirements, constraints, and test
+strategy.
+
+**Key decisions (ADRs):**
+- ADR-026: CLI uses `actions/create-github-app-token` (no CLI code changes).
+- ADR-027: Webhooks deferred to v3.
+- ADR-028: Dashboard OAuth via remix-auth (no custom implementation).
+
+**v2 scope summary:**
+- Register GitHub App (webhooks disabled).
+- Dashboard: OAuth login via remix-auth + remix-auth-github.
+- Dashboard: Installation token generation (JWT + token exchange in TypeScript).
+- Dashboard: Installation discovery via startup sync + 15-minute background loop.
+- Dashboard: `source: github-app` mode in `dashboard.yml`.
+- Dashboard: `installations` table + `installation_id` on `projects`.
+- CLI: No code changes. External token injection via `actions/create-github-app-token`.
+- Contract tests: App auth endpoints added to `schemas/github-api.json`.
+
+**Deferred to future milestones:**
+- CLI-native App auth (JWT in Go, TokenProvider): triggered by non-GitHub-Actions
+  CI support. See `docs/plans/cli-native-app-auth.md`.
+- Webhooks (real-time unquarantine, instant artifact ingestion): deferred to v3.
+  See `docs/plans/webhooks.md`.
+
+---
+
 ## Cross-References
 
 - `docs/specs/cli-spec.md`: CLI commands, flags, exit codes, output format.

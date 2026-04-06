@@ -45,6 +45,9 @@ sections below for full context on each contract.
 | [Artifact naming](#16-artifact-naming-convention) | Implicit | CI workflow YAML, `github.server.ts` | `quarantine-results-{run_id}` name prefix | CI workflow (`actions/upload-artifact`) | Dashboard (`filterArtifactsByPrefix()`) | Dashboard identifies which artifacts contain quarantine results | Not tested |
 | [CLI exit codes](#17-cli-exit-codes) | Implicit | `run.go` | Integer: 0=pass, 1=failures, 2=infra error | CLI | CI pipeline, scripts, users | CI determines build pass/fail from exit code | Extensively tested (`run_*_test.go`) |
 | [Rate limit headers](#18-rate-limit-headers) | Implicit | `init_ops.go` | `X-RateLimit-Remaining` / `X-RateLimit-Limit` response headers | GitHub API | CLI | Warn before rate limit exhaustion | 9 tests in `ratelimit_test.go` covering: below/above/exact threshold, missing headers, one header missing, limit=0, reset time formatting |
+| [v2+] [App token exchange](#19-app-token-exchange) | Explicit | GitHub API | REST / JSON | Dashboard | GitHub | Dashboard generates installation tokens for artifact polling and installation discovery | JS Prism contract tests (planned: `test/contract/github-app.test.js`) |
+| [v2+] [Installations API](#20-installations-api) | Explicit | GitHub API | REST / JSON | GitHub | Dashboard | Dashboard discovers which repos the App is installed on | JS Prism contract tests (planned: `test/contract/github-app.test.js`) |
+| [v2+] [dashboard.yml source mode](#21-dashboardyml-source-mode) | Explicit | `dashboard.yml` | YAML | User | Dashboard | `source: github-app` mode populates repos from App installations instead of manual list | Dashboard unit tests (planned: `config.server.test.ts`) |
 
 ## Schemas
 
@@ -56,7 +59,7 @@ and consumers — they define the expected shape that both sides agree on.
 | `test-result.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `results.json` | Dashboard runtime (ajv); Go marshal test (planned, ADR-025); negative regression test (planned, ADR-025) | Dashboard validates at runtime; Go marshal validation planned |
 | `quarantine-state.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `quarantine.json` | Negative regression test (planned, ADR-025) | Single-component; `issue_number`/`issue_url` to be made optional (ADR-025) |
 | `quarantine-config.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `quarantine.yml` | Negative regression test (planned, ADR-025) | Documentation artifact; CLI validates via Go code, not schema |
-| `github-api.json` | `schemas/` | OpenAPI 3.x | All GitHub API endpoints used by CLI and dashboard (Contents, Issues, Search, Comments, Refs, Repository, Artifacts) | Prism contract tests (`make contract-test`) | Go: `*_contract_test.go` in `cli/internal/github/`; JS: `test/contract/github-artifacts.test.js` |
+| `github-api.json` | `schemas/` | OpenAPI 3.x | All GitHub API endpoints used by CLI and dashboard (Contents, Issues, Search, Comments, Refs, Repository, Artifacts; [v2+] App installations, installation token exchange, installation repositories) | Prism contract tests (`make contract-test`) | Go: `*_contract_test.go` in `cli/internal/github/`; JS: `test/contract/github-artifacts.test.js`, [v2+] `test/contract/github-app.test.js` |
 
 ## Contract Details
 
@@ -647,6 +650,77 @@ response.
 **Current validation:** 9 tests in `cli/internal/github/ratelimit_test.go`
 covering: below/above/exact threshold, missing headers, one header missing,
 limit=0, reset time formatting.
+
+---
+
+### 19. App token exchange [v2+]
+
+**Why:** The dashboard needs short-lived installation tokens to call GitHub APIs
+(artifact polling, installation discovery) when `source: github-app` is
+configured. The token exchange endpoint is the contract between the dashboard
+and GitHub's App authentication system.
+
+**Where:** `POST /app/installations/{installation_id}/access_tokens` on
+`api.github.com`.
+
+**When:** Dashboard generates a JWT (RS256, `iss` = App client ID), calls the
+endpoint, and caches the returned token until < 5 minutes before expiry. At
+most one exchange per ~55 minutes per installation.
+
+**Parties:**
+- Producer: Dashboard (`installation-token.server.ts`)
+- Consumer: GitHub API
+- Schema: `schemas/github-api.json` (vendored OpenAPI spec)
+
+**Current validation:** Planned. JS Prism contract tests in
+`test/contract/github-app.test.js` will validate 201, 401, and 404 responses.
+See `docs/plans/github-app.md` section 5.3.
+
+---
+
+### 20. Installations API [v2+]
+
+**Why:** The dashboard discovers which repositories the App is installed on by
+querying the installations API. This drives automatic repo discovery when
+`source: github-app` is configured.
+
+**Where:** `GET /app/installations` (JWT auth) lists installations.
+`GET /installation/repositories` (installation token auth) lists repos per
+installation.
+
+**When:** On dashboard startup (blocking) and every 15 minutes via background
+discovery loop.
+
+**Parties:**
+- Producer: GitHub API
+- Consumer: Dashboard (`installation-sync.server.ts`)
+- Schema: `schemas/github-api.json` (vendored OpenAPI spec)
+
+**Current validation:** Planned. JS Prism contract tests in
+`test/contract/github-app.test.js`. Integration tests in
+`dashboard/test/installation-sync.integration.test.ts` verify the sync logic
+against mock HTTP servers with real SQLite.
+
+---
+
+### 21. dashboard.yml source mode [v2+]
+
+**Why:** The `source` field in `dashboard.yml` determines how the dashboard
+discovers repositories: `manual` (explicit repo list) or `github-app`
+(auto-discovery from App installations).
+
+**Where:** `dashboard/dashboard.yml`.
+
+**When:** Dashboard reads the config on startup.
+
+**Parties:**
+- Producer: User (manual editing)
+- Consumer: Dashboard (`config.server.ts`)
+
+**Current validation:** Planned. Dashboard unit tests in
+`dashboard/app/lib/config.server.test.ts` will validate both modes.
+`source: github-app` ignores `repos` array if present. `source: manual`
+requires `repos` array (existing behavior).
 
 ---
 

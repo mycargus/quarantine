@@ -1,6 +1,6 @@
 # ADR-008: API Key Auth (v1), GitHub App + OAuth (v2)
 
-**Status:** Accepted
+**Status:** Accepted (refined by ADR-026, ADR-027, ADR-028)
 **Date:** 2026-03-14
 
 ## Context
