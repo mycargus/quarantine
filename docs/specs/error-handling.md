@@ -362,6 +362,36 @@ uploaded artifact.
 - Log: `Dashboard WARNING: artifact {id} for {repo} failed schema validation: {error}. Skipping.`
 - Do not crash or halt ingestion of other artifacts.
 
+### [v2+] App token exchange failure
+
+**Cause:** Invalid or missing App private key, malformed `QUARANTINE_APP_CLIENT_ID`,
+expired or revoked private key, GitHub API error on
+`POST /app/installations/{id}/access_tokens`, network timeout during token
+exchange.
+
+**Behavior:**
+- **On startup:** If the initial token exchange fails and `source: github-app`
+  is configured, the dashboard logs an error and exits. The operator must fix
+  the credentials before the dashboard can serve App-discovered data.
+  (`source: manual` dashboards are unaffected.)
+- **During background discovery loop:** If token exchange fails mid-operation,
+  log a warning. Artifact polling for that installation's repos pauses (no
+  valid token to call GitHub APIs). The discovery loop continues on its
+  15-minute schedule; on the next cycle, it attempts token exchange again.
+  If the exchange succeeds, artifact polling resumes. Dashboard continues
+  serving cached data from SQLite during the pause.
+- **JWT generation failure** (invalid PEM, wrong key format): This is a local
+  error (no network call). Log at error level with a descriptive message
+  (e.g., "Failed to parse private key: expected PKCS#1 RSAPrivateKey").
+  Same pausing behavior as token exchange failure.
+- **401 from token exchange:** The JWT was generated but GitHub rejected it.
+  Likely cause: client ID mismatch, private key revoked, or App suspended.
+  Log at error level. Do not retry immediately (will fail again). Wait for
+  next discovery loop interval.
+- **404 from token exchange:** Installation ID does not exist or App is not
+  installed on the target account. Log at error level with the installation
+  ID. Mark the installation as `deleted` in SQLite.
+
 ### Dashboard error summary table
 
 | Error | Impact on CI | Dashboard Behavior |
@@ -373,6 +403,9 @@ uploaded artifact.
 | Artifact download failure | None | Skip, retry next cycle |
 | Artifact deleted (404/410) | None | Mark permanently skipped |
 | Malformed artifact JSON | None | Skip permanently, log warning |
+| [v2+] App token exchange failure | None | Pause polling for affected repos, retry on next discovery interval |
+| [v2+] JWT generation failure | None | Pause polling for affected repos, log error |
+| [v2+] Installation not found (404) | None | Mark installation deleted, stop polling |
 
 ---
 

@@ -133,9 +133,9 @@ Dashboard SQLite schema will be defined during M6 implementation.
 
 | Component              | v1                                      | v2+                                     |
 |------------------------|-----------------------------------------|-----------------------------------------|
-| CLI to GitHub          | `QUARANTINE_GITHUB_TOKEN` (preferred) or `GITHUB_TOKEN` (PAT or Actions token). `GITHUB_TOKEN` is limited to 1,000 req/hr/repo; PATs get 5,000/hr. | GitHub App installation token (1-hour expiry; 5,000-12,500 req/hr) |
-| Dashboard to GitHub    | GitHub PAT (stored as env var)          | GitHub App installation token           |
-| Dashboard web UI       | Network-level (internal only)           | GitHub OAuth via remix-auth             |
+| CLI to GitHub          | `QUARANTINE_GITHUB_TOKEN` (preferred) or `GITHUB_TOKEN` (PAT or Actions token). `GITHUB_TOKEN` is limited to 1,000 req/hr/repo; PATs get 5,000/hr. | Unchanged. CLI receives App-generated tokens via `actions/create-github-app-token` as `QUARANTINE_GITHUB_TOKEN`. CLI code is unchanged; the token source differs (ADR-026). CLI-native App auth (JWT in Go) deferred to non-GitHub-Actions CI milestone. |
+| Dashboard to GitHub    | GitHub PAT (stored as env var)          | When `source: github-app`: dashboard generates installation tokens from App private key (JWT + token exchange). When `source: manual`: PAT via env var (unchanged). |
+| Dashboard web UI       | Network-level (internal only)           | GitHub OAuth via remix-auth + remix-auth-github (ADR-028). No custom OAuth implementation. |
 
 **Required GitHub token scopes [v1]:**
 - `repo` (read/write contents for quarantine.json, create issues, post PR comments)
@@ -146,6 +146,10 @@ Dashboard SQLite schema will be defined during M6 implementation.
 - Issues: read/write
 - Pull requests: write (comments, code sync PRs)
 - Actions: read (artifacts)
+
+**[v2+] GitHub App registration:**
+- Webhooks disabled in v2 (ADR-027). Dashboard uses API polling for installation discovery and artifact ingestion.
+- CLI uses `actions/create-github-app-token` for token generation (ADR-026).
 
 ### 6.2 Branch Security
 
@@ -171,12 +175,14 @@ The CLI never hard-depends on anything other than GitHub, and degrades gracefull
 - **Dashboard unreachable:** CLI operates normally. Results upload as artifacts; dashboard ingests on recovery. No data loss.
 - **GitHub API unreachable:** CLI falls back to cached `quarantine.json` from Actions cache. Result upload is skipped (fire-and-forget).
 - **GitHub API rate-limited (429):** Exponential backoff (CLI), circuit breaker (dashboard).
+- **[v2+] App token exchange failure (dashboard):** If JWT generation or `POST /access_tokens` fails, artifact polling for that installation's repos pauses until the next successful token exchange. Installation discovery loop continues on schedule. Dashboard serves cached data. See `docs/specs/error-handling.md` Category 3.
 
 ### 6.5 Secrets Handling
 
 - CLI reads tokens from environment variables only -- never from config files.
 - `quarantine.yml` contains no secrets.
 - Dashboard stores GitHub PAT as an environment variable, never in SQLite.
+- [v2+] Dashboard reads the App private key from `QUARANTINE_PRIVATE_KEY` (env var value) or `QUARANTINE_PRIVATE_KEY_PATH` (file path). Private key is never stored in SQLite, config files, or source code. Generated installation tokens are cached in memory only (not persisted).
 
 ## 7. Roadmap
 
