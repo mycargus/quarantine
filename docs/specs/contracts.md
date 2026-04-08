@@ -48,6 +48,7 @@ sections below for full context on each contract.
 | [v2+] [App token exchange](#19-app-token-exchange) | Explicit | GitHub API | REST / JSON | Dashboard | GitHub | Dashboard generates installation tokens for artifact polling and installation discovery | JS Prism contract tests (planned: `test/contract/github-app.test.js`) |
 | [v2+] [Installations API](#20-installations-api) | Explicit | GitHub API | REST / JSON | GitHub | Dashboard | Dashboard discovers which repos the App is installed on | JS Prism contract tests (planned: `test/contract/github-app.test.js`) |
 | [v2+] [dashboard.yml source mode](#21-dashboardyml-source-mode) | Explicit | `dashboard.yml` | YAML | User | Dashboard | `source: github-app` mode populates repos from App installations instead of manual list | Dashboard unit tests (planned: `config.server.test.ts`) |
+| [v2+] [User installation repos](#22-user-installation-repos) | Explicit | GitHub API | REST / JSON | GitHub | Dashboard | Dashboard filters projects to repos the authenticated user can access within each installation | JS Prism contract tests (planned: `test/contract/github-app.test.js`) |
 
 ## Schemas
 
@@ -673,7 +674,8 @@ most one exchange per ~55 minutes per installation.
 - Schema: `schemas/github-api.json` (vendored OpenAPI spec)
 
 **Current validation:** Planned. JS Prism contract tests in
-`test/contract/github-app.test.js` will validate 201, 401, and 404 responses.
+`test/contract/github-app.test.js` will validate 201, 401, 403, and 404 responses.
+The 403 case covers suspended installations or insufficient permissions.
 See `docs/plans/github-app.md` section 5.3.
 
 ---
@@ -696,10 +698,24 @@ discovery loop.
 - Consumer: Dashboard (`installation-sync.server.ts`)
 - Schema: `schemas/github-api.json` (vendored OpenAPI spec)
 
+**Contract details:**
+- The Installation object has no `status` field. Suspension is conveyed via
+  `suspended_at` (string or null). Null means active; an ISO 8601 timestamp
+  means suspended. `suspended_by` (object or null) identifies who suspended it.
+- Installations that are uninstalled simply stop appearing in the
+  `GET /app/installations` response. The dashboard detects removal by comparing
+  known installation IDs against the API response set and marking absent
+  installations with a `removed_at` timestamp.
+
+**Pagination:** All calls use `per_page=100` and follow `Link` header
+`rel="next"` to fetch all pages. `parseLinkHeader` is a pure function with
+colocated unit tests.
+
 **Current validation:** Planned. JS Prism contract tests in
 `test/contract/github-app.test.js`. Integration tests in
 `dashboard/test/installation-sync.integration.test.ts` verify the sync logic
-against mock HTTP servers with real SQLite.
+(including pagination across multiple pages) against mock HTTP servers with
+real SQLite.
 
 ---
 
@@ -721,6 +737,37 @@ discovers repositories: `manual` (explicit repo list) or `github-app`
 `dashboard/app/lib/config.server.test.ts` will validate both modes.
 `source: github-app` ignores `repos` array if present. `source: manual`
 requires `repos` array (existing behavior).
+
+---
+
+### 22. User installation repos [v2+]
+
+**Why:** The dashboard must filter projects to only those the authenticated user
+can access. `GET /user/installations` returns installation metadata but not
+repository lists. A separate per-installation call is required to get the repos
+a specific user can see.
+
+**Where:** `GET /user/installations/{installation_id}/repositories` on
+`api.github.com`. Uses the user's OAuth access token (`ghu_` prefix), NOT the
+App's installation token.
+
+**When:** On each authenticated page load (or from cache). The dashboard calls
+`GET /user/installations` first, then this endpoint per installation to build
+the user's accessible repo set.
+
+**Parties:**
+- Producer: GitHub API
+- Consumer: Dashboard (`permissions.server.ts`)
+- Schema: `schemas/github-api.json` (vendored OpenAPI spec)
+
+**Pagination:** All calls use `per_page=100` and follow `Link` header
+`rel="next"` to fetch all pages. Reuses `parseLinkHeader` from M12.
+
+**Current validation:** Planned. JS Prism contract test in
+`test/contract/github-app.test.js` will validate the 200 response shape.
+Integration tests in `dashboard/test/user-permissions.integration.test.ts`
+verify the filtering logic (including pagination across multiple pages)
+against mock HTTP servers with real SQLite.
 
 ---
 

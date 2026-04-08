@@ -76,7 +76,7 @@ The v2 CLI requires **no code changes** for GitHub App auth. The standard `actio
 **Recommended CI usage:**
 
 ```yaml
-- uses: actions/create-github-app-token@v1
+- uses: actions/create-github-app-token@v3
   id: app-token
   with:
     app-id: ${{ vars.QUARANTINE_APP_ID }}
@@ -94,13 +94,13 @@ The v2 CLI requires **no code changes** for GitHub App auth. The standard `actio
 
 | ID | Requirement |
 |----|-------------|
-| FR-DASH-1 | GitHub OAuth login uses `remix-auth` with `remix-auth-github` strategy. The library handles OAuth redirect, state parameter, code exchange, and user profile fetching. Verify Remix 3 compatibility before implementation. |
-| FR-DASH-2 | User access tokens (8hr, `ghu_` prefix) stored server-side in SQLite. Refresh tokens (6mo, `ghr_` prefix) used to renew before expiry. Token storage is application code, not handled by remix-auth. |
-| FR-DASH-3 | Session: encrypted httpOnly secure SameSite=Lax cookie for session ID. Token data stored server-side in SQLite, not in the cookie. |
-| FR-DASH-4 | Dashboard uses user's access token to call `GET /user/installations` and filters repos to only those the user can access. |
+| FR-DASH-1 | GitHub OAuth login uses Remix 3's first-party `@remix-run/auth` with `createGitHubAuthProvider` and `@remix-run/auth-middleware` for route protection (ADR-029). The library handles OAuth redirect, PKCE code challenge, code exchange, and user profile fetching. |
+| FR-DASH-2 | Session lifetime matches GitHub access token lifetime (8 hours). No refresh tokens stored or used. User re-authenticates via OAuth after session expiry. |
+| FR-DASH-3 | Session: encrypted httpOnly secure SameSite=Lax cookie with Max-Age=28800 (8hr). Encrypted cookie holds access token and user profile via `createCookieSessionStorage`. No server-side session table. |
+| FR-DASH-4 | Dashboard uses user's access token to call `GET /user/installations` then `GET /user/installations/{id}/repositories` per installation (all paginated, `per_page=100`, following `Link` header `rel="next"`) and filters repos to only those the user can access. |
 | FR-DASH-5 | For server-side GitHub API calls (artifact polling, installation discovery), the dashboard generates installation tokens from the App's private key. Replaces the PAT from `QUARANTINE_GITHUB_TOKEN`. |
 | FR-DASH-6 | `dashboard.yml` gains `source: github-app` mode. Repo list populated from App installations. `source: manual` continues to work with PATs for backward compatibility. When `source: github-app`, the `repos` array is silently ignored if present. The two modes are mutually exclusive. |
-| FR-DASH-7 | Unauthenticated access limited to `/auth/login`, `/auth/github/callback`, `/health`. All other routes return 401. |
+| FR-DASH-7 | Unauthenticated access limited to `/auth/login`, `/auth/github/callback`, `/auth/logout`, `/health`. All other routes return 401. `/auth/logout` is public so that users with expired sessions can still trigger logout without receiving a 401. |
 | FR-DASH-8 | Rate limits per ADR-015: 20 req/min/IP unauthenticated, 300 req/min/user authenticated. |
 | FR-DASH-9 | New routes: `/auth/login`, `/auth/github/callback`, `/auth/logout`, `/health`. |
 
@@ -109,12 +109,14 @@ The v2 CLI requires **no code changes** for GitHub App auth. The standard `actio
 | Env Var | Required | Description |
 |---------|----------|-------------|
 | `QUARANTINE_APP_CLIENT_ID` | Yes | App client ID (e.g., `Iv23li...`). Used as JWT `iss` claim. |
-| `QUARANTINE_APP_CLIENT_SECRET` | Yes | App client secret. Used by remix-auth for OAuth token exchange. |
-| `QUARANTINE_PRIVATE_KEY_PATH` | Yes* | Path to PEM file. |
-| `QUARANTINE_PRIVATE_KEY` | Yes* | PEM contents as env var value. Alternative to path. |
-| `QUARANTINE_INSTALLATION_ID` | Yes | GitHub installation ID (numeric). Identifies which org's installation to generate tokens for. |
+| `QUARANTINE_APP_CLIENT_SECRET` | Yes | App client secret. Used by `@remix-run/auth` for OAuth token exchange. |
+| `QUARANTINE_APP_PRIVATE_KEY_PATH` | Yes* | Path to PEM file. |
+| `QUARANTINE_APP_PRIVATE_KEY` | Yes* | PEM contents as env var value. Alternative to path. |
+| `QUARANTINE_APP_ORIGIN` | Yes | Dashboard origin for constructing OAuth `redirectUri` (e.g., `http://localhost:3000` for dev, `https://dashboard.example.com` for prod). |
 
-\* One of `QUARANTINE_PRIVATE_KEY_PATH` or `QUARANTINE_PRIVATE_KEY` is required.
+\* One of `QUARANTINE_APP_PRIVATE_KEY_PATH` or `QUARANTINE_APP_PRIVATE_KEY` is required.
+
+**Note:** Installation IDs are discovered dynamically via `GET /app/installations` (M12), not configured as env vars.
 
 ### 2.4 Dashboard App Auth (JWT + Installation Tokens)
 
@@ -130,14 +132,14 @@ The v2 CLI requires **no code changes** for GitHub App auth. The standard `actio
 
 | ID | Requirement |
 |----|-------------|
-| FR-INST-1 | SQLite `installations` table: `id` (GitHub installation ID, numeric), `account_login`, `account_type`, `status` (active/suspended/deleted), `repository_selection` (all/selected), `created_at`, `updated_at`. |
+| FR-INST-1 | SQLite `installations` table: `id` (GitHub installation ID, numeric), `account_login`, `account_type`, `suspended_at` (ISO 8601 timestamp or NULL; NULL = active, timestamp = suspended; GitHub API has no `status` field — suspension state is conveyed via `suspended_at`), `repository_selection` (all/selected), `removed_at` (ISO 8601 timestamp or NULL; installations that no longer appear in `GET /app/installations` are marked with a non-NULL `removed_at`), `created_at`, `updated_at`. |
 | FR-INST-2 | Add nullable `installation_id` column to existing `projects` table (FK to `installations.id`). When `source: github-app`, projects have an `installation_id`. When `source: manual`, `installation_id` is NULL. No separate `installation_repos` join table. |
 | FR-INST-3 | When `source: github-app`, artifact polling uses projects discovered from installations instead of manual `repos` list. |
-| FR-INST-4 | **Startup sync:** On startup, dashboard generates a JWT, calls `GET /app/installations` to list installations, then generates an installation token per installation and calls `GET /installation/repositories` to list repos. Upserts into `installations` and `projects` tables. Blocks serving traffic until complete. |
+| FR-INST-4 | **Startup sync:** On startup, dashboard generates a JWT, calls `GET /app/installations` to list installations (paginated, `per_page=100`, following `Link` header `rel="next"`), then generates an installation token per installation and calls `GET /installation/repositories` to list repos (paginated). Upserts into `installations` and `projects` tables. Blocks serving traffic until complete. |
 | FR-INST-5 | **Background discovery loop:** After startup, re-sync installations every 15 minutes via `setInterval`. First tick fires 15 minutes after startup (not immediately, since startup sync already ran). |
 | FR-INST-6 | **Shutdown:** `process.on('SIGTERM', ...)` and `process.on('SIGINT', ...)` clear the interval. |
 | FR-INST-7 | **Error resilience:** `syncInstallations()` catches all errors internally, logs them, never throws. Failed syncs leave existing `projects` table unchanged. The loop continues on next interval. |
-| FR-INST-8 | **Suspended/deleted installations:** API returns installation status. Dashboard updates `installations.status` accordingly. Artifact polling skips repos linked to non-active installations. |
+| FR-INST-8 | **Suspended/removed installations:** The GitHub API conveys suspension via `suspended_at` (null = active, ISO 8601 timestamp = suspended). Dashboard stores this value in `installations.suspended_at`. Installations that no longer appear in `GET /app/installations` are marked with a non-NULL `removed_at` timestamp (deletion is inferred by sync diff, not an API field). Artifact polling skips repos linked to suspended or removed installations. |
 | FR-INST-9 | Use GitHub numeric `id` for installations, repos, and users. Never names or slugs (per GitHub best practices -- names can change). |
 
 ### 2.6 Branch Protection Bypass
@@ -157,10 +159,10 @@ The v2 CLI requires **no code changes** for GitHub App auth. The standard `actio
 
 | ID | Requirement |
 |----|-------------|
-| NFR-SEC-1 | Private key read from file path (`QUARANTINE_PRIVATE_KEY_PATH`) or injected as env var value (`QUARANTINE_PRIVATE_KEY`). Dashboard-only in v2. Never in source code or config files. |
+| NFR-SEC-1 | Private key read from file path (`QUARANTINE_APP_PRIVATE_KEY_PATH`) or injected as env var value (`QUARANTINE_APP_PRIVATE_KEY`). Dashboard-only in v2. Never in source code or config files. |
 | NFR-SEC-2 | JWT: `iat` = now minus 60s (clock skew tolerance), `exp` = max 10 minutes from `iat`, `alg` = RS256, `iss` = App client ID. |
-| NFR-SEC-3 | OAuth handled by remix-auth-github, which manages state parameter (CSRF) and code exchange. Library configuration must enforce HTTPS redirect URIs in production. |
-| NFR-SEC-4 | Session cookies: httpOnly, secure (HTTPS-only), SameSite=Lax. Session data in SQLite, not in cookie. |
+| NFR-SEC-3 | OAuth handled by `@remix-run/auth` with `createGitHubAuthProvider` (ADR-029), which manages PKCE code challenge, state parameter (CSRF), and code exchange. HTTPS redirect URIs enforced in production via `QUARANTINE_APP_ORIGIN`. |
+| NFR-SEC-4 | Session cookies: httpOnly, secure (HTTPS-only), SameSite=Lax, Max-Age=28800. Encrypted cookie holds access token and user profile. No server-side session table. |
 | NFR-SEC-5 | Auth events logged with timestamps and user IDs. Token values never logged. |
 
 ### 3.2 Performance
@@ -170,7 +172,7 @@ The v2 CLI requires **no code changes** for GitHub App auth. The standard `actio
 | NFR-PERF-1 | Installation tokens cached, refreshed only when < 5 min remaining. Max one `POST /access_tokens` per ~55 min per installation. |
 | NFR-PERF-2 | JWT generation: < 1ms overhead (pure CPU, RSA signing, no I/O). |
 | NFR-PERF-3 | Rate limit budget monitored via `X-RateLimit-Remaining`. Warning logged at < 20% remaining. |
-| NFR-PERF-4 | Installation discovery: ~2 API calls per poll cycle (single org). Negligible rate limit impact at 15-min intervals (~8 calls/hr). |
+| NFR-PERF-4 | Installation discovery: ~2+ API calls per poll cycle (varies with installation/repo count due to pagination at `per_page=100`). At 15-min intervals, negligible rate limit impact for typical orgs (< 500 repos). |
 | NFR-PERF-5 | On-demand artifact pull debouncing (per ADR-015): max 1 pull per repo per 5 minutes regardless of user page loads. Existing v1 behavior, unchanged by App auth. |
 
 ### 3.3 Reliability
@@ -201,12 +203,12 @@ The v2 CLI requires **no code changes** for GitHub App auth. The standard `actio
 |-----------|--------|
 | JWT `exp` max 10 min from `iat` | JWTs regenerated per token request (or cached ~9 min). |
 | Installation token expiry: 1 hour | Token provider must track expiry and refresh proactively. |
-| User access token expiry: 8 hours | Dashboard sessions need refresh logic using 6-month refresh token. |
+| User access token expiry: 8 hours | Session cookie expires at 8 hours — no refresh tokens, user re-authenticates via OAuth. |
 | Max 25 private keys per App | Supports rotation with headroom. Keys don't expire (manual revocation). |
 | Installation token rate limits: 5,000 base, max 12,500 req/hr | Scales +50/hr per repo beyond 20 and +50/hr per user beyond 20. |
 | Secondary rate limits: 100 concurrent, 900 pts/min | Dashboard must stagger API calls. |
 | Content creation: 80/min, 500/hr | Limits state writes. Not a concern at expected volume. |
-| OAuth token exchange on github.com, not api.github.com | Different base URL for OAuth vs REST API. Handled by remix-auth-github. |
+| OAuth token exchange on github.com, not api.github.com | Different base URL for OAuth vs REST API. Handled by `@remix-run/auth` GitHub provider. |
 | Branch protection bypass is repo-admin configured | App cannot self-grant bypass. Requires user documentation. |
 
 ### 4.2 Architecture Constraints (from ADRs)
@@ -221,7 +223,7 @@ The v2 CLI requires **no code changes** for GitHub App auth. The standard `actio
 | Functional Core / Imperative Shell | Test strategy |
 | No mocks in unit tests | Test strategy |
 | v2 CLI unchanged -- external token injection only | This plan |
-| OAuth via remix-auth -- no custom OAuth implementation | This plan |
+| OAuth via `@remix-run/auth` -- no custom OAuth implementation (ADR-029) | This plan |
 
 ### 4.3 Scope Exclusions
 
@@ -273,13 +275,13 @@ Pure functions, no I/O, no mocks.
 Full component flows with mock HTTP servers. Real SQLite.
 
 **Dashboard OAuth Flow** (`dashboard/test/oauth-flow.integration.test.ts`)
-- Verify remix-auth-github strategy is configured with correct client ID and callback URL
+- Verify `@remix-run/auth` GitHub provider is configured with correct client ID and callback URL
 - Authenticated `GET /` -> 200
 - Unauthenticated `GET /` -> 401
 - `GET /auth/login` -> redirects to GitHub OAuth URL
 - `GET /auth/logout` -> clears session, redirects to login
 - `GET /health` -> 200 (unauthenticated, always accessible)
-- Note: full OAuth code exchange is tested by remix-auth-github library. Dashboard integration tests verify route protection and session behavior.
+- Note: full OAuth code exchange is tested by `@remix-run/auth` library. Dashboard integration tests verify route protection and session behavior.
 
 **Dashboard User Permission Filtering** (`dashboard/test/user-permissions.integration.test.ts`)
 - Mock GitHub API serves `GET /user/installations` returning 2 installations (3 repos total)
@@ -299,8 +301,8 @@ Full component flows with mock HTTP servers. Real SQLite.
 - Idempotency: run sync twice with same mock response. Row counts unchanged, `updated_at` timestamps refreshed.
 - Repo added: first sync returns 2 repos, second sync returns 3 repos. Third project row appears.
 - Repo removed: first sync returns 3 repos, second sync returns 2 repos. Removed project's `installation_id` set to NULL. Historical data (`test_runs`, `quarantined_tests`) preserved.
-- Installation suspended: mock returns installation with `suspended` status. Installation row updated, artifact polling skipped for those repos.
-- Installation deleted: mock returns empty installations list. Installation rows marked deleted.
+- Installation suspended: mock returns installation with non-null `suspended_at` timestamp. `installations.suspended_at` column updated, artifact polling skipped for those repos.
+- Installation removed: mock returns empty installations list (previously known installations are absent). Installation rows marked with non-null `removed_at` timestamp. Historical data preserved.
 - API error during sync: mock returns 500. Sync logs warning, does not throw, existing `projects` table unchanged.
 - JWT auth failure: mock returns 401 on token exchange. Sync logs warning, skips that installation.
 
@@ -318,7 +320,7 @@ Full component flows with mock HTTP servers. Real SQLite.
 Prism-based, offline, no credentials.
 
 **New endpoints to add to `schemas/github-api.json`:**
-- `POST /app/installations/{installation_id}/access_tokens` (201, 401, 404)
+- `POST /app/installations/{installation_id}/access_tokens` (201, 401, 403, 404)
 - `GET /app/installations` (200)
 - `GET /installation/repositories` (200)
 
@@ -326,13 +328,14 @@ Extract these from the official GitHub OpenAPI spec at `github/rest-api-descript
 
 **JS Contract Tests** (`test/contract/github-app.test.js`)
 - `POST /app/installations/{id}/access_tokens` -> 201 with `token`, `expires_at`, `permissions`
-- Same with `Prefer: code=404` -> 404 (installation not found)
 - Same with `Prefer: code=401` -> 401 (bad JWT)
+- Same with `Prefer: code=403` -> 403 (App suspended or insufficient permissions)
+- Same with `Prefer: code=404` -> 404 (installation not found)
 - `GET /app/installations` -> 200 with array of installation objects
 - `GET /installation/repositories` -> 200 with repository list
 - Uses existing Prism test patterns from `test/contract/github-artifacts.test.js`
 
-**OAuth token exchange is NOT contract-tested**: The endpoint (`github.com/login/oauth/access_token`) is on `github.com`, not `api.github.com`. Prism can't serve it from the REST API spec. Covered by remix-auth-github library tests and dashboard integration tests.
+**OAuth token exchange is NOT contract-tested**: The endpoint (`github.com/login/oauth/access_token`) is on `github.com`, not `api.github.com`. Prism can't serve it from the REST API spec. Covered by `@remix-run/auth` library tests and dashboard integration tests.
 
 **One-time setup:**
 - Add 3 new endpoint definitions to `schemas/github-api.json` from official GitHub OpenAPI spec
@@ -342,49 +345,68 @@ Extract these from the official GitHub OpenAPI spec at `github/rest-api-descript
 
 Real GitHub API, real App.
 
-**Test fixture:** New repo `mycargus/quarantine-gh-app-test-fixture`.
+**Test fixtures:**
+- `mycargus/quarantine-test-fixture` — existing PAT-based E2E tests (unchanged, `e2e` CI job)
+- `mycargus/quarantine-app-test-fixture` — App-based E2E tests (new, `e2e-app` CI job)
 
-**E2E Test Scenarios** (`test/e2e/github-app-dashboard.test.js`)
+**App E2E Test Scenarios** (`test/e2e/github-app-dashboard.test.js`, runs in `e2e-app` job)
 - **Real installation token exchange:** Dashboard generates JWT from dev App credentials, calls `POST /app/installations/{id}/access_tokens`, receives valid token. Verify token works for `GET /repos/{owner}/{repo}`.
-- **Real installation discovery:** Dashboard calls `GET /app/installations` and `GET /installation/{id}/repositories` with real credentials. Verify fixture repo appears in results.
+- **Real installation discovery:** Dashboard calls `GET /app/installations` and `GET /installation/{id}/repositories` with real credentials. Verify fixture repo (`quarantine-app-test-fixture`) appears in results.
 - **Real artifact polling with App token:** Dashboard uses installation token to list and download artifacts from fixture repo. Verify same behavior as existing PAT-based E2E tests.
-- **OAuth E2E:** Skip in CI (requires browser interaction with GitHub consent page). Test manually during development. Integration tests cover the route protection and session behavior.
 
-**CLI E2E:** Existing CLI E2E tests are unchanged. They use `QUARANTINE_GITHUB_TOKEN` (a PAT). Optionally, the CI workflow can add a parallel job that runs CLI E2E tests with a token from `actions/create-github-app-token` to verify App tokens work end-to-end. This tests GitHub's action, not our code, but provides confidence.
+**CLI E2E with App token** (runs in `e2e-app` job)
+- Existing CLI E2E test suite runs against `mycargus/quarantine-app-test-fixture` with `QUARANTINE_GITHUB_TOKEN` set to a token generated by `actions/create-github-app-token`. Validates the recommended CI integration path (ADR-026) end-to-end.
+
+**Browser E2E — OAuth login** (`test/e2e-browser/dashboard-oauth.test.ts`, runs in `e2e-app` job)
+- Playwright navigates to `/auth/login`, completes GitHub OAuth with a dedicated test account (App pre-authorized, TOTP 2FA), and verifies session cookie + authenticated page load + logout. Uses `@playwright/test`.
+
+**Existing CLI E2E:** Unchanged. PAT-based tests continue running in the existing `e2e` CI job against `mycargus/quarantine-test-fixture`.
 
 **One-time setup steps:**
 
 1. **Register dev GitHub App** (under `mycargus` account):
    - Permissions: `contents:read+write`, `issues:read+write`, `pull_requests:write`, `actions:read`
    - Webhooks: **disabled** (uncheck "Active")
+   - Token expiration: **enabled** (Settings > Optional features > User-to-server token expiration — required for 8-hour session alignment)
    - Generate private key, download PEM file
    - Note the App ID, Client ID, Client Secret
 
-2. **Create test fixture repo:**
-   ```bash
-   gh repo create mycargus/quarantine-gh-app-test-fixture --public --add-readme
-   ```
+2. **Create and configure `mycargus/quarantine-app-test-fixture`:**
+   - Create the repo under `mycargus`
+   - Set up `quarantine.yml`, `quarantine/state` branch with empty `quarantine.json`
+   - Add GitHub Actions workflows that upload `quarantine-results-{run_id}` artifacts (matching the existing fixture pattern)
+   - Verify artifacts are uploaded and accessible
 
 3. **Install dev App on fixture repo:**
    - Go to the dev App's installation page
-   - Install on `mycargus` account, select only `quarantine-gh-app-test-fixture`
-   - Note the installation ID (from URL or API: `GET /repos/mycargus/quarantine-gh-app-test-fixture/installation`)
+   - Install on `mycargus` account, select `quarantine-app-test-fixture`
+   - Note the installation ID (from URL or API: `GET /repos/mycargus/quarantine-app-test-fixture/installation`)
 
-4. **Configure CI secrets** (on the quarantine repo, Settings > Secrets and variables > Actions):
+4. **Create dedicated GitHub test account for Playwright OAuth E2E:**
+   - Create a GitHub account (e.g., `quarantine-test-bot`)
+   - Enable TOTP 2FA and note the TOTP secret
+   - Authorize the dev App on this account (visit the App's authorization URL, click Authorize)
+   - Grant the test account read access to `quarantine-app-test-fixture`
+
+5. **Configure CI secrets** (on the quarantine repo, Settings > Secrets and variables > Actions):
 
    | Type | Name | Value |
    |------|------|-------|
    | Secret | `QUARANTINE_APP_PRIVATE_KEY` | PEM file contents |
    | Secret | `QUARANTINE_APP_CLIENT_SECRET` | Dev App's client secret |
+   | Secret | `QUARANTINE_E2E_GITHUB_USERNAME` | Test account username |
+   | Secret | `QUARANTINE_E2E_GITHUB_PASSWORD` | Test account password |
+   | Secret | `QUARANTINE_E2E_GITHUB_TOTP_SECRET` | Test account TOTP secret (base32) |
    | Variable | `QUARANTINE_APP_ID` | Dev App's numeric App ID (for `actions/create-github-app-token`) |
    | Variable | `QUARANTINE_APP_CLIENT_ID` | Dev App's client ID (for dashboard JWT `iss`) |
    | Variable | `QUARANTINE_APP_INSTALLATION_ID` | Installation ID on fixture |
+   | Variable | `QUARANTINE_APP_ORIGIN` | `http://localhost:3000` (for E2E dashboard tests) |
    | Variable | `QUARANTINE_GH_APP_TEST_OWNER` | `mycargus` |
-   | Variable | `QUARANTINE_GH_APP_TEST_REPO` | `quarantine-gh-app-test-fixture` |
+   | Variable | `QUARANTINE_GH_APP_TEST_REPO` | `quarantine-app-test-fixture` |
 
-5. **CI workflow:** Add E2E job (or extend existing) in `.github/workflows/ci.yml` that passes App credentials as env vars. Uses `CI` environment for secret access. Tests skip silently if env vars missing (safe for forks/external PRs).
+6. **CI workflow:** Add a separate `e2e-app` job in `.github/workflows/ci.yml` with its own concurrency group (`e2e-app-quarantine-app-test-fixture`). Passes App credentials and test account credentials as env vars. Installs Playwright browsers. Uses `CI` environment for secret access. Gates execution to trusted branches only. The existing `e2e` job is unchanged.
 
-6. **Production App:** Registered separately when feature ships. Own private key, credentials. Never shares credentials with dev App.
+7. **Production App:** Registered separately when feature ships. Own private key, credentials. Never shares credentials with dev App.
 
 ---
 
@@ -406,10 +428,19 @@ These are the critical files where changes will land. **No CLI files are modifie
 
 | File | Purpose |
 |------|---------|
+| `dashboard/app/lib/github-client.server.ts` | GitHub HTTP client wrapper: rate limit monitoring, `parseLinkHeader` pagination helper, `fetchAllPages` utility |
 | `dashboard/app/lib/jwt.server.ts` | Pure function: `generateJWT(clientID, privateKeyPEM, now)` |
 | `dashboard/app/lib/installation-token.server.ts` | `InstallationTokenProvider`: JWT exchange, caching, refresh |
 | `dashboard/app/lib/installation-sync.server.ts` | `syncInstallations()`: discovery via `GET /app/installations` + repos |
-| `dashboard/app/lib/auth.server.ts` | remix-auth configuration, GitHub strategy, session storage |
+| `dashboard/app/lib/auth.server.ts` | `@remix-run/auth` configuration, GitHub provider, cookie session + SQLite token management |
+| `dashboard/app/lib/permissions.server.ts` | `filterProjectsByUserAccess()`: pure function for user permission filtering |
+
+**New repo-root files:**
+
+| File | Purpose |
+|------|---------|
+| `test/e2e-browser/dashboard-oauth.test.ts` | Playwright browser E2E: OAuth login flow against real GitHub |
+| `test/e2e-browser/playwright.config.ts` | Playwright configuration for browser E2E tests |
 
 ---
 
@@ -417,4 +448,4 @@ These are the critical files where changes will land. **No CLI files are modifie
 
 1. **App name availability:** Need to check if "quarantine" is available as a GitHub App name (globally unique, max 34 chars). Alternatives: "quarantine-ci", "quarantine-app", "quarantine-flaky".
 2. **Private key in CI:** GitHub Actions secrets have a 48KB size limit. RSA private keys (2048-bit) are ~1.7KB, well within limits. But the multiline PEM format may need encoding (base64 the whole file, decode at runtime in the dashboard).
-3. **remix-auth Remix 3 compatibility:** Verify that `remix-auth` and `remix-auth-github` are compatible with Remix 3 (the dashboard's framework version) before implementation. If incompatible, evaluate alternatives or contribute compatibility patches.
+3. ~~**remix-auth Remix 3 compatibility:**~~ **Resolved by ADR-029.** Community `remix-auth` v4 is incompatible with Remix 3. Remix 3 shipped first-party `@remix-run/auth` v0.1.0 (2026-03-25) with `createGitHubAuthProvider`. ADR-029 adopts the first-party packages.
