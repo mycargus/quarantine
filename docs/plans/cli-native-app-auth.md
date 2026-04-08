@@ -17,9 +17,9 @@ v2 CLI auth uses `actions/create-github-app-token` (ADR-026). This works because
 | Env Var | Description |
 |---------|-------------|
 | `QUARANTINE_APP_CLIENT_ID` | App client ID (JWT `iss` claim) |
-| `QUARANTINE_PRIVATE_KEY` | PEM contents (alternative to path) |
-| `QUARANTINE_PRIVATE_KEY_PATH` | Path to PEM file |
-| `QUARANTINE_INSTALLATION_ID` | GitHub installation ID (numeric) |
+| `QUARANTINE_APP_PRIVATE_KEY` | PEM contents (alternative to path) |
+| `QUARANTINE_APP_PRIVATE_KEY_PATH` | Path to PEM file |
+| `QUARANTINE_APP_INSTALLATION_ID` | GitHub installation ID (numeric). Required for CLI-native auth since the CLI targets a single repo/installation, unlike the dashboard which discovers installations dynamically. |
 
 **Token resolution order (updated):**
 

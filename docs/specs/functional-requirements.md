@@ -109,6 +109,61 @@ creates GitHub issues, and provides a dashboard for visibility.
 | FR-1.11.5 | GitHub OAuth for dashboard login via remix-auth. | [v2+] |
 | FR-1.11.6 | Org-level integration: install once, all repos covered. | [v2+] |
 
+## 1.13 GitHub App Registration
+
+| ID | Requirement | Version |
+|----|-------------|---------|
+| FR-1.13.1 | Register the GitHub App with permissions: `contents:read+write`, `issues:read+write`, `pull_requests:write`, `actions:read`. | [v2] |
+| FR-1.13.2 | Register the App with webhooks disabled. No webhook URL, no webhook secret. Webhooks deferred to v3 (ADR-027). | [v2] |
+| FR-1.13.3 | Register an OAuth callback URL for dashboard login (e.g., `https://<dashboard-host>/auth/github/callback`). | [v2] |
+| FR-1.13.4 | Store the App's private key (PEM, PKCS#1 RSAPrivateKey) in a secrets manager or CI secret. Never in source code, config files, or `quarantine.yml`. | [v2] |
+| FR-1.13.5 | Register a separate dev App for development and testing with its own credentials and private key. | [v2] |
+
+## 1.14 Dashboard App Auth (JWT + Installation Tokens)
+
+| ID | Requirement | Version |
+|----|-------------|---------|
+| FR-1.14.1 | JWT generation is a pure function: `generateJWT(clientID, privateKeyPEM, now)`. Produces RS256 JWT with `iss` = client ID, `iat` = now-60s, `exp` = now+9min. | [v2] |
+| FR-1.14.2 | Installation token exchange: `POST /app/installations/{id}/access_tokens` with JWT in `Authorization: Bearer` header. Returns token with `expires_at`. | [v2] |
+| FR-1.14.3 | Installation token requests omit the `permissions` body parameter, inheriting the App's configured permissions. | [v2] |
+| FR-1.14.4 | `InstallationTokenProvider` caches the installation token and refreshes when < 5 minutes remain before expiry. At most one token exchange per ~55 minutes per installation. | [v2] |
+| FR-1.14.5 | If installation token exchange fails, dashboard logs a warning. Artifact polling for that installation's repos pauses until the next successful token exchange. Dashboard continues serving cached data. | [v2] |
+
+## 1.15 Dashboard OAuth
+
+| ID | Requirement | Version |
+|----|-------------|---------|
+| FR-1.15.1 | GitHub OAuth login uses Remix 3's first-party `@remix-run/auth` with `createGitHubAuthProvider` and `@remix-run/auth-middleware` for route protection (ADR-029). Application owns SQLite session storage and token refresh. | [v2] |
+| FR-1.15.2 | Session lifetime matches GitHub access token lifetime (8 hours). No refresh tokens are stored or used. When the session cookie expires, the user re-authenticates via OAuth. This eliminates refresh token rotation complexity. | [v2] |
+| FR-1.15.3 | Session: encrypted `httpOnly` `secure` `SameSite=Lax` cookie with `Max-Age: 28800` (8 hours). The encrypted cookie holds the access token and user profile via `createCookieSessionStorage`. No server-side session table. | [v2] |
+| FR-1.15.4 | Dashboard uses user's access token to call `GET /user/installations`, then `GET /user/installations/{id}/repositories` per installation (all paginated calls use `per_page=100` and follow `Link` header `rel="next"` to fetch all pages), and filters projects to only repos the user can access. | [v2] |
+| FR-1.15.5 | For server-side GitHub API calls (artifact polling, installation discovery), the dashboard generates installation tokens from the App's private key. Replaces the PAT from `QUARANTINE_GITHUB_TOKEN`. | [v2] |
+| FR-1.15.6 | `dashboard.yml` gains `source: github-app` mode. Repo list populated from App installations. `source: manual` continues to work for backward compatibility. When `source: github-app`, the `repos` array is silently ignored if present. | [v2] |
+| FR-1.15.7 | Unauthenticated access limited to `/auth/login`, `/auth/github/callback`, `/auth/logout`, `/health`. All other routes return 401. `/auth/logout` is public so that users with expired sessions can still trigger logout without receiving a 401. | [v2] |
+| FR-1.15.8 | New routes: `/auth/login`, `/auth/github/callback`, `/auth/logout`, `/health`. | [v2] |
+
+## 1.16 Installation Discovery
+
+| ID | Requirement | Version |
+|----|-------------|---------|
+| FR-1.16.1 | SQLite `installations` table: `id` (GitHub installation ID, numeric), `account_login`, `account_type`, `suspended_at` (ISO 8601 timestamp or NULL; NULL = active, timestamp = suspended; GitHub API has no `status` field — suspension state is conveyed via `suspended_at`), `repository_selection` (all/selected), `created_at`, `updated_at`. Installations that no longer appear in `GET /app/installations` are marked with a non-NULL `removed_at` timestamp (deletion is inferred by sync diff, not an API field). | [v2] |
+| FR-1.16.2 | Add nullable `installation_id` column to existing `projects` table (FK to `installations.id`). When `source: github-app`, projects have an `installation_id`. When `source: manual`, `installation_id` is NULL. | [v2] |
+| FR-1.16.3 | When `source: github-app`, artifact polling uses projects discovered from installations instead of manual `repos` list. | [v2] |
+| FR-1.16.4 | Startup sync: on startup, dashboard calls `GET /app/installations` then `GET /installation/repositories` per installation (all paginated calls use `per_page=100` and follow `Link` header `rel="next"` to fetch all pages), upserts into tables, blocks serving traffic until complete. | [v2] |
+| FR-1.16.5 | Background discovery loop: re-sync installations every 15 minutes via `setInterval`. First tick fires 15 minutes after startup (not immediately). Each sync paginates all API calls. | [v2] |
+| FR-1.16.6 | Shutdown: `process.on('SIGTERM')` and `process.on('SIGINT')` clear the interval. | [v2] |
+| FR-1.16.7 | Error resilience: `syncInstallations()` catches all errors internally, logs them, never throws. Failed syncs leave existing `projects` table unchanged. | [v2] |
+| FR-1.16.8 | Suspended installations: dashboard reads `suspended_at` from the GitHub API response (`null` = active, ISO 8601 timestamp = suspended) and stores it in the `installations.suspended_at` column. Installations that no longer appear in `GET /app/installations` are marked with a non-NULL `removed_at` timestamp. Artifact polling skips repos linked to suspended or removed installations. | [v2] |
+| FR-1.16.9 | Use GitHub numeric `id` for installations, repos, and users. Never names or slugs. | [v2] |
+| FR-1.16.10 | Repo removed from installation: project's `installation_id` set to NULL. Historical data (`test_runs`, `quarantined_tests`) preserved. | [v2] |
+
+## 1.17 Branch Protection Bypass
+
+| ID | Requirement | Version |
+|----|-------------|---------|
+| FR-1.17.1 | Branch protection bypass is a repo-admin action, not an App capability. The App's `contents:write` makes it eligible, but a repo admin must add it to the repository ruleset bypass list. | [v2] |
+| FR-1.17.2 | Documentation instructs admins on adding the App to their ruleset bypass list. | [v2] |
+
 ## 1.12 Notifications
 
 | ID | Requirement | Version |

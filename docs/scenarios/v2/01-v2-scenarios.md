@@ -30,9 +30,9 @@ This document contains v2+ user scenarios. For v1 scenarios, see [`docs/scenario
 
 **Risk:** Each repository requires manual PAT setup, making org-wide adoption impractical at scale.
 
-**Given** an organization admin navigates to the Quarantine GitHub App installation page
-**When** the admin installs the GitHub App on the organization, granting access to all repositories (or a selected subset)
-**Then** the GitHub App sends an `installation` webhook event to the dashboard, the dashboard auto-discovers all accessible repositories, begins polling them for CI artifacts, and displays the newly discovered repositories on the org overview page within the next polling cycle
+**Given** an organization admin has installed the Quarantine GitHub App on the organization granting access to all repositories (or a selected subset), and the dashboard is configured with `source: github-app` in `dashboard.yml`
+**When** the dashboard starts up (or the next 15-minute discovery poll fires)
+**Then** the dashboard generates a JWT from the App's private key, calls `GET /app/installations` to list installations, generates an installation token per installation, calls `GET /installation/repositories` to list repos, upserts discovered repos into the `installations` and `projects` tables, begins polling them for CI artifacts, and displays the newly discovered repositories on the org overview page
 
 ---
 

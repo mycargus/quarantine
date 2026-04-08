@@ -45,6 +45,15 @@ Phase 3 -- Integration and polish (sequential)
 
 Phase 4 -- Init UX improvements (depends on M5, parallel with M6-M8)
   M9: Init UX improvements
+
+Phase 5 -- GitHub App Integration (v2, depends on M5-M8 being complete)
+  Prerequisite: register dev GitHub App (M14 one-time setup step 1)
+  Sequential:
+    M10: Dashboard App auth foundation (JWT + InstallationTokenProvider + rate limit monitoring + contract tests)
+    M11: Dashboard OAuth login (@remix-run/auth, sessions, route protection, rate limiting) (ADR-029) (depends on M10)
+    M12: Installation discovery (depends on M11)
+    M13: github-app mode integration + user permission filtering (depends on M12)
+    M14: E2E integration + CI (depends on M13)
 ```
 
 ---
@@ -835,6 +844,21 @@ M5 (issues + PR comments) M7 (dashboard analytics)
   v           v
   M9        M8 (polish + hardening)
 (init UX)
+
+--- v2 begins after v1 is complete ---
+
+M10 (App auth foundation)    M11 (OAuth login)
+  |                            |
+  +----------------------------+
+               |
+               v
+  M12 (installation discovery)
+               |
+               v
+  M13 (github-app mode integration)
+               |
+               v
+  M14 (E2E integration + CI)
 ```
 
 ---
@@ -851,11 +875,12 @@ strategy.
 **Key decisions (ADRs):**
 - ADR-026: CLI uses `actions/create-github-app-token` (no CLI code changes).
 - ADR-027: Webhooks deferred to v3.
-- ADR-028: Dashboard OAuth via remix-auth (no custom implementation).
+- ADR-028: Dashboard OAuth via remix-auth (superseded by ADR-029).
+- ADR-029: Dashboard OAuth via first-party `@remix-run/auth` (no custom implementation).
 
 **v2 scope summary:**
 - Register GitHub App (webhooks disabled).
-- Dashboard: OAuth login via remix-auth + remix-auth-github.
+- Dashboard: OAuth login via `@remix-run/auth` with `createGitHubAuthProvider` (ADR-029).
 - Dashboard: Installation token generation (JWT + token exchange in TypeScript).
 - Dashboard: Installation discovery via startup sync + 15-minute background loop.
 - Dashboard: `source: github-app` mode in `dashboard.yml`.

@@ -75,9 +75,15 @@ Exercise full component flows end-to-end within the component boundary. A mock H
 
 ### E2E Tests
 
-Exercise the full system — compiled binary + real GitHub API — against a dedicated test repository. Written in JavaScript (Vitest + [`riteway`](https://github.com/paralleldrive/riteway) assertions) and located in `test/e2e/` at the repository root. These catch issues that mocks cannot: API behavior changes, response format drift, auth edge cases, and real-world integration bugs.
+Exercise the full system — compiled binary + real GitHub API — against dedicated test repositories. API-level E2E tests are written in JavaScript (Vitest + [`riteway`](https://github.com/paralleldrive/riteway) assertions) and located in `test/e2e/` at the repository root. Browser-level E2E tests use Playwright (`@playwright/test`) for OAuth flows that require real browser interaction and are located in `test/e2e-browser/`. These catch issues that mocks cannot: API behavior changes, response format drift, auth edge cases, and real-world integration bugs.
 
-Run on the main branch and on PRs from within the repository (not forks, which cannot access secrets). See `test/e2e/README.md` for setup instructions.
+**Test fixtures:**
+- `mycargus/quarantine-test-fixture` — PAT-based CLI and dashboard E2E tests (existing `e2e` CI job)
+- `mycargus/quarantine-app-test-fixture` — App-based E2E tests: token exchange, installation discovery, artifact polling with App tokens, CLI with App tokens (separate `e2e-app` CI job)
+
+**Browser E2E (Playwright):** OAuth login flow tested with a dedicated GitHub test account (App pre-authorized, TOTP 2FA). Runs as part of the `e2e-app` CI job. See `test/e2e-browser/README.md` for setup instructions.
+
+Run on the main branch and on PRs from within the repository (not forks, which cannot access secrets). See `test/e2e/README.md` for API-level setup instructions.
 
 ### Contract Tests
 

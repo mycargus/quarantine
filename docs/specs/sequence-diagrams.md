@@ -1,8 +1,8 @@
 # Sequence Diagrams for Key Flows
 
-> Last updated: 2026-03-17
+> Last updated: 2026-04-07
 >
-> Mermaid sequence diagrams for the 8 key flows.
+> Mermaid sequence diagrams for the 12 key flows (8 v1, 4 v2).
 > Each diagram is self-contained and renderable in GitHub.
 
 ---
@@ -468,6 +468,222 @@ sequenceDiagram
 
 ---
 
+## 9. Dashboard: JWT → Installation Token Exchange (v2)
+
+The dashboard generates a JWT from the App's private key, exchanges it for
+a short-lived installation token, and uses that token for GitHub API calls.
+The `InstallationTokenProvider` caches the token and refreshes proactively.
+
+```mermaid
+sequenceDiagram
+    participant Caller as Dashboard (polling / sync)
+    participant TP as InstallationTokenProvider
+    participant JWT as generateJWT()
+    participant API as GitHub API
+
+    Caller->>TP: getToken(installationId)
+
+    alt Cached token valid (>5 min remaining)
+        TP-->>Caller: cached installation token
+    else No token or <5 min remaining
+        TP->>JWT: generateJWT(clientID, privateKeyPEM, now)
+        Note over JWT: Pure function: RS256 JWT<br>iss=clientID, iat=now-60s, exp=now+9min
+        JWT-->>TP: signed JWT
+
+        TP->>API: POST /app/installations/{id}/access_tokens<br>Authorization: Bearer {jwt}<br>(no permissions body)
+        alt 201 Created
+            API-->>TP: { token, expires_at, permissions }
+            Note over TP: Cache token + expires_at
+            TP-->>Caller: new installation token
+        else 401 Unauthorized (bad JWT)
+            API-->>TP: 401
+            Note over TP: Log warning: JWT rejected
+            TP-->>Caller: error (do not throw)
+        else Network error / 5xx
+            API-->>TP: error
+            Note over TP: Log warning: exchange failed
+            TP-->>Caller: error (do not throw)
+        end
+    end
+
+    Caller->>API: GET /repos/{owner}/{repo}/actions/artifacts<br>Authorization: Bearer {installation_token}
+    API-->>Caller: artifact list
+```
+
+---
+
+## 10. Dashboard: Startup Sync + Discovery Loop (v2)
+
+On startup, the dashboard blocks HTTP traffic until installation discovery
+completes. After startup, a 15-minute interval re-syncs periodically.
+SIGTERM/SIGINT stops the loop cleanly.
+
+```mermaid
+sequenceDiagram
+    participant Proc as Dashboard Process
+    participant Sync as syncInstallations()
+    participant TP as InstallationTokenProvider
+    participant API as GitHub API
+    participant DB as SQLite
+    participant HTTP as HTTP Server
+
+    Note over Proc: Process starts
+
+    Note over Proc: Validate App credentials<br>(CLIENT_ID, PRIVATE_KEY)
+    alt Credentials missing or invalid
+        Proc-->>Proc: Exit with descriptive error<br>(HTTP server never starts)
+    end
+
+    Proc->>Sync: syncInstallations() [blocking]
+
+    Note over Sync: Generate JWT for App-level API call
+    Sync->>API: GET /app/installations?per_page=100<br>Authorization: Bearer {jwt}
+    API-->>Sync: installations page 1 (with IDs)
+
+    loop Follow Link rel="next" until all pages fetched
+        Sync->>API: GET /app/installations?page=N&per_page=100
+        API-->>Sync: installations page N
+    end
+
+    loop For each installation
+        Sync->>TP: getToken(installationId)
+        TP->>API: POST /app/installations/{id}/access_tokens<br>Authorization: Bearer {jwt}
+        API-->>TP: installation token
+        TP-->>Sync: installation token
+
+        Sync->>API: GET /installation/repositories?per_page=100<br>Authorization: Bearer {installation_token}
+        API-->>Sync: repos page 1
+
+        loop Follow Link rel="next" until all pages fetched
+            Sync->>API: GET /installation/repositories?page=N&per_page=100
+            API-->>Sync: repos page N
+        end
+
+        Sync->>DB: UPSERT installations (id, suspended_at, ...)
+        Sync->>DB: UPSERT projects (owner, repo, installation_id)
+    end
+
+    alt Repo removed from installation
+        Sync->>DB: UPDATE projects SET installation_id = NULL<br>WHERE repo not in discovered list<br>(preserves test_runs, quarantined_tests)
+    end
+
+    Sync-->>Proc: sync complete
+
+    Note over Proc: Start HTTP server
+    Proc->>HTTP: listen()
+
+    Note over Proc: Start background loop<br>setInterval(syncInstallations, 15min)
+
+    loop Every 15 minutes
+        alt Sync succeeds
+            Sync->>DB: UPSERT installations + projects
+        else Sync fails (500, network error, etc.)
+            Note over Sync: Log error, do NOT throw<br>Existing DB data unchanged
+        end
+    end
+
+    alt SIGTERM or SIGINT received
+        Proc->>Proc: clearInterval(discoveryLoop)
+        Note over Proc: No further sync calls
+        Proc->>HTTP: close()
+    end
+```
+
+---
+
+## 11. Dashboard: OAuth Login Flow (v2)
+
+A user logs in via GitHub OAuth. `@remix-run/auth` handles the redirect and
+code exchange. The dashboard stores the access token in an encrypted session
+cookie (8-hour Max-Age). No server-side session table. No refresh tokens.
+
+```mermaid
+sequenceDiagram
+    participant User as User (Browser)
+    participant Dash as Dashboard
+    participant GH as GitHub (github.com)
+
+    User->>Dash: GET / (no session)
+    Dash-->>User: 401 Unauthorized
+
+    User->>Dash: GET /auth/login
+    Note over Dash: @remix-run/auth builds<br>OAuth URL with PKCE + state param (CSRF)
+    Dash-->>User: 302 Redirect → github.com/login/oauth/authorize<br>?client_id={id}&redirect_uri={callback}&state={csrf}
+
+    User->>GH: Authorize Quarantine App
+    GH-->>User: 302 Redirect → /auth/github/callback?code={code}&state={csrf}
+
+    User->>Dash: GET /auth/github/callback?code={code}&state={csrf}
+    Note over Dash: @remix-run/auth validates state + PKCE,<br>exchanges code for tokens
+
+    Dash->>GH: POST github.com/login/oauth/access_token<br>(client_id, client_secret, code)
+    GH-->>Dash: { access_token (ghu_, 8hr) }
+
+    Note over Dash: Store access_token + user profile<br>in encrypted cookie (Max-Age: 28800)
+    Dash-->>User: Set-Cookie: session={encrypted}<br>(httpOnly, secure, SameSite=Lax, Max-Age=28800)<br>302 Redirect → /
+
+    User->>Dash: GET / (with session cookie)
+    Note over Dash: Decrypt cookie → access_token
+
+    alt Cookie expired (after 8 hours)
+        Dash-->>User: 401 (re-authenticate via OAuth)
+    else Cookie valid
+        Dash-->>User: 200 OK (dashboard page)
+    end
+```
+
+---
+
+## 12. Dashboard: User Permission Filtering (v2)
+
+After OAuth login, the dashboard filters the project list to only repos the
+user can access via their GitHub permissions. Note: `GET /user/installations`
+returns installation metadata only (no repos). A separate call to
+`GET /user/installations/{id}/repositories` per installation is required to
+list repos the user can access.
+
+```mermaid
+sequenceDiagram
+    participant User as User (Browser)
+    participant Dash as Dashboard
+    participant API as GitHub API
+    participant DB as SQLite
+
+    User->>Dash: GET / (authenticated, session cookie)
+    Note over Dash: session() middleware decrypts cookie<br>→ access_token + user profile
+
+    Dash->>API: GET /user/installations?per_page=100<br>Authorization: Bearer {user_access_token}
+    API-->>Dash: installations page 1<br>(metadata only, no repo lists)
+
+    loop Follow Link rel="next" until all pages fetched
+        Dash->>API: GET /user/installations?page=N&per_page=100
+        API-->>Dash: installations page N
+    end
+
+    loop For each installation
+        Dash->>API: GET /user/installations/{id}/repositories?per_page=100<br>Authorization: Bearer {user_access_token}
+        API-->>Dash: repos page 1
+
+        loop Follow Link rel="next" until all pages fetched
+            Dash->>API: GET /user/installations/{id}/repositories?page=N&per_page=100
+            API-->>Dash: repos page N
+        end
+    end
+
+    Dash->>DB: SELECT * FROM projects<br>WHERE installation_id IS NOT NULL
+    DB-->>Dash: all App-discovered projects
+
+    Note over Dash: Intersect: projects in DB<br>∩ repos user can access<br>(pure function)
+
+    alt User has access to some repos
+        Dash-->>User: 200 OK — filtered project list
+    else User has access to zero repos
+        Dash-->>User: 200 OK — empty project list (not an error)
+    end
+```
+
+---
+
 ## Participant Reference
 
 | Participant | Description |
@@ -475,10 +691,14 @@ sequenceDiagram
 | User/Developer | Human running CLI locally or CI triggering it |
 | CLI | The `quarantine` Go binary |
 | Test Runner | The wrapped test framework (Jest, RSpec, Vitest) |
-| GitHub API | GitHub REST API (Contents, Search, Issues, Artifacts) |
+| GitHub API | GitHub REST API (Contents, Search, Issues, Artifacts, App) |
 | GitHub Branch | The `quarantine/state` branch storing `quarantine.json` |
 | GitHub Issues | GitHub Issues used to track flaky tests |
 | GitHub Actions Cache | Fallback cache for `quarantine.json` in degraded mode |
 | Dashboard | Remix 3 analytics application |
 | SQLite | Dashboard's local database (WAL mode) |
 | Poll Timer | Dashboard's scheduled polling worker |
+| generateJWT() | Pure function: produces RS256 JWT for App auth (v2) |
+| InstallationTokenProvider | Token cache + exchange: JWT → installation token (v2) |
+| syncInstallations() | Discovery function: lists installations + repos, upserts DB (v2) |
+| GitHub (github.com) | OAuth endpoints on github.com (not api.github.com) (v2) |

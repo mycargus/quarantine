@@ -1,6 +1,6 @@
 # ADR-028: Dashboard OAuth via remix-auth
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-029](029-dashboard-oauth-first-party.md)
 **Date:** 2026-04-05
 
 ## Context

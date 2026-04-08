@@ -22,7 +22,7 @@
 |----|-------------|---------|
 | NFR-2.3.1 | Dashboard is internal-only (deployed behind corporate network). | [v1] |
 | NFR-2.3.2 | Reverse proxy with rate limiting at 60 requests/min/IP. | [v1] |
-| NFR-2.3.3 | Unauthenticated rate limit: 20 req/min/IP; authenticated rate limit: 300 req/min/user. | [v2+] |
+| NFR-2.3.3 | Unauthenticated rate limit: 20 req/min/IP; authenticated rate limit: 300 req/min/user. Both layers use **fixed-window** counters (reset every 60 seconds from the start of each window). Respond with HTTP 429 and `Retry-After` header (seconds remaining until window reset) per RFC 6585 / RFC 9110. Implementation: two-layer custom middleware using the `remix/fetch-router` middleware system (the router provides middleware chaining; rate limiting logic is application code) — (1) IP-based limit before auth resolution, (2) user-based limit after `session()` + `auth()`. | [v2+] |
 | NFR-2.3.4 | Artifact polling is debounced (max 1 pull per repo per 5 minutes). | [v1] |
 | NFR-2.3.5 | GitHub API circuit breaker triggers on consecutive failures. | [v1] |
 
@@ -48,3 +48,37 @@
 | NFR-2.6.1 | CI-provider agnostic: works in any CI environment that can run a binary. | [v1] |
 | NFR-2.6.2 | Native GitHub Actions integration for artifacts and cache. | [v1] |
 | NFR-2.6.3 | Supports JUnit XML output from any test framework. | [v1] |
+
+## 2.7 App Auth Security
+
+| ID | Requirement | Version |
+|----|-------------|---------|
+| NFR-2.7.1 | Private key read from file path (`QUARANTINE_APP_PRIVATE_KEY_PATH`) or injected as env var value (`QUARANTINE_APP_PRIVATE_KEY`). Client ID from `QUARANTINE_APP_CLIENT_ID`. Dashboard-only in v2. Never in source code or config files. | [v2] |
+| NFR-2.7.2 | JWT: `iat` = now minus 60s (clock skew tolerance), `exp` = max 10 minutes from `iat`, `alg` = RS256, `iss` = App client ID (recommended over App ID per GitHub docs). | [v2] |
+| NFR-2.7.3 | OAuth handled by `@remix-run/auth` with `createGitHubAuthProvider` (ADR-029), which manages PKCE code challenge and code exchange. HTTPS redirect URIs enforced in production via `QUARANTINE_APP_ORIGIN`. | [v2] |
+| NFR-2.7.4 | Session cookies: httpOnly, secure (HTTPS-only), SameSite=Lax, Max-Age=28800 (8 hours). Encrypted cookie holds access token and user profile via `createCookieSessionStorage`. No server-side session table. Session expires when the access token does — no refresh tokens stored. | [v2] |
+| NFR-2.7.5 | Auth events logged with timestamps and user IDs. Token values never logged. | [v2] |
+
+## 2.8 App Auth Performance
+
+| ID | Requirement | Version |
+|----|-------------|---------|
+| NFR-2.8.1 | Installation tokens cached, refreshed only when < 5 min remaining. Max one `POST /access_tokens` per ~55 min per installation. | [v2] |
+| NFR-2.8.2 | JWT generation < 1ms overhead (pure CPU, RSA signing, no I/O). | [v2] |
+| NFR-2.8.3 | Rate limit budget monitored via `X-RateLimit-Remaining`. Warning logged at < 20% remaining. | [v2] |
+
+## 2.9 App Auth Reliability
+
+| ID | Requirement | Version |
+|----|-------------|---------|
+| NFR-2.9.1 | Missing/invalid App credentials on dashboard startup: fail with descriptive error. Artifact polling and installation discovery do not start. | [v2] |
+| NFR-2.9.2 | Installation suspended (GitHub API returns non-null `suspended_at`): dashboard stores the timestamp in `installations.suspended_at` and pauses artifact polling for affected repos. Resumes on unsuspension (detected by next discovery poll when `suspended_at` returns to null). Installations that no longer appear in `GET /app/installations` are marked with a non-NULL `removed_at` timestamp; their repos are also skipped. | [v2] |
+| NFR-2.9.3 | Mixed auth supported: some repos use PATs (via `source: manual`), others use App (via `source: github-app`). No global cutover required. | [v2] |
+| NFR-2.9.4 | Discovery loop error isolation: a failed `syncInstallations()` call does not crash the process or affect in-flight HTTP requests. Existing project data remains available. | [v2] |
+
+## 2.10 App Auth Observability
+
+| ID | Requirement | Version |
+|----|-------------|---------|
+| NFR-2.10.1 | Dashboard logs installation token refresh events with timestamp and new expiry. | [v2] |
+| NFR-2.10.2 | Dashboard logs installation discovery results: installations found, repos added/removed, errors. | [v2] |

@@ -78,7 +78,7 @@ GitHub serves as the central data plane. The CLI interacts with GitHub for all p
 | PR Comments          | Notify developers of flaky tests         | v1      |
 | Actions Cache        | Fallback for `quarantine.json` in branch-protected repos | v1 |
 | GitHub App           | Fine-grained permissions, branch protection bypass | v2+ |
-| OAuth (remix-auth)   | Dashboard web UI login                   | v2+     |
+| OAuth (`@remix-run/auth`) | Dashboard web UI login                | v2+     |
 | Webhooks             | Real-time issue close -> unquarantine    | v2+     |
 
 For GitHub API details, see `docs/specs/github-api-inventory.md`.
@@ -135,7 +135,7 @@ Dashboard SQLite schema will be defined during M6 implementation.
 |------------------------|-----------------------------------------|-----------------------------------------|
 | CLI to GitHub          | `QUARANTINE_GITHUB_TOKEN` (preferred) or `GITHUB_TOKEN` (PAT or Actions token). `GITHUB_TOKEN` is limited to 1,000 req/hr/repo; PATs get 5,000/hr. | Unchanged. CLI receives App-generated tokens via `actions/create-github-app-token` as `QUARANTINE_GITHUB_TOKEN`. CLI code is unchanged; the token source differs (ADR-026). CLI-native App auth (JWT in Go) deferred to non-GitHub-Actions CI milestone. |
 | Dashboard to GitHub    | GitHub PAT (stored as env var)          | When `source: github-app`: dashboard generates installation tokens from App private key (JWT + token exchange). When `source: manual`: PAT via env var (unchanged). |
-| Dashboard web UI       | Network-level (internal only)           | GitHub OAuth via remix-auth + remix-auth-github (ADR-028). No custom OAuth implementation. |
+| Dashboard web UI       | Network-level (internal only)           | GitHub OAuth via `@remix-run/auth` with `createGitHubAuthProvider` (ADR-029). No custom OAuth implementation. |
 
 **Required GitHub token scopes [v1]:**
 - `repo` (read/write contents for quarantine.json, create issues, post PR comments)
@@ -182,7 +182,7 @@ The CLI never hard-depends on anything other than GitHub, and degrades gracefull
 - CLI reads tokens from environment variables only -- never from config files.
 - `quarantine.yml` contains no secrets.
 - Dashboard stores GitHub PAT as an environment variable, never in SQLite.
-- [v2+] Dashboard reads the App private key from `QUARANTINE_PRIVATE_KEY` (env var value) or `QUARANTINE_PRIVATE_KEY_PATH` (file path). Private key is never stored in SQLite, config files, or source code. Generated installation tokens are cached in memory only (not persisted).
+- [v2+] Dashboard reads the App private key from `QUARANTINE_APP_PRIVATE_KEY` (env var value) or `QUARANTINE_APP_PRIVATE_KEY_PATH` (file path). Private key is never stored in SQLite, config files, or source code. Generated installation tokens are cached in memory only (not persisted).
 
 ## 7. Roadmap
 
