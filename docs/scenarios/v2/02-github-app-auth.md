@@ -331,12 +331,12 @@ Removed: no refresh tokens. Session cookie expires after 8 hours. No concurrent 
 
 ---
 
-## Dashboard OAuth E2E (M14)
+## Expired Session Logout (M11)
 
-### Scenario 49: Dashboard OAuth login succeeds end-to-end via browser [v2]
+### Scenario 49: Logout with expired or absent session does not error [v2]
 
-**Risk:** Integration tests with mocked OAuth endpoints pass, but the real GitHub consent flow fails due to redirect URL mismatches, PKCE issues, or cookie handling bugs in a real browser.
+**Risk:** A user whose session has expired clicks "logout" and receives a confusing 401 error instead of being redirected to the login page.
 
-**Given** the dashboard is running with real dev App credentials and a dedicated GitHub test account exists that has pre-authorized the App (consent page skipped) and has TOTP 2FA enabled
-**When** a Playwright browser navigates to `/auth/login`, is redirected to GitHub, enters the test account credentials, completes TOTP 2FA, and is redirected back to the dashboard
-**Then** the session cookie is set, the dashboard home page loads with authenticated content, and `GET /auth/logout` clears the session (subsequent requests return 401)
+**Given** a user has no active session (cookie expired or never set)
+**When** they request `GET /auth/logout`
+**Then** the dashboard redirects to `/auth/login` without returning an error (clearing the cookie is a no-op when the session is already expired)

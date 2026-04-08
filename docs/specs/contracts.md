@@ -674,8 +674,9 @@ most one exchange per ~55 minutes per installation.
 - Schema: `schemas/github-api.json` (vendored OpenAPI spec)
 
 **Current validation:** Planned. JS Prism contract tests in
-`test/contract/github-app.test.js` will validate 201, 401, 403, and 404 responses.
+`test/contract/github-app.test.js` will validate 201, 401, 403, 404, and 422 responses.
 The 403 case covers suspended installations or insufficient permissions.
+The 422 case covers validation failures (e.g., spammed endpoint).
 See [Contract 19](#19-app-token-exchange-v2) and [Contract 20](#20-installations-api-v2).
 
 ---
@@ -763,11 +764,13 @@ the user's accessible repo set.
 **Pagination:** All calls use `per_page=100` and follow `Link` header
 `rel="next"` to fetch all pages. Reuses `parseLinkHeader` from M12.
 
-**Current validation:** Planned. JS Prism contract test in
-`test/contract/github-app.test.js` will validate the 200 response shape.
-Integration tests in `dashboard/test/user-permissions.integration.test.ts`
-verify the filtering logic (including pagination across multiple pages)
-against mock HTTP servers with real SQLite.
+**Current validation:** Planned. JS Prism contract tests in
+`test/contract/github-app.test.js` will validate 200, 403, and 404 response
+shapes. The 403 case covers a user without access to the installation. The
+404 case covers a deleted installation. Integration tests in
+`dashboard/test/user-permissions.integration.test.ts` verify the filtering
+logic (including pagination across multiple pages) against mock HTTP servers
+with real SQLite.
 
 ---
 
