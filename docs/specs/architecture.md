@@ -150,6 +150,9 @@ Dashboard SQLite schema will be defined during M6 implementation.
 **[v2+] GitHub App registration:**
 - Webhooks disabled in v2 (ADR-027). Dashboard uses API polling for installation discovery and artifact ingestion.
 - CLI uses `actions/create-github-app-token` for token generation (ADR-026).
+- See the [GitHub App Setup Guide](../guides/github-app-setup.md) for registration steps, CI workflow examples, dashboard env vars, and platform constraints.
+- See the [Dashboard Deployment Guide](../guides/dashboard-deployment.md) for deployment configuration.
+- See the [CI Integration Guide](../guides/ci-integration.md) for per-framework workflow examples.
 
 ### 6.2 Branch Security
 

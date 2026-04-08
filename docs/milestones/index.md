@@ -867,10 +867,25 @@ M10 (App auth foundation)    M11 (OAuth login)
 
 v2 adds GitHub App support for org-wide installation, fine-grained permissions,
 higher rate limits, dashboard OAuth login, and automatic repository discovery.
-v2 targets GitHub Actions only.
+v2 targets GitHub Actions only. See ADR-008 for the motivation behind the
+migration from PATs to GitHub App auth.
 
-**Plan:** `docs/plans/github-app.md` -- full requirements, constraints, and test
-strategy.
+**User stories driving v2:**
+
+| ID | As a... | I want to... | So that... |
+|----|---------|-------------|------------|
+| US-1.1 | Org admin | Install a single GitHub App on my org | All repos can use quarantine without per-repo PAT configuration |
+| US-1.2 | Org admin | Use fine-grained permissions | I can audit exactly what the tool accesses |
+| US-1.3 | Org admin | Add the App to ruleset bypass lists | The CLI can write to `quarantine/state` with branch protection enabled |
+| US-1.4 | Org admin | Have the dashboard auto-discover repos | I don't manually edit `dashboard.yml` for every new repo |
+| US-1.5 | Org admin | Suspend/uninstall the App gracefully | CI falls back to cached state, dashboard stops polling — no CI failures |
+| US-2.1 | Developer | Log in via "Sign in with GitHub" | I can view test data without a separate account |
+| US-2.2 | Developer | See only repos I have access to | Data is filtered by my GitHub permissions |
+| US-2.3 | Developer | See the App's bot identity on comments/issues | PR comments aren't from a personal account |
+| US-2.4 | Developer | Keep using a PAT if my team hasn't migrated | The upgrade isn't forced |
+| US-3.1 | Platform engineer | Configure App credentials once at org level | All repos get short-lived installation tokens via `actions/create-github-app-token` |
+| US-3.2 | Platform engineer | Have the dashboard generate its own tokens | No long-lived PAT for dashboard artifact polling |
+| US-3.3 | Platform engineer | Monitor rate limit usage | I can track GitHub API consumption across installations |
 
 **Key decisions (ADRs):**
 - ADR-026: CLI uses `actions/create-github-app-token` (no CLI code changes).

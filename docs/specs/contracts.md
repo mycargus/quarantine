@@ -676,7 +676,7 @@ most one exchange per ~55 minutes per installation.
 **Current validation:** Planned. JS Prism contract tests in
 `test/contract/github-app.test.js` will validate 201, 401, 403, and 404 responses.
 The 403 case covers suspended installations or insufficient permissions.
-See `docs/plans/github-app.md` section 5.3.
+See [Contract 19](#19-app-token-exchange-v2) and [Contract 20](#20-installations-api-v2).
 
 ---
 
