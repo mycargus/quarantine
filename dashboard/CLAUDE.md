@@ -8,6 +8,7 @@ make dash-lint       # Or: pnpm run lint
 make dash-typecheck  # Or: pnpm run typecheck
 pnpm dev             # Start dev server (node --import tsx/esm app/server.ts)
 pnpm run format
+pnpm run seed        # Seed local SQLite database with fixture data
 ```
 
 ## Structure
@@ -15,12 +16,17 @@ pnpm run format
 | Path | Purpose |
 |------|---------|
 | `app/server.ts` | HTTP server entry point (remix/node-fetch-server + remix/fetch-router) |
-| `app/routes.ts` | Route map (remix/fetch-router/routes) |
+| `app/routes.ts` | Route map — two routes: `home` (`/`) and `projectDetail` (`/projects/:owner/:repo`) |
 | `app/controllers/home.tsx` | Index route handler + server-rendered component |
-| `app/lib/db.server.ts` | SQLite operations (remix/data-table + better-sqlite3) |
-| `app/lib/config.server.ts` | YAML config parsing (remix/data-schema) |
+| `app/controllers/project.tsx` | Project detail route handler + component |
+| `app/lib/db.server.ts` | SQLite operations (better-sqlite3); migrations run on startup in `initDb()` |
+| `app/lib/config.server.ts` | YAML config parsing (js-yaml + AJV + JSON Schema) |
 | `app/lib/github.server.ts` | GitHub Artifacts polling |
-| `app/lib/ingest.server.ts` | Artifact JSON ingestion into SQLite |
+| `app/lib/ingest.server.ts` | Artifact ZIP download + JSON ingestion into SQLite |
+| `app/lib/sync.server.ts` | Sync orchestration (polls GitHub, triggers ingest) |
+| `app/lib/filter.server.ts` | Query filtering logic for dashboard views |
+| `app/lib/circuit-breaker.server.ts` | Rate limit / repeated-failure circuit breaker for GitHub API calls |
+| `app/lib/debounce.server.ts` | Request deduplication for concurrent sync triggers |
 
 ## Conventions
 

@@ -6,19 +6,27 @@
 make cli-build   # Or: go build -o bin/quarantine ./cli/cmd/quarantine
 make cli-test    # Or: go test ./cli/...
 make cli-lint    # Or: golangci-lint run ./cli/...
+
+# Run a single test
+go test ./cli/... -run TestName
+
+# Build with version injected (matches release builds)
+go build -ldflags "-X main.version=v0.1.0" -o bin/quarantine ./cli/cmd/quarantine
 ```
 
 ## Packages
 
 | Package | Purpose |
 |---------|---------|
-| `cmd/quarantine` | Entry point, cobra command setup |
-| `internal/config` | `quarantine.yml` parsing and validation |
+| `cmd/quarantine` | Entry point, cobra subcommands: `init`, `run`, `doctor`, `version` |
+| `internal/cas` | Compare-and-swap write logic for `quarantine.json` via GitHub Contents API (SHA-based retry on 409) |
+| `internal/config` | `quarantine.yml` parsing, validation, unknown-field tracking (forward-compatible) |
 | `internal/git` | Git remote URL parsing |
-| `internal/github` | GitHub API client (Contents, Issues, Search, Comments) |
-| `internal/parser` | JUnit XML parsing, test_id construction |
-| `internal/quarantine` | `quarantine.json` read/write/merge, quarantine state logic |
-| `internal/runner` | Test command execution, rerun command construction |
+| `internal/github` | GitHub API client (Contents, Issues, Search, Comments); rate-limit warning callbacks |
+| `internal/parser` | JUnit XML parsing, deterministic `test_id` construction (`<file>::<classname>::<name>`) |
+| `internal/quarantine` | `quarantine.json` read/write/merge; pure functions only — no I/O |
+| `internal/result` | Builds structured JSON output for `.quarantine/results.json` |
+| `internal/runner` | Test command execution, signal forwarding, framework detection, rerun command construction, glob exclude patterns |
 
 ## Conventions
 
@@ -26,4 +34,7 @@ make cli-lint    # Or: golangci-lint run ./cli/...
 - Test fixtures live in `testdata/` at the repo root.
 - Integration tests use build tag `integration`. E2E tests use build tag `e2e`.
 - Error handling: never break the build. See `docs/specs/error-handling.md`.
-- Exit codes: 0 = success, 1 = test failures, 2 = quarantine error.
+- Exit codes: 0 = success, 1 = test failures (never used for quarantine errors), 2 = quarantine error.
+- **Output routing:** `init` writes to stdout. `run` writes diagnostic/status output to stderr so it doesn't contaminate the test runner's stdout.
+- **`--` separator:** `quarantine run` requires `--` before the test command (e.g., `quarantine run -- go test ./...`). Missing `--` triggers a helpful error.
+- **Signal forwarding:** `runner.Run()` forwards SIGINT/SIGTERM to the child test process so interrupts work naturally.

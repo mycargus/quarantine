@@ -2,6 +2,10 @@
 
 Flaky test detection and quarantine for CI pipelines. Go CLI + Remix 3 dashboard.
 
+## Prerequisites
+
+Tool versions are pinned in `.tool-versions` (managed by [asdf](https://asdf-vm.com)). Run `asdf install` to install the correct versions of Go and Node. Also requires `pnpm` (`npm install -g pnpm`).
+
 ## Commands
 
 ```bash
@@ -12,12 +16,14 @@ make lint-all          # Run all linters (CLI + dashboard + test)
 make cli-build         # Build CLI binary to bin/quarantine
 make cli-test          # Go tests
 make cli-lint          # golangci-lint
+make cli-mutate        # Run mutation tests on CLI (uses Claude)
 make dash-test         # Dashboard tests
 make dash-lint         # Biome lint
 make dash-typecheck    # TypeScript type checking
 make contract-test     # Contract tests (Prism, offline, no credentials)
 make e2e-test          # E2E tests (requires test/e2e/.env with GitHub credentials)
 make test-lint         # Lint all test code
+make release VERSION=vX.Y.Z  # Tag and push a release (verifies CHANGELOG, runs checks)
 ```
 
 The pre-commit hook runs `make check` automatically.
@@ -30,6 +36,7 @@ See `docs/specs/architecture.md` for full design. See `cli/CLAUDE.md` and `dashb
 - **CLI (Go):** Wraps test commands, parses JUnit XML, retries failures, manages quarantine state on `quarantine/state` branch, creates Issues, posts PR comments, uploads Artifacts.
 - **Dashboard (Remix 3 + SQLite):** Pulls from GitHub Artifacts. Read-only analytics.
 - **No SaaS in the CI path.** CLI never talks to the dashboard.
+- **Shared schemas:** `schemas/` contains JSON Schemas for `quarantine.json` (state), `quarantine.yml` (config), and `.quarantine/results.json` (output). These are the contract between CLI and dashboard. `schemas/github-api.json` is a vendored OpenAPI extract used by contract tests.
 
 ## Key Design Principles
 
@@ -45,6 +52,8 @@ See `docs/specs/architecture.md` for full design. See `cli/CLAUDE.md` and `dashb
 - **Concurrency:** `quarantine.json` uses compare-and-swap via GitHub Contents API. Issue creation uses check-before-create with deterministic labels.
 - **JUnit XML:** No official schema. Jest needs `jest-junit`, RSpec needs `rspec_junit_formatter`, Vitest has built-in support.
 - **Test fixtures:** `testdata/` at repo root (shared across packages).
+- **Exit codes:** 0 = success, 1 = test failures (reserved — never used for quarantine errors), 2 = quarantine error (config, API, etc.).
+- **Token resolution:** `QUARANTINE_GITHUB_TOKEN` → `GITHUB_TOKEN` → error. Never put tokens in config files.
 
 ## Skills
 
