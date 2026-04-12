@@ -13,40 +13,44 @@ creates GitHub issues, and provides a dashboard for visibility.
 
 | ID | Requirement | Version |
 |----|-------------|---------|
-| FR-1.1.1 | CLI wraps the user's test command via `quarantine run -- <test command>`. | [v1] |
-| FR-1.1.2 | Parses JUnit XML output to identify test failures. Supports a glob pattern for multiple XML files (e.g., `--junitxml="results/*.xml"`); the CLI merges all matching files before processing. | [v1] |
-| FR-1.1.3 | Re-runs individual failing tests N times (configurable, default 3). | [v1] |
+| FR-1.1.1 | CLI wraps the user's existing test command (from the suite's `command` field in config) via `quarantine run [suite-name]`. The command is executed via `exec.Command` unmodified — quarantine never appends flags. | [v1 M9] |
+| FR-1.1.2 | Parses JUnit XML output to identify test failures. Supports a glob pattern for multiple XML files (e.g., `junitxml: "results/*.xml"`); the CLI merges all matching files before processing. | [v1] |
+| FR-1.1.3 | Re-runs individual failing tests N times (configurable per suite, default 3). | [v1] |
 | FR-1.1.4 | If a test passes on any retry, it is flagged as flaky. | [v1] |
-| FR-1.1.5 | Auto-detects the test framework from JUnit XML structure. | [v1] |
-| FR-1.1.6 | Ships with baked-in rerun command signatures for: RSpec, Jest, and Vitest [v1]. Adds pytest, go test (`gotestsum`), JUnit/Maven, PHPUnit, NUnit, and others in [v2+]. | [v1] |
-| FR-1.1.7 | User can override the rerun command in `quarantine.yml` config. | [v1] |
+| FR-1.1.5 | Framework-agnostic: any test runner that produces JUnit XML works without quarantine code changes (ADR-030). No auto-detection of framework at runtime. | [v1 M9] |
+| FR-1.1.6 | `quarantine init` detects test frameworks (jest/vitest from `package.json`, rspec from `Gemfile`) and pre-fills suite entries in config with `junitxml` and `rerun_command` defaults. Detection is advisory — never fatal, never gates functionality. | [v1 M9] |
+| FR-1.1.7 | `rerun_command` is a required per-suite field (YAML array). Placeholder substitution (`{name}`, `{classname}`, `{file}`) is performed within array elements before `exec.Command` is called. No shell involved. | [v1 M9] |
+| FR-1.1.8 | When the test command exits non-zero and no JUnit XML is found, quarantine classifies this as a command crash (not test failures) and exits 2 with a diagnostic. | [v1 M9] |
+| FR-1.1.9 | When `rerun_command` fails for a specific test, that test is classified as `"unresolved"` (not flaky, not genuine failure). The run continues processing other tests. Exit code 2 (unless genuine failures exist, then exit 1). | [v1 M9] |
+| FR-1.1.10 | `quarantine status [suite-name]` shows quarantined test count, estimated CI time (from `duration_ms` in recent artifacts), and oldest quarantined tests with issue links and age. | [v1 M10] |
 
 ## 1.2 Quarantine Management
 
 | ID | Requirement | Version |
 |----|-------------|---------|
-| FR-1.2.1 | Maintains `quarantine.json` on a dedicated GitHub branch (`quarantine/state`). | [v1] |
-| FR-1.2.2 | Quarantined test failures are suppressed by converting them to skips in modified JUnit XML output. | [v1] |
-| FR-1.2.3 | Build exits 0 if only quarantined tests failed; exits 1 for real (non-quarantined) failures. | [v1] |
-| FR-1.2.4 | On each run, checks if the GitHub issue for a quarantined test is closed; if so, unquarantines the test. | [v1] |
-| FR-1.2.5 | Uses optimistic concurrency for `quarantine.json` updates (SHA-based compare-and-swap via GitHub API, with retry on conflict). | [v1] |
+| FR-1.2.1 | Maintains per-suite state files at `.quarantine/<suite-name>/state.json` on the dedicated `quarantine/state` branch (ADR-032). | [v1 M9] |
+| FR-1.2.2 | Quarantined test failures are recognized by checking the suite's state file; their failures are ignored in exit code determination. Quarantined tests still execute (exclusion deferred to v2). | [v1 M9] |
+| FR-1.2.3 | Build exits 0 if only quarantined tests failed; exits 1 for genuine (non-quarantined) failures; exits 2 for quarantine infrastructure errors (unresolved tests, crashes, config errors). | [v1 M9] |
+| FR-1.2.4 | On each run, batch-checks GitHub issue status for quarantined tests; removes from in-memory state any test whose issue is now closed. | [v1] |
+| FR-1.2.5 | Uses optimistic concurrency for per-suite state file updates (SHA-based compare-and-swap via GitHub Contents API, with retry on conflict). | [v1] |
+| FR-1.2.6 | Writes `.quarantine/<suite>/quarantined-files.txt` (deduplicated file paths of quarantined tests) before executing the test command, as a composable building block for user-driven file-level exclusion. | [v1 M10] |
 
 ## 1.3 GitHub Integration
 
 | ID | Requirement | Version |
 |----|-------------|---------|
-| FR-1.3.1 | Creates GitHub issues for newly detected flaky tests, with appropriate labels. | [v1] |
-| FR-1.3.2 | Posts PR comments summarizing flaky test results. | [v1] |
-| FR-1.3.3 | Performs check-before-create for issues to avoid duplicates (searches by label + test ID). | [v1] |
-| FR-1.3.4 | Uses the GitHub Contents API for `quarantine.json` state management. | [v1] |
+| FR-1.3.1 | Creates GitHub issues for newly detected flaky tests with label `quarantine:<suite-name>:<test_hash>`. One issue per flaky test per suite. | [v1 M9] |
+| FR-1.3.2 | Posts or updates a per-suite PR comment identified by `<!-- quarantine:<suite-name> -->`. Each suite has its own independent comment. | [v1 M9] |
+| FR-1.3.3 | Performs check-before-create for issues using suite-scoped dedup label (`quarantine:<suite-name>:<test_hash>`); no duplicate issues per suite. | [v1 M9] |
+| FR-1.3.4 | Uses the GitHub Contents API for per-suite state file management at `.quarantine/<suite-name>/state.json`. | [v1 M9] |
 
 ## 1.4 Configuration
 
 | ID | Requirement | Version |
 |----|-------------|---------|
-| FR-1.4.1 | Configuration is stored in `quarantine.yml` in the repository root. | [v1] |
-| FR-1.4.2 | Configurable options include: retries, framework (auto-detected if omitted), and github owner/repo (auto-detected from git remote). | [v1] |
-| FR-1.4.3 | `quarantine doctor` command checks configuration for correctness. | [v1] |
+| FR-1.4.1 | Configuration is stored in `.quarantine/config.yml` at the repository root. Quarantine discovers the repo root via git; walking up from a subdirectory is supported. | [v1 M9] |
+| FR-1.4.2 | Configurable options include: `test_suites` array (each suite: `name`, `command`, `junitxml`, `rerun_command` [all required], `retries`, `timeout`, `rerun_timeout` [optional]); shared `github`, `labels`, `notifications`, `storage` fields. Suite management via `quarantine suite list` and `quarantine suite remove`. | [v1 M9/M10] |
+| FR-1.4.3 | `quarantine doctor` validates the full config: non-empty `test_suites`, suite name constraints (`[a-z0-9][a-z0-9-]*`, max 30), required fields, duration format; warns on detected framework-level retry config (Jest `retryTimes`, Vitest `retry`, RSpec `rspec-retry`). | [v1 M9] |
 
 ## 1.5 Dashboard
 
@@ -80,9 +84,9 @@ creates GitHub issues, and provides a dashboard for visibility.
 
 | ID | Requirement | Version |
 |----|-------------|---------|
-| FR-1.8.1 | v1 assumes one `quarantine.yml` and one `quarantine.json` per repository. | [v1] |
-| FR-1.8.2 | Add a `scope` or `project` field in `quarantine.yml` to namespace test IDs for monorepos. | [v2+] |
-| FR-1.8.3 | The `quarantine.json` key structure uses full test IDs (including file path), enabling future scope prefixes without breaking existing entries. | [v1] |
+| FR-1.8.1 | v1 uses one `.quarantine/config.yml` per repository with a `test_suites` array. Multiple suites in one config provide namespace isolation between test runners in a monorepo context. | [v1 M9] |
+| FR-1.8.2 | Each suite has its own state file at `.quarantine/<suite-name>/state.json`, providing per-namespace test ID scope. No global uniqueness assumption across suites. | [v1 M9] |
+| FR-1.8.3 | Test IDs (`file_path::classname::name`) are unique within a suite's state file. Scoping at the state-file level allows the same test ID to exist in two suites independently. | [v1 M9] |
 
 ## 1.9 Expanded CI Support
 

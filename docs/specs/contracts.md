@@ -1,6 +1,6 @@
 # Contracts
 
-> Last updated: 2026-03-30
+> Last updated: 2026-04-11 (multi-suite: config path, state path, PR marker, dedup labels)
 >
 > Every boundary where one component produces data that another component
 > consumes. A contract breaks when the producer changes the data shape or
@@ -27,9 +27,9 @@ sections below for full context on each contract.
 
 | Contract | Type | Location | Protocol | Producer | Consumer | Purpose | Tested |
 |----------|------|----------|----------|----------|----------|---------|--------|
-| [`quarantine.yml`](#1-quarantineyml-cli-configuration) | Explicit | Repo root | YAML | User (`quarantine init`) | CLI | CLI configuration: framework, retries, repo, labels, notifications, storage, excludes | Go unit tests (`config_test.go`); not validated against JSON schema |
-| [`quarantine.json`](#2-quarantinejson-quarantine-state) | Explicit | `quarantine/state` branch via Contents API | JSON | CLI | CLI | Active quarantine state: which tests are quarantined, associated issues | Go unit tests (`state_test.go`, `state_merge_test.go`); not validated against JSON schema |
-| [`results.json`](#3-resultsjson) | Explicit | Local, then GitHub Artifact | JSON | CLI | Dashboard | Test run results: statuses, retries, flaky detection, summary | Go unit tests (`result_test.go`); dashboard validates against schema at runtime via ajv |
+| [`.quarantine/config.yml`](#1-quarantineconfigyml-cli-configuration) | Explicit | `.quarantine/` at repo root | YAML | User (`quarantine init`) | CLI | CLI configuration: test suites (command, junitxml, rerun_command), retries, repo, labels, notifications, storage | Go unit tests (`config_test.go`); not validated against JSON schema |
+| [`.quarantine/<suite>/state.json`](#2-quarantinesuitestejson-quarantine-state) | Explicit | `quarantine/state` branch via Contents API | JSON | CLI | CLI | Per-suite active quarantine state: which tests are quarantined, associated issues | Go unit tests (`state_test.go`, `state_merge_test.go`); not validated against JSON schema |
+| [`results.json`](#3-resultsjson) | Explicit | `.quarantine/<suite>/` local, then GitHub Artifact | JSON | CLI | Dashboard | Test run results: statuses, retries, flaky detection, summary, suite_name | Go unit tests (`result_test.go`); dashboard validates against schema at runtime via ajv |
 | [JUnit XML](#4-junit-xml) | Implicit | Local (e.g. `junit.xml`) | XML | Test runner (Jest, RSpec, Vitest) | CLI parser | Raw test results from the framework | Go unit tests (`parser_*_test.go`) with XML fixtures in `testdata/junit-xml/` |
 | [Contents API](#5-contents-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Read/write `quarantine.json` on state branch via CAS | Go Prism contract tests (`contents_contract_test.go`) |
 | [Issues API](#6-issues-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Create GitHub Issues for flaky tests (HTTP shape; see [Issue creation](#13-issue-creation) for content conventions) | Go Prism contract tests (`issues_contract_test.go`) |
@@ -38,9 +38,9 @@ sections below for full context on each contract.
 | [Refs API](#9-refs-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Check/create `quarantine/state` branch | Go Prism contract tests (`refs_contract_test.go`) |
 | [Repository API](#10-repository-api) | Explicit | GitHub API | REST / JSON | CLI | GitHub | Verify repo exists and token has access | Go Prism contract tests (`repos_contract_test.go`) |
 | [Artifacts API](#11-artifacts-api) | Explicit | GitHub API | REST / JSON | GitHub | Dashboard | List and download test result artifacts | JS Prism contract tests (`github-artifacts.test.js`) |
-| [PR comment format](#12-pr-comment-format) | Implicit | GitHub PR via Comments API | Markdown with `<!-- quarantine-bot -->` marker | CLI | Humans, CLI (update detection) | Content convention for PR comments (built on [Comments API](#8-comments-api)) | `PRCommentMarker` constant in `run_notifications.go`; `TestContractPRCommentMarker*` in `contract_test.go` |
+| [PR comment format](#12-pr-comment-format) | Implicit | GitHub PR via Comments API | Markdown with `<!-- quarantine:<suite-name> -->` marker | CLI | Humans, CLI (update detection) | Content convention for PR comments, one per suite (built on [Comments API](#8-comments-api)) | `PRCommentMarker` function in `run_notifications.go`; `TestContractPRCommentMarker*` in `contract_test.go` |
 | [Issue creation](#13-issue-creation) | Implicit | GitHub Issues API | Markdown body + label array | CLI | Humans, CLI (dedup search) | Content convention for flaky test issues (built on [Issues API](#6-issues-api)) | `IssueTitlePrefix` constant in `run_notifications.go`; `TestContractIssueTitleFormat` in `contract_test.go` |
-| [Issue dedup labels](#14-issue-dedup-labels) | Implicit | GitHub Issues + Search API | `["quarantine", "quarantine:{hash}"]` | CLI | CLI (search) | Label convention for deduplication (built on [Search API](#7-search-api)) | `IssueLabelBase`, `IssueLabelPrefix` constants in `run_notifications.go`; `TestContractIssueLabelArrayStructure`, `TestContractDedupHash*` in `contract_test.go` |
+| [Issue dedup labels](#14-issue-dedup-labels) | Implicit | GitHub Issues + Search API | `["quarantine", "quarantine:<suite-name>:<hash>"]` | CLI | CLI (search) | Suite-scoped label convention for deduplication (built on [Search API](#7-search-api)) | `IssueLabelBase`, `IssueLabelForSuite` functions in `run_notifications.go`; `TestContractIssueLabelArrayStructure`, `TestContractDedupHash*` in `contract_test.go` |
 | [Test ID format](#15-test-id-format) | Implicit | `parser.go` | `file_path::classname::name` string | CLI parser | State (map key), issues (hash input), results (display) | Stable test identity across runs for quarantine lookup and issue dedup | Parser tests assert construction; no cross-component test |
 | [Artifact naming](#16-artifact-naming-convention) | Implicit | CI workflow YAML, `github.server.ts` | `quarantine-results-{run_id}` name prefix | CI workflow (`actions/upload-artifact`) | Dashboard (`filterArtifactsByPrefix()`) | Dashboard identifies which artifacts contain quarantine results | Not tested |
 | [CLI exit codes](#17-cli-exit-codes) | Implicit | `run.go` | Integer: 0=pass, 1=failures, 2=infra error | CLI | CI pipeline, scripts, users | CI determines build pass/fail from exit code | Extensively tested (`run_*_test.go`) |
@@ -59,19 +59,21 @@ and consumers — they define the expected shape that both sides agree on.
 |--------|----------|----------|-----------|---------|--------|
 | `test-result.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `results.json` | Dashboard runtime (ajv); Go marshal test (planned, ADR-025); negative regression test (planned, ADR-025) | Dashboard validates at runtime; Go marshal validation planned |
 | `quarantine-state.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `quarantine.json` | Negative regression test (planned, ADR-025) | Single-component; `issue_number`/`issue_url` to be made optional (ADR-025) |
-| `quarantine-config.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `quarantine.yml` | Negative regression test (planned, ADR-025) | Documentation artifact; CLI validates via Go code, not schema |
+| `quarantine-config.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `.quarantine/config.yml` | Negative regression test (planned, ADR-025) | Documentation artifact; CLI validates via Go code, not schema. To be updated for `test_suites` array, removed `framework`/`exclude` fields. |
 | `github-api.json` | `schemas/` | OpenAPI 3.x | All GitHub API endpoints used by CLI and dashboard (Contents, Issues, Search, Comments, Refs, Repository, Artifacts; [v2+] App installations, installation token exchange, installation repositories) | Prism contract tests (`make contract-test`) | Go: `*_contract_test.go` in `cli/internal/github/`; JS: `test/contract/github-artifacts.test.js`, [v2+] `test/contract/github-app.test.js` |
 
 ## Contract Details
 
-### 1. quarantine.yml (CLI configuration)
+### 1. `.quarantine/config.yml` (CLI configuration)
 
-**Why:** Users configure the CLI's behavior: which test framework, how many
-retries, which repo, which labels, etc. The config file is the contract between
-the user and the CLI.
+**Why:** Users configure the CLI's behavior: which test suites to run, their
+commands, JUnit XML paths, rerun commands, retries, and shared settings. The
+config file is the contract between the user and the CLI.
 
-**Where:** `quarantine.yml` in the repository root. Created by
-`quarantine init`.
+**Where:** `.quarantine/config.yml` at the repository root. Created by
+`quarantine init`. Quarantine discovers the repo root via git; running from a
+subdirectory is supported. There is no `--config` flag — the path is a fixed
+convention.
 
 **When:** CLI reads it at the start of every command. Validated immediately
 after parsing.
@@ -79,44 +81,62 @@ after parsing.
 **Parties:**
 - Producer: User (via `quarantine init` or manual editing)
 - Consumer: CLI (`config.Load()` in `cli/internal/config/config.go`)
-- Schema: `schemas/quarantine-config.schema.json`
+- Schema: `schemas/quarantine-config.schema.json` (to be updated for `test_suites`)
+
+**Contract details:**
+- `test_suites` is a required non-empty array. Each suite has required fields:
+  `name`, `command`, `junitxml`, `rerun_command`.
+- `command` and `rerun_command` are YAML arrays (sequences). String values are
+  rejected with a diagnostic error.
+- Suite names must match `[a-z0-9][a-z0-9-]*`, max 30 characters, and be unique.
+- No `framework` field (removed per ADR-030). No `exclude` field (removed per
+  plan D12). No top-level `rerun_command` or `junitxml`.
+- See `docs/specs/config-schema.md` for the complete field reference.
 
 **Current validation:**
 - CLI validates via Go code (`config.Validate()`), not against the JSON schema.
-  The Go validation and JSON schema are independent implementations of the same
-  rules and could drift.
 - Unknown keys are detected via two-pass YAML decoding and emitted as warnings
   (not errors).
 
 ---
 
-### 2. quarantine.json (quarantine state)
+### 2. `.quarantine/<suite>/state.json` (per-suite quarantine state)
 
 **Why:** The CLI needs persistent state to know which tests are quarantined
-across CI runs. The state file is stored on a dedicated Git branch and accessed
-via the GitHub Contents API, using SHA-based compare-and-swap for optimistic
+across CI runs. Each suite has its own state file so parallel suite runs never
+contend (ADR-032). Files are stored on a dedicated Git branch and accessed via
+the GitHub Contents API, using SHA-based compare-and-swap for optimistic
 concurrency (ADR-012).
 
-**Where:** Stored as `quarantine.json` on the `quarantine/state` branch (or
-whatever branch `storage.branch` in config specifies). Read and written via the
-GitHub Contents API.
+**Where:** Stored as `.quarantine/<suite-name>/state.json` on the
+`quarantine/state` branch (or whatever branch `storage.branch` specifies). Read
+and written via the GitHub Contents API. Created on the first `quarantine run`
+for each suite — not during init.
 
-**When:** CLI reads it at the start of `quarantine run` to know which tests to
-exclude or mark. CLI writes it after detecting new flaky tests. Concurrent CI
-runs may race; CAS with retry on 409 resolves conflicts.
+**When:** CLI reads it at the start of `quarantine run <suite>` to know which
+tests are quarantined. CLI writes it after detecting new flaky tests. Concurrent
+runs of different suites operate on different files with no conflict.
 
 **Parties:**
 - Producer: CLI (`State.MarshalAt()` in `cli/internal/quarantine/state.go`)
-- Consumer: CLI (`ParseState()` in `cli/internal/quarantine/state.go`)
+- Consumer: CLI (`ParseState()` in `cli/internal/quarantine/state.go`),
+  Dashboard (reads all per-suite files by listing `.quarantine/` directory)
 - Transport: GitHub Contents API (`cli/internal/cas/cas.go`)
-- Schema: `schemas/quarantine-state.schema.json`
+- Schema: `schemas/quarantine-state.schema.json` (to be updated: per-suite path,
+  `last_failure_at` replacing `last_flaky_at`, `suite` field semantics)
+
+**Contract details:**
+- State file path uses the suite name as the directory: the name must be valid
+  for use as a directory name on the state branch.
+- Test IDs (`file_path::classname::name`) are unique within a suite's file.
+  Two suites may independently track the same test ID (ADR-020 amendment).
+- Dashboard reads the state branch by listing `.quarantine/` (1 API call) then
+  reading each suite's `state.json` (N calls). If `.quarantine/` doesn't exist
+  yet (no suite has run), the dashboard handles 404 gracefully.
 
 **Current validation:**
 - No runtime schema validation. CLI trusts its own output.
-- Fixtures in `testdata/quarantine-state/` are not validated against the
-  schema.
-- Scenario 66 in `docs/scenarios/v1/10-github-api-edge-cases.md` covers a
-  struct-schema mismatch (not yet tested).
+- Fixtures in `testdata/quarantine-state/` are not validated against the schema.
 
 ---
 
@@ -127,10 +147,10 @@ talk to each other directly. The CLI produces test run results; the dashboard
 consumes them via GitHub Artifacts. The JSON schema is the shared agreement
 that keeps them compatible.
 
-**Where:** CLI writes to `.quarantine/results.json` locally. CI uploads it as a
-GitHub Artifact named `quarantine-results-{run_id}`. Dashboard downloads the
-artifact ZIP, extracts the JSON, validates it against the schema, and ingests
-it into SQLite.
+**Where:** CLI writes to `.quarantine/<suite-name>/results.json` locally. CI
+uploads it as a GitHub Artifact named `quarantine-results-{suite-name}-{run_id}`.
+Dashboard downloads the artifact ZIP, extracts the JSON, validates it against
+the schema, and ingests it into SQLite.
 
 **When:** CLI produces it at the end of every `quarantine run`. Dashboard
 consumes it during artifact polling.
@@ -459,17 +479,18 @@ is enabled and the run is associated with a PR.
   humans reading the PR
 
 **Contract details:**
-- Marker `<!-- quarantine-bot -->` must be the first line for detection
+- Marker `<!-- quarantine:<suite-name> -->` must be the first line for
+  detection. Each suite uses its own marker; multiple suites on the same PR
+  produce independent comments that coexist without interference (ADR-032).
 - Body is structured Markdown: summary table, sections for flaky/quarantined/
-  failed tests, footer with CLI version
+  failed/unresolved tests, footer with CLI version
 - Update replaces the entire comment body (not append)
 
-**Current validation:** `PRCommentMarker` constant in
-`cli/cmd/quarantine/run_notifications.go` makes the value grep-able and
-change-resistant. `TestContractPRCommentMarkerValue`,
-`TestContractPRCommentMarkerIsFirstLine`, and
-`TestContractPRCommentMarkerDetectsExistingComment` in
-`cli/cmd/quarantine/contract_test.go` guard the marker value and usage.
+**Current validation:** `PRCommentMarker(suiteName string)` function in
+`cli/cmd/quarantine/run_notifications.go` generates the marker deterministically.
+`TestContractPRCommentMarkerFormat`, `TestContractPRCommentMarkerIsFirstLine`,
+and `TestContractPRCommentMarkerDetectsExistingComment` in
+`cli/cmd/quarantine/contract_test.go` guard the marker format and usage.
 Update-vs-create logic is tested end-to-end in `run_pr_comment_sections_test.go`.
 
 ---
@@ -526,20 +547,22 @@ before creating a new one.
 - External: GitHub Search API
 
 **Contract details:**
-- Two labels required: the base label (default `"quarantine"`) and the hash
-  label (`quarantine:{8-char-hex}`)
+- Two labels required: the base label (default `"quarantine"`) and the
+  suite-scoped hash label (`quarantine:<suite-name>:<8-char-hex>`)
 - Hash is deterministic: first 8 hex characters of `SHA-256(test_id)`
-- Custom base label configurable via `labels` in `quarantine.yml`
-- If label structure changes, existing issues won't be found, creating
-  duplicates
+- Suite name is the same name as configured in `test_suites[].name` (max 30
+  chars). The full label is capped under GitHub's 50-character limit.
+- A test flaky in two different suites gets separate issues with separate labels
+  (e.g., `quarantine:backend:a1b2c3d4` and `quarantine:frontend:a1b2c3d4`).
+- If label structure changes, existing issues won't be found, creating duplicates.
 
 **Current validation:**
 - Dedup logic tested in `run_issues_dedup_test.go`.
-- `IssueLabelBase`, `IssueLabelPrefix`, `DedupHashLength` constants in
+- `IssueLabelBase`, `IssueLabelForSuite(suiteName, testID string)` functions in
   `cli/cmd/quarantine/run_notifications.go` make label structure grep-able.
 - `TestContractIssueLabelArrayStructure`, `TestContractDedupHashIsEightHexChars`,
-  and `TestContractDedupHashIsDeterministic` in
-  `cli/cmd/quarantine/contract_test.go` guard label format and hash properties.
+  `TestContractDedupHashIsDeterministic`, and `TestContractIssueLabelUnder50Chars`
+  in `cli/cmd/quarantine/contract_test.go` guard label format and hash properties.
 
 ---
 
@@ -621,8 +644,12 @@ pass broken builds.
 **Contract details:**
 - `0`: All tests passed, or all failures are quarantined/flaky (build
   protected)
-- `1`: Genuine test failures remain after retries
-- `2`: Quarantine infrastructure failure in `--strict` mode
+- `1`: Genuine test failures remain after retries (takes priority over 2)
+- `2`: Quarantine infrastructure error — unresolved tests (rerun command
+  failure or timeout), command crash, config error, API error. Exit 2 is
+  used for all infrastructure errors when there are no genuine test failures.
+  All exit-2 messages use a parseable prefix: `Error [config]:`,
+  `Error [crash]:`, `Error [timeout]:`, `Error [rerun]:`.
 
 **Current validation:** Extensively tested in `run_*_test.go`. Well-covered.
 
@@ -762,7 +789,7 @@ the user's accessible repo set.
 - Schema: `schemas/github-api.json` (vendored OpenAPI spec)
 
 **Pagination:** All calls use `per_page=100` and follow `Link` header
-`rel="next"` to fetch all pages. Reuses `parseLinkHeader` from M12.
+`rel="next"` to fetch all pages. Reuses `parseLinkHeader` from M14.
 
 **Current validation:** Planned. JS Prism contract tests in
 `test/contract/github-app.test.js` will validate 200, 403, and 404 response

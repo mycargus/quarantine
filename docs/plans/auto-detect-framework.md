@@ -71,33 +71,36 @@ Fail-fast improvement: errors before prompts, not after.
 
 Between cwd resolution and overwrite check.
 
-### Modified Framework Prompt
+### Modified Init Behavior (post-M9)
 
-Extract `promptFramework(cmd, in, detected)` helper. Three cases:
+Detection is advisory only — no interactive framework prompt. Three cases:
 
 **Case A — One framework detected:**
+Pre-fills one suite entry in `.quarantine/config.yml` with the detected
+framework's defaults for `junitxml` and `rerun_command`. Prints:
 ```
-Detected jest (from package.json devDependencies).
-Which test framework? [jest]
+Detected test frameworks: jest
+Pre-filled 1 suite entry in .quarantine/config.yml
 ```
-Enter accepts default. User can type a different name.
 
-**Case B — Multiple detected:**
+**Case B — Multiple detected (pre-fills all, no prompt):**
+
+> **Note (2026-04-11):** The numbered-list selection prompt for Case B is
+> deferred with M9. Detection now pre-fills one suite entry per detected
+> framework. No interactive selection prompt is shown. See
+> `docs/plans/multi-suite-support.md` decision D4.
+
+Pre-fills one suite entry per detected framework. Prints:
 ```
-Detected multiple test frameworks:
-  1. vitest (from package.json devDependencies)
-  2. jest (from package.json devDependencies)
-Which test framework? Enter name or number [vitest]
+Detected test frameworks: vitest, jest
+Pre-filled 2 suite entries in .quarantine/config.yml
 ```
-Enter accepts first item. User can type number (1, 2) or name (jest, vitest).
-Validation: check as number first (1-indexed), then as framework name via
-`config.IsValidFramework()`. Invalid input re-prompts.
 
 **Case C — None detected:**
+Writes a commented example suite entry. No prompt for framework. Prints:
 ```
-Which test framework? [rspec/jest/vitest]
+No test frameworks detected.
 ```
-Identical to current behavior.
 
 ## Documentation Updates
 

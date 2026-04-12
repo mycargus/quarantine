@@ -1,30 +1,46 @@
-# quarantine.yml Configuration Schema
+# `.quarantine/config.yml` Configuration Schema
 
-> Last updated: 2026-03-17
+> Last updated: 2026-04-11 (multi-suite rewrite; supersedes quarantine.yml)
 >
-> Canonical reference for every field in `quarantine.yml`. This file is created
-> by `quarantine init` and lives in the repository root.
+> Canonical reference for every field in `.quarantine/config.yml`. This file is
+> created by `quarantine init` and lives in the `.quarantine/` directory at the
+> repository root. Quarantine discovers the repo root via git; running from a
+> subdirectory is supported.
 
 ## Complete Schema
 
 ```yaml
 version: 1
-framework: jest
-retries: 3
-junitxml: "results/*.xml"
+
 github:
   owner: my-org
   repo: my-project
+
 issue_tracker: github
+
 labels:
   - quarantine
+
 notifications:
   github_pr_comment: true
+
 storage:
   branch: quarantine/state
-exclude:
-  - "test/integration/**"
-rerun_command: ""
+
+test_suites:
+  - name: backend
+    command: ["bundle", "exec", "rspec"]
+    junitxml: "rspec.xml"
+    rerun_command: ["bundle", "exec", "rspec", "-e", "{name}"]
+    retries: 3
+    timeout: 30m
+    rerun_timeout: 5m
+
+  - name: frontend
+    command: ["npx", "jest", "--ci"]
+    junitxml: "junit.xml"
+    rerun_command: ["npx", "jest", "--testNamePattern", "{name}"]
+    retries: 3
 ```
 
 ---
@@ -46,144 +62,40 @@ future versions.
 **Validation rules:**
 - Must be present.
 - Must be the integer `1`. String values (e.g., `"1"`) are rejected.
-- Values greater than `1` produce an error: `"Unsupported config version: {value}. This version of the CLI supports version 1."`
+- Values greater than `1` produce an error:
+  `"Unsupported config version: {value}. This version of the CLI supports version 1."`
 
 **Behavior when omitted:**
-- Error: `"Missing required field 'version' in quarantine.yml."`
-
----
-
-### `framework`
-
-| Property    | Value                          |
-|-------------|--------------------------------|
-| Type        | String                         |
-| Required    | Yes                            |
-| Default     | None (must be specified)       |
-| Valid values| `rspec`, `jest`, `vitest` (v1) |
-
-The test framework in use. Set by `quarantine init` during interactive setup.
-There is no auto-detection; the user must choose explicitly.
-
-The framework determines:
-- Default `junitxml` glob pattern (see [`junitxml`](#junitxml)).
-- Rerun command construction for individual failing tests.
-- Test exclusion flags used to skip quarantined tests.
-
-**Validation rules:**
-- Must be present.
-- Must be one of the v1-supported values: `rspec`, `jest`, `vitest`.
-- Case-sensitive. `Jest` or `JEST` are rejected.
-- Values planned for v2+ (`pytest`, `go`, `maven`) produce: `"Framework '{value}' is not supported in this version. Supported frameworks: rspec, jest, vitest."`
-- Unrecognized values produce: `"Unknown framework '{value}'. Supported frameworks: rspec, jest, vitest."`
-
-**Behavior when omitted:**
-- Error: `"Missing required field 'framework' in quarantine.yml."`
-
----
-
-### `retries`
-
-| Property    | Value                          |
-|-------------|--------------------------------|
-| Type        | Integer                        |
-| Required    | No                             |
-| Default     | `3`                            |
-| Valid values| `1` through `10`               |
-
-Number of times to re-run a failing test before declaring it a genuine failure.
-A test that passes on any retry attempt is classified as flaky.
-
-**Validation rules:**
-- Must be an integer.
-- Must be in the range 1--10 inclusive.
-- Values below 1 produce: `"Invalid retries value: {value}. Must be between 1 and 10."`
-- Values above 10 produce: `"Invalid retries value: {value}. Must be between 1 and 10."`
-- Non-integer values (e.g., `3.5`, `"three"`) produce: `"Invalid retries value: expected integer, got {type}."`
-
-**Behavior when omitted:**
-- Uses default value of `3`.
-
-**CLI override:** `--retries` flag on `quarantine run`.
-
----
-
-### `junitxml`
-
-| Property    | Value                            |
-|-------------|----------------------------------|
-| Type        | String (glob pattern)            |
-| Required    | No                               |
-| Default     | Framework-specific (see below)   |
-
-Glob pattern for locating JUnit XML output files. Supports multiple files for
-parallel test runners (e.g., Jest `--shard`, RSpec `parallel_tests`, Vitest
-threads).
-
-**Framework-specific defaults:**
-
-| Framework | Default `junitxml` value | Notes |
-|-----------|--------------------------|-------|
-| `jest`    | `junit.xml`              | Requires `jest-junit` package. Output location depends on `JEST_JUNIT_OUTPUT_DIR` and `JEST_JUNIT_OUTPUT_NAME` env vars. |
-| `rspec`   | `rspec.xml`              | Requires `rspec_junit_formatter` gem. Output path set via `--format RspecJunitFormatter --out rspec.xml`. |
-| `vitest`  | `junit-report.xml`       | Built-in support via `--reporter=junit`. No third-party package needed. |
-
-**Validation rules:**
-- Must be a non-empty string.
-- Must be a valid glob pattern (syntax errors produce a parse-time warning).
-- The CLI resolves the glob at runtime after the test command completes. If no
-  files match, the CLI logs an error suggesting the `--junitxml` flag and exits
-  with the test runner's exit code.
-
-**Behavior when omitted:**
-- Uses the framework-specific default from the table above.
-
-**CLI override:** `--junitxml` flag on `quarantine run`.
+- Error: `"Missing required field 'version' in .quarantine/config.yml."`
 
 ---
 
 ### `github`
 
-A nested object for GitHub repository identification.
-
-#### `github.owner`
-
 | Property    | Value                          |
 |-------------|--------------------------------|
-| Type        | String                         |
+| Type        | Object                         |
 | Required    | No                             |
 | Default     | Auto-detected from git remote  |
 
-The GitHub organization or user that owns the repository.
+GitHub repository coordinates. Both subfields are auto-detected from the `origin`
+git remote if not specified.
+
+**Subfields:**
+
+| Field   | Type   | Required | Default           |
+|---------|--------|----------|-------------------|
+| `owner` | String | No       | Auto-detected     |
+| `repo`  | String | No       | Auto-detected     |
+
+Auto-detection parses the `origin` remote URL and extracts `owner` and `repo`.
+Supports both HTTPS (`https://github.com/owner/repo.git`) and SSH
+(`git@github.com:owner/repo.git`) formats. If auto-detection fails, quarantine
+errors with an actionable message.
 
 **Validation rules:**
-- Must be a non-empty string if provided.
-- Must be a valid GitHub owner name (alphanumeric and hyphens).
-
-**Behavior when omitted:**
-- Auto-detected by parsing the `origin` remote URL from the local git config.
-  Supports both HTTPS (`https://github.com/owner/repo.git`) and SSH
-  (`git@github.com:owner/repo.git`) remote formats.
-- If auto-detection fails (e.g., no git remote, non-GitHub remote), the CLI
-  logs an error: `"Could not detect GitHub owner from git remote. Set 'github.owner' in quarantine.yml or ensure a GitHub remote is configured."`
-
-#### `github.repo`
-
-| Property    | Value                          |
-|-------------|--------------------------------|
-| Type        | String                         |
-| Required    | No                             |
-| Default     | Auto-detected from git remote  |
-
-The GitHub repository name (without the owner prefix).
-
-**Validation rules:**
-- Must be a non-empty string if provided.
-- Must be a valid GitHub repository name.
-
-**Behavior when omitted:**
-- Auto-detected from the `origin` remote URL, same as `github.owner`.
-- If auto-detection fails, the CLI logs an error: `"Could not detect GitHub repo from git remote. Set 'github.repo' in quarantine.yml or ensure a GitHub remote is configured."`
+- If specified, both `owner` and `repo` must be non-empty strings.
+- Partial specification (only `owner`, or only `repo`) is an error.
 
 ---
 
@@ -193,23 +105,14 @@ The GitHub repository name (without the owner prefix).
 |-------------|--------------------------------|
 | Type        | String                         |
 | Required    | No                             |
-| Default     | `github`                       |
-| Valid values| `github` (v1)                  |
+| Default     | `"github"`                     |
+| Valid values| `"github"` (v1 only)           |
 
-Specifies the issue tracking system where the CLI creates tickets for flaky
-tests.
-
-**Forward compatibility:** This field exists so that `quarantine.yml` files
-can be written today and extended in v2+ without breaking changes. v2+ will add
-values such as `jira`.
+Which system to use for flaky test issue tracking.
 
 **Validation rules:**
-- Must be a string.
-- v1 accepts only `github`.
-- Any other value produces: `"Unsupported issue_tracker '{value}'. This version supports: github. Jira support is planned for a future release."`
-
-**Behavior when omitted:**
-- Uses default value of `github`.
+- v1: only `"github"` is accepted. Any other value produces:
+  `"jira is not supported in v1. Supported values: github"`
 
 ---
 
@@ -217,301 +120,377 @@ values such as `jira`.
 
 | Property    | Value                          |
 |-------------|--------------------------------|
-| Type        | List of strings                |
+| Type        | Array of strings               |
 | Required    | No                             |
 | Default     | `["quarantine"]`               |
-| Valid values| `["quarantine"]` (v1)          |
 
-Labels applied to GitHub Issues created for flaky tests. Used for deterministic
-issue deduplication (the CLI searches for existing issues by these labels plus
-the test identifier).
-
-**Forward compatibility:** This field exists so that v2+ can support custom
-labels. In v1, only the exact list `["quarantine"]` is accepted.
+Labels applied to created GitHub Issues.
 
 **Validation rules:**
-- Must be a list of strings.
-- v1 requires exactly one element: `"quarantine"`.
-- An empty list produces: `"Invalid labels: must contain at least one label. Default: ['quarantine']."`
-- Additional labels produce: `"Custom labels are not supported in this version. Only ['quarantine'] is accepted."`
-- Labels other than `"quarantine"` produce: `"Custom labels are not supported in this version. Only ['quarantine'] is accepted."`
-
-**Behavior when omitted:**
-- Uses default value of `["quarantine"]`.
+- v1: only `["quarantine"]` is accepted. Custom labels not supported.
+- Used as the base label in the issue dedup label pair: `["quarantine",
+  "quarantine:<suite-name>:<hash>"]`.
 
 ---
 
 ### `notifications`
 
-A nested object controlling how the CLI notifies developers about flaky test
-results.
-
-**Forward compatibility:** v2+ will add keys such as `slack` and `email`.
-In v1, only `github_pr_comment` is accepted.
-
-**Validation rules (top-level):**
-- Must be an object (map).
-- Any key other than `github_pr_comment` produces: `"Unknown notification channel '{key}'. This version supports: github_pr_comment. Slack and email notifications are planned for a future release."`
-
-**Behavior when omitted:**
-- Uses default value of `{ github_pr_comment: true }`.
-
-#### `notifications.github_pr_comment`
-
 | Property    | Value                          |
 |-------------|--------------------------------|
-| Type        | Boolean                        |
+| Type        | Object                         |
 | Required    | No                             |
-| Default     | `true`                         |
-| Valid values| `true`, `false`                |
+| Default     | `{ github_pr_comment: true }`  |
 
-When `true`, the CLI posts or updates a PR comment summarizing flaky test
-findings. Comments are identified by a hidden HTML marker
-(`<!-- quarantine-bot -->`) so the CLI updates an existing comment rather than
-creating duplicates.
+**Subfields:**
 
-**Validation rules:**
-- Must be a boolean.
-- Non-boolean values produce: `"Invalid value for notifications.github_pr_comment: expected boolean, got {type}."`
+| Field                | Type    | Required | Default |
+|----------------------|---------|----------|---------|
+| `github_pr_comment`  | Boolean | No       | `true`  |
 
-**Behavior when omitted:**
-- Uses default value of `true`.
-
-**Behavior when `false`:**
-- The CLI does not post or update PR comments. All other behavior (issue
-  creation, state updates, artifact upload) is unaffected.
+When `github_pr_comment: false`, no PR comment is posted or updated. The
+`quarantine run` flag `--pr` is still accepted but has no effect on PR comment
+creation.
 
 ---
 
 ### `storage`
 
-A nested object controlling where quarantine state (`quarantine.json`) is
-stored.
+| Property    | Value                          |
+|-------------|--------------------------------|
+| Type        | Object                         |
+| Required    | No                             |
+| Default     | `{ branch: "quarantine/state"}`|
 
-**Design note:** In an earlier design, `storage.backend` existed with values
-`branch` and `actions-cache`. This was removed. v1 only supports branch-based
-storage. The Actions cache is used internally as a degraded-mode fallback and
-is not a user-facing configuration option.
+**Subfields:**
 
-#### `storage.branch`
+| Field    | Type   | Required | Default             |
+|----------|--------|----------|---------------------|
+| `branch` | String | No       | `"quarantine/state"`|
+
+The Git branch on which per-suite state files are stored. See [Per-suite state
+files](#per-suite-state-files).
+
+---
+
+### `test_suites`
+
+| Property    | Value                          |
+|-------------|--------------------------------|
+| Type        | Array of suite objects         |
+| Required    | Yes                            |
+| Default     | None (must be specified)       |
+
+The list of test suite configurations. Must be non-empty. Each entry fully
+describes one suite's command, JUnit XML output location, and rerun behavior.
+
+**Validation rules:**
+- Must be a non-empty array. An empty `test_suites` is invalid:
+  `"No test suites configured. Edit .quarantine/config.yml to add one."`
+- Suite names must be unique within the file.
+- Detected by `quarantine doctor`; also checked at the start of `quarantine run`.
+
+---
+
+#### Suite fields
+
+##### `name`
 
 | Property    | Value                          |
 |-------------|--------------------------------|
 | Type        | String                         |
-| Required    | No                             |
-| Default     | `quarantine/state`             |
+| Required    | Yes                            |
+| Pattern     | `[a-z0-9][a-z0-9-]*`          |
+| Max length  | 30 characters                  |
 
-The Git branch name where `quarantine.json` is stored. This branch is created
-by `quarantine init` and is never merged into other branches. The CLI reads and
-writes `quarantine.json` on this branch via the GitHub Contents API with
-SHA-based compare-and-swap for optimistic concurrency.
+The suite identifier. Used as:
+- Directory name on the state branch (`.quarantine/<name>/state.json`)
+- Directory name in the working tree (`.quarantine/<name>/results.json`,
+  `.quarantine/<name>/quarantined-files.txt`)
+- PR comment marker (`<!-- quarantine:<name> -->`)
+- CLI argument (`quarantine run <name>`)
+- Issue dedup label component (`quarantine:<name>:<hash>`)
 
 **Validation rules:**
-- Must be a non-empty string.
-- Must be a valid Git branch name (no spaces, no `..`, no leading `/`, etc.).
-
-**Behavior when omitted:**
-- Uses default value of `quarantine/state`.
+- Must match `[a-z0-9][a-z0-9-]*` (lowercase alphanumeric, hyphens allowed,
+  must start with alphanumeric).
+- Maximum 30 characters (keeps GitHub label `quarantine:<name>:<hash>` under
+  the 50-character limit).
+- Must be unique across all suites in the file.
+- If invalid, `quarantine run` errors and aborts (does NOT truncate).
 
 ---
 
-### `exclude`
+##### `command`
+
+| Property    | Value                                     |
+|-------------|-------------------------------------------|
+| Type        | Array of strings (YAML sequence)          |
+| Required    | Yes                                       |
+
+The user's existing test command as an explicit argument array. Quarantine
+executes it via `exec.Command(command[0], command[1:]...)` without modification.
+No shell is involved.
+
+**Examples:**
+```yaml
+command: ["bundle", "exec", "rspec"]
+command: ["npx", "jest", "--ci"]
+command: ["npx", "vitest", "run", "--reporter=junit"]
+command: ["sh", "-c", "npm test && echo done"]  # explicit shell when needed
+```
+
+**Validation rules:**
+- Must be a YAML sequence (array), not a string. A string value is rejected:
+  `"Error [config]: test_suites[0].command must be a YAML array, not a string.
+  Use: command: ["bundle", "exec", "rspec"]"`
+- Must be non-empty.
+
+**Why array, not string:** A string command requires `sh -c`, which introduces
+shell interpretation, process group management, and platform differences. The
+array format uses `exec.Command` directly — identical to how `rerun_command` is
+executed — and is safe against shell metacharacters in test names.
+
+---
+
+##### `junitxml`
 
 | Property    | Value                          |
 |-------------|--------------------------------|
-| Type        | List of strings (glob patterns)|
-| Required    | No                             |
-| Default     | None (empty list; no exclusions)|
+| Type        | String (glob pattern)          |
+| Required    | Yes                            |
 
-Patterns for tests that Quarantine ignores entirely. Matched tests are not
-retried, not quarantined, and do not trigger issue creation. The behavior is as
-if Quarantine is not installed for those tests.
-
-**Pattern matching:**
-
-Patterns are matched against the `test_id`, which has the format:
-
-```
-file_path::classname::name
-```
-
-The `::` delimiter was chosen because it does not appear in JUnit XML output
-from any v1-supported framework. Standard glob syntax is supported:
-
-- `*` matches any characters within a single segment.
-- `**` matches across path separators (for the `file_path` portion).
-- `?` matches a single character.
+A glob pattern for the JUnit XML output file(s) produced by the suite's
+`command`. Quarantine reads the XML after the command completes.
 
 **Examples:**
-
 ```yaml
-exclude:
-  - "test/integration/**"           # Exclude all integration tests by file path
-  - "**::SlowServiceTest::*"        # Exclude all tests in a specific class
-  - "**::*timeout*"                  # Exclude tests with "timeout" in the name
+junitxml: "rspec.xml"
+junitxml: "junit.xml"
+junitxml: "junit-report.xml"
+junitxml: "test-results/junit.xml"
+junitxml: "results/*.xml"              # multiple XML files (parallel runners)
 ```
 
 **Validation rules:**
-- Must be a list of strings.
-- Each string must be a valid glob pattern.
-- Invalid glob syntax produces a warning at parse time but does not prevent the
-  CLI from running.
+- Must be present. No default.
+- Glob is resolved relative to the repository root.
+- If no files match the glob after the command completes, and the command
+  exited non-zero, this is a command crash (see [Error handling](#error-handling)).
 
-**Behavior when omitted:**
-- No tests are excluded. All tests are eligible for retry and quarantine.
+JUnit XML is produced by the test runner, not by quarantine. Quarantine reads
+it but does not generate it.
 
 ---
 
-### `rerun_command`
+##### `rerun_command`
+
+| Property    | Value                                     |
+|-------------|-------------------------------------------|
+| Type        | Array of strings (YAML sequence)          |
+| Required    | Yes                                       |
+
+The command to re-run a single failing test. Executed via `exec.Command` (no
+shell). Supports placeholders substituted from JUnit XML:
+
+| Placeholder   | Source                                       |
+|---------------|----------------------------------------------|
+| `{name}`      | `name` attribute from JUnit `<testcase>`     |
+| `{classname}` | `classname` attribute from JUnit `<testcase>`|
+| `{file}`      | `file_path` component of the test ID         |
+
+Placeholders are substituted within each array element via simple string
+replacement before `exec.Command` is called. No shell is involved, so
+shell metacharacters in test names are literal and harmless.
+
+**Init defaults** (pre-filled by `quarantine init` for known runners):
+
+| Detected runner | Pre-filled `rerun_command` |
+|-----------------|---------------------------|
+| jest            | `["npx", "jest", "--testNamePattern", "{name}"]` |
+| rspec           | `["bundle", "exec", "rspec", "-e", "{name}"]` |
+| vitest          | `["npx", "vitest", "run", "--reporter=junit", "{file}", "-t", "{name}"]` |
+
+**Validation rules:**
+- Must be a YAML sequence (array), not a string. Same rejection as `command`.
+- Must be non-empty.
+
+---
+
+##### `retries`
+
+| Property    | Value          |
+|-------------|----------------|
+| Type        | Integer        |
+| Required    | No             |
+| Default     | `3`            |
+| Range       | `1` – `10`     |
+
+Number of times to re-run a failing test before classifying it as a genuine
+failure. A test that passes on any retry is classified as flaky.
+
+**Validation rules:**
+- Must be an integer.
+- Must be in range 1–10.
+- Out-of-range values are rejected by `quarantine doctor` and `quarantine run`.
+
+---
+
+##### `timeout`
 
 | Property    | Value                          |
 |-------------|--------------------------------|
-| Type        | String                         |
+| Type        | Duration string                |
 | Required    | No                             |
-| Default     | `""` (empty; use auto-detected)|
+| Default     | `"30m"`                        |
 
-Override the auto-detected rerun command template used to re-run individual
-failing tests. This is useful for frameworks not supported in v1 or for
-non-standard test runner configurations.
+Maximum time to wait for the suite's `command` to complete. Uses Go's
+`time.ParseDuration` format: `30m`, `1h`, `90s`, `2h30m`.
 
-**Placeholder variables:**
-
-| Placeholder   | Description                                    |
-|---------------|------------------------------------------------|
-| `{name}`      | Test name from JUnit XML `name` attribute      |
-| `{classname}` | Class name from JUnit XML `classname` attribute|
-| `{file}`      | File path extracted from the test identifier   |
-
-**Examples:**
-
-```yaml
-# Custom jest config file
-rerun_command: "npx jest --config jest.ci.config.js --testNamePattern '{name}'"
-
-# pnpm
-rerun_command: "pnpm exec jest --testNamePattern '{name}'"
-
-# bun
-rerun_command: "bunx jest --testNamePattern '{name}'"
-
-# Narrow by file and name
-rerun_command: "npx jest --testPathPattern={file} --testNamePattern={name}"
-```
-
-**Framework-specific auto-detected commands (when `rerun_command` is empty):**
-
-| Framework | Auto-detected rerun command                                      |
-|-----------|------------------------------------------------------------------|
-| `jest`    | `npx jest --testNamePattern "{name}"`                            |
-| `rspec`   | `bundle exec rspec -e "{name}"`                                  |
-| `vitest`  | `npx vitest run --reporter=junit {file} -t "{name}"`             |
+When the timeout elapses:
+1. `SIGTERM` is sent to the process.
+2. Quarantine waits 5 seconds for graceful shutdown.
+3. `SIGKILL` is sent if the process is still running.
+4. If JUnit XML exists at kill time, partial results are processed.
+5. If no JUnit XML exists, treated as command crash (exit 2).
 
 **Validation rules:**
-- Must be a string.
-- When non-empty, the CLI uses this template verbatim instead of the
-  framework-specific default.
-- The CLI does not validate that the command is executable at config parse time;
-  errors surface at runtime when the rerun is attempted.
-
-**Behavior when omitted or empty:**
-- Uses the framework-specific auto-detected rerun command.
+- Must be a valid Go duration string. Invalid values are rejected by
+  `quarantine doctor`.
+- Override with `--timeout` CLI flag for a single invocation.
 
 ---
 
-## Authentication
+##### `rerun_timeout`
 
-Tokens are **never** stored in `quarantine.yml`. Authentication is handled
-exclusively through environment variables:
+| Property    | Value                          |
+|-------------|--------------------------------|
+| Type        | Duration string                |
+| Required    | No                             |
+| Default     | `"5m"`                         |
 
-| Environment variable         | Purpose                                    |
-|------------------------------|--------------------------------------------|
-| `QUARANTINE_GITHUB_TOKEN`    | Preferred. GitHub PAT for API access.      |
-| `GITHUB_TOKEN`               | Fallback. Commonly set in GitHub Actions.  |
+Maximum time to wait for each individual `rerun_command` invocation. When this
+elapses, the rerun process is killed (`SIGKILL`) and the test is classified as
+`"unresolved"`. The run continues processing other tests.
 
-The CLI checks `QUARANTINE_GITHUB_TOKEN` first. If not set, it falls back to
-`GITHUB_TOKEN`. If neither is set, the CLI cannot perform GitHub operations
-(state management, issue creation, PR comments) and runs in degraded mode
-(unless `--strict` is set, which causes exit 2).
-
-**Rate limit implications:**
-
-| Token type              | Rate limit         |
-|-------------------------|--------------------|
-| `GITHUB_TOKEN` (Actions)| 1,000 req/hr/repo |
-| Personal Access Token   | 5,000 req/hr       |
-| GitHub App (v2+)        | 5,000--12,500 req/hr|
+**Validation rules:**
+- Same as `timeout`: must be a valid Go duration string.
+- Override with `--rerun-timeout` CLI flag.
 
 ---
 
-## File Location and Discovery
+## Per-suite state files
 
-- The CLI looks for `quarantine.yml` in the current working directory (repo root).
-- The `--config` flag on `quarantine run` overrides the path.
-- `quarantine init` creates the file interactively.
-- `quarantine doctor` parses and validates the file, printing resolved values
-  (including auto-detected `github.owner`, `github.repo`, and
-  framework-specific defaults).
+Each suite maintains its own state file at `.quarantine/<suite-name>/state.json`
+on the `quarantine/state` branch (or whichever branch `storage.branch` specifies).
+State files are created on the first `quarantine run` for each suite — not during
+`quarantine init`.
 
----
-
-## Validation Summary
-
-`quarantine doctor` checks all of the following and reports errors or
-warnings:
-
-| Check                                | Severity |
-|--------------------------------------|----------|
-| `version` missing or unsupported     | Error    |
-| `framework` missing or unsupported   | Error    |
-| `retries` out of range               | Error    |
-| `junitxml` invalid glob syntax       | Warning  |
-| `issue_tracker` unsupported value    | Error    |
-| `labels` non-default value           | Error    |
-| `notifications` unknown keys         | Error    |
-| `storage.branch` empty               | Error    |
-| `exclude` invalid glob syntax        | Warning  |
-| Unknown top-level keys               | Warning  |
-| GitHub token not found in env        | Warning  |
-| Git remote not parseable (when `github` omitted) | Warning |
+Test IDs are unique within a suite's state file. Two suites may independently
+track the same test ID. See ADR-032.
 
 ---
 
-## Minimal Valid Configuration
+## Generated files
 
-The smallest valid `quarantine.yml`:
+`quarantine init` creates:
+- `.quarantine/config.yml` — the config file (source-controlled)
+- `.quarantine/.gitignore` — ignores all runtime files except `config.yml`
 
-```yaml
-version: 1
-framework: jest
+The `.gitignore` contents:
+```gitignore
+# Ignore all runtime files. Only config.yml is source-controlled.
+*
+!.gitignore
+!config.yml
 ```
 
-All other fields use defaults. The CLI auto-detects `github.owner` and
-`github.repo` from the git remote.
+`quarantine run` generates in the working tree (NOT source-controlled):
+- `.quarantine/<suite>/results.json` — full test run results for dashboard
+- `.quarantine/<suite>/quarantined-files.txt` — deduplicated quarantined file
+  paths (written before the test command runs)
+
+`quarantine run` generates on the state branch (NOT in working tree):
+- `.quarantine/<suite>/state.json` — current quarantine state per suite
 
 ---
 
-## Full Example with All Defaults Shown
+## Error handling
 
-```yaml
-version: 1
-framework: jest
-retries: 3
-junitxml: "junit.xml"          # Framework-specific default for Jest
-github:
-  owner: my-org                # Auto-detected from git remote
-  repo: my-project             # Auto-detected from git remote
-issue_tracker: github
-labels:
-  - quarantine
-notifications:
-  github_pr_comment: true
-storage:
-  branch: quarantine/state
-exclude: []
-rerun_command: ""
+### Command crash detection
+
+When the suite's `command` exits non-zero AND no files match the `junitxml`
+glob:
+
+```
+Error [crash]: test command exited with code 1 but no JUnit XML files found at 'junit.xml'.
+This usually means the test runner crashed before producing results.
+Check that:
+  - Your test command ('npx jest --ci') runs successfully outside of quarantine
+  - JUnit XML output is configured in your test runner
+  - the junitxml path in .quarantine/config.yml matches where your runner writes XML
+```
+
+Exit code: `2`.
+
+### Rerun failure
+
+When `rerun_command` fails for a specific test, that test is classified as
+`"unresolved"`. The run continues. See FR-1.1.9.
+
+### Config validation errors
+
+All config errors use the `Error [config]:` prefix:
+```
+Error [config]: test_suites[0].command must be a YAML array, not a string.
+Error [config]: suite "My Backend!": name must match [a-z0-9][a-z0-9-]* (max 30 chars)
+Error [config]: test_suites is required and must be non-empty
 ```
 
 ---
 
-*References: ADR-010 (YAML config format), ADR-016 (v1 framework scope),
-ADR-003 (quarantine mechanism), pre-implementation tasks (task 4).*
+## CLI flags that override suite config
+
+These flags override the corresponding per-suite config value for a single
+`quarantine run` invocation. The config file is not modified.
+
+| Flag               | Overrides          |
+|--------------------|-------------------|
+| `--retries N`      | `retries`         |
+| `--junitxml GLOB`  | `junitxml`        |
+| `--timeout DUR`    | `timeout`         |
+| `--rerun-timeout DUR` | `rerun_timeout` |
+
+---
+
+## `quarantine init` behavior
+
+`quarantine init` creates `.quarantine/config.yml` with:
+1. Shared settings (`version`, `github`, `issue_tracker`, `labels`,
+   `notifications`, `storage`) with auto-detected `github.owner`/`repo`.
+2. Pre-filled `test_suites` entries for each detected framework (jest/vitest
+   from `package.json`, rspec from `Gemfile`).
+3. When no framework is detected: a commented example suite entry.
+
+Init is idempotent: re-running skips existing artifacts without overwriting.
+See NFR-2.2.4.
+
+`quarantine doctor` validates the config and prints resolved values including
+auto-detected fields.
+
+---
+
+## Removed fields (previously in `quarantine.yml`)
+
+The following fields existed in the old `quarantine.yml` format and are **not
+present** in `.quarantine/config.yml`:
+
+| Removed field  | Reason |
+|----------------|--------|
+| `framework`    | Removed per ADR-030 (framework-agnostic design). Suite's `command` replaces the role of framework-specific defaults. |
+| `exclude`      | Removed per plan D12. Suite's `command` controls which tests run. |
+| `rerun_command` (top-level) | Moved to per-suite required field. |
+| `junitxml` (top-level) | Moved to per-suite required field. |
+| `retries` (top-level) | Moved to per-suite optional field. |
+
+The `--config PATH` flag is also removed. There is only one config file per
+repository, at `.quarantine/config.yml`.

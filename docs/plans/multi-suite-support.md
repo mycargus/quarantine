@@ -895,7 +895,7 @@ reads the consolidated `state.json` if available (v2, see below).
 ### Schema transition
 
 Nothing has shipped. There are no users and no production data. The CLI
-replaces the old format with the new across two milestones (MS1a/MS1b). The
+replaces the old format with the new across two milestones (M9/M10). The
 dashboard is implemented against the new schemas only:
 
 - **Results artifact:** Requires `suite_name`. No `framework` field.
@@ -1253,9 +1253,9 @@ guidance may be added later.
 | `docs/adr/030-framework-agnostic-design.md` | No amendment needed. Plan aligns with ADR-030 as accepted (`framework` removed from config entirely). |
 | `docs/adr/020-test-id-construction.md` | Amend: test IDs scoped per suite state file, no global uniqueness assumption |
 | `docs/adr/027-v2-webhooks-deferred.md` | Amendment reverted: all webhooks remain deferred to v3. State consolidation uses scheduled Action + CLI command. |
-| `docs/milestones/m9.md` | Remove multi-framework numbered list from auto-detection; adjust scope |
+| `docs/milestones/m11.md` | Remove multi-framework numbered list from auto-detection; adjust scope |
 | `docs/plans/auto-detect-framework.md` | Remove Case B (multi-framework selection); detection is advisory for init |
-| `docs/milestones/index.md` | Replace "Phase 5 addition" webhook reference with Phase 6 MS1a/MS1b milestones; renumber Phase 6 → Phase 7 |
+| `docs/milestones/index.md` | Replace "Phase 5 addition" webhook reference with Phase 6 M9/M10 milestones; renumber Phase 6 → Phase 7 |
 | `docs/plans/webhooks.md` | Update status: all webhooks deferred to v3. State consolidation section updated to use scheduled Action. |
 
 ---
@@ -1271,10 +1271,10 @@ There are zero users and no production data. The convergence struct pattern
 protect backwards compatibility --- but there is nothing to protect. Maintaining
 dual code paths during migration adds bug surface without reducing risk.
 
-Instead, two milestones (MS1a, MS1b) replace the old format with the new.
+Instead, two milestones (M9, M10) replace the old format with the new.
 Ordering safety comes from atomic commits within each milestone, and a hard
-boundary between them: MS1a changes the irreducibly coupled core (config,
-execution model, state paths, notifications); MS1b adds features on top of
+boundary between them: M9 changes the irreducibly coupled core (config,
+execution model, state paths, notifications); M10 adds features on top of
 that stable surface (new commands, timeouts, dashboard, schemas). Each commit
 compiles, tests pass, and git bisect works. No deprecation warnings, no dual
 config paths, no deletion pass.
@@ -1282,10 +1282,10 @@ config paths, no deletion pass.
 **Why two milestones, not one?** The execution flow in `runRun()` is tightly
 coupled: `cfg.Framework` flows into exclusion args, state path, rerun command,
 result metadata, PR comment marker, and issue label format --- six downstream
-concerns. These must change together (MS1a). But new commands (`suite list`,
+concerns. These must change together (M9). But new commands (`suite list`,
 `suite remove`, `quarantine status`), timeout enforcement, dashboard migration,
-and schema file updates are additive --- they consume MS1a's output but cannot
-break it. Keeping them in MS1b limits blast radius: a bug in `suite remove`
+and schema file updates are additive --- they consume M9's output but cannot
+break it. Keeping them in M10 limits blast radius: a bug in `suite remove`
 cannot cascade into the core run path.
 
 ### Migration impact matrix
@@ -1313,7 +1313,7 @@ categorizes files by the nature of the change required.
 **Atomic commit sequence:** Each commit keeps tests green. The commits are
 ordered to minimize blast radius:
 
-**MS1a commits:**
+**M9 commits:**
 
 1. **Add `TestSuites` to Config** (additive --- `Framework` field still exists,
    all tests compile). `junitxml` and `rerun_command` always required. New
@@ -1333,7 +1333,7 @@ ordered to minimize blast radius:
    handling, `--config` flag, `--output` flag, `--exclude` flag,
    `SplitShellArgs` (if unused). Delete tests for removed features.
 
-**MS1b commits:**
+**M10 commits:**
 
 7. **New commands.** `suite list`, `suite remove`, `quarantine status`. Tests.
 8. **Timeout enforcement.** `timeout` and `rerun_timeout` config fields,
@@ -1344,7 +1344,7 @@ ordered to minimize blast radius:
 11. **Dashboard + schemas.** Enumerate per-suite state files. Results schema
     adds `suite_name`, removes `framework`. Schema files updated.
 
-### MS1a: Core Conversion
+### M9: Core Conversion
 
 The irreducibly coupled core — config, execution model, state paths, and
 notifications must change together because `cfg.Framework` flows into six
@@ -1372,11 +1372,11 @@ requires a translation layer that adds bug surface without reducing risk.
   `--exclude` flag, `--output` flag, `--` separator syntax, `Framework` type
 
 **Does NOT include:**
-- New CLI commands (MS1b)
-- Timeout enforcement (MS1b)
-- `quarantined-files.txt` generation (MS1b)
-- Dashboard migration (MS1b)
-- Schema file updates (MS1b)
+- New CLI commands (M10)
+- Timeout enforcement (M10)
+- `quarantined-files.txt` generation (M10)
+- Dashboard migration (M10)
+- Schema file updates (M10)
 - Full exclusion (deferred to v2)
 - Combined PR comments (deferred to v2)
 - `quarantine suite add` (deferred; users edit YAML, D4)
@@ -1384,13 +1384,13 @@ requires a translation layer that adds bug surface without reducing risk.
 **Demoable artifact:** Single suite configured, runs, state on branch, PR
 comment, issue created — on a real GitHub repo.
 
-### MS1b: Additive Features
+### M10: Additive Features
 
 New commands, timeout enforcement, and downstream consumers. These are built
-on MS1a's stable surface and cannot cascade failures into the core execution
+on M9's stable surface and cannot cascade failures into the core execution
 path.
 
-**Dependencies:** MS1a complete.
+**Dependencies:** M9 complete.
 
 **Scope:**
 - `suite list`, `suite remove` commands
@@ -1406,20 +1406,20 @@ timeouts enforced, dashboard reads per-suite state.
 
 ### Existing milestones: unchanged
 
-M1--M8 retain their current scope and implementation. MS1a/MS1b refactor on top.
+M1--M8 retain their current scope and implementation. M9/M10 refactor on top.
 
-| Milestone | Relationship to MS1a/MS1b |
+| Milestone | Relationship to M9/M10 |
 |-----------|--------------------------|
-| M1 | MS1a: Config rewritten. Init rewritten. |
-| M2 | MS1a: `runRun` refactored. `-- <cmd>` syntax removed. |
-| M3 | MS1a: Rerun command from per-suite config array. |
-| M4 | MS1a: State files at `.quarantine/<suite>/state.json`. |
-| M5 | MS1a: PR comment marker and issue dedup label format updated. |
-| M6 | MS1b: Dashboard enumerates per-suite state files. |
-| M7 | MS1b: Dashboard per-suite and cross-suite views. |
-| M8 | MS1b: Error handling and degraded mode per suite. Error prefixes for exit 2. |
-| M9 | MS1a: Scope reduced: detection pre-fills config. Init detects and suggests. |
-| M10--M14 | Unchanged. State consolidation uses scheduled Action + CLI command, not webhooks. |
+| M1 | M9: Config rewritten. Init rewritten. |
+| M2 | M9: `runRun` refactored. `-- <cmd>` syntax removed. |
+| M3 | M9: Rerun command from per-suite config array. |
+| M4 | M9: State files at `.quarantine/<suite>/state.json`. |
+| M5 | M9: PR comment marker and issue dedup label format updated. |
+| M6 | M10: Dashboard enumerates per-suite state files. |
+| M7 | M10: Dashboard per-suite and cross-suite views. |
+| M8 | M10: Error handling and degraded mode per suite. Error prefixes for exit 2. |
+| M11 | M9: Scope reduced: detection pre-fills config. Init detects and suggests. |
+| M12--M16 | Unchanged. State consolidation uses scheduled Action + CLI command, not webhooks. |
 
 ---
 

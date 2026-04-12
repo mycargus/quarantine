@@ -1,6 +1,6 @@
 # ADR-020: Test ID Construction Strategy
 
-**Status:** Accepted
+**Status:** Amended (2026-04-11: per-suite scoping)
 **Date:** 2026-03-17
 
 ## Context
@@ -47,3 +47,26 @@ The dashboard stores a SHA-256 hash of `test_id` internally for efficient databa
 - (-) Jest requires specific `jest-junit` configuration for stable output. Mitigated by recommending config during `quarantine init` and documenting in setup guides.
 - (-) If a test file is renamed, its `test_id` changes, breaking quarantine continuity. The old quarantine entry becomes orphaned. Mitigated by the unquarantine-on-issue-close mechanism (orphaned entries are cleaned up when their issues are closed).
 - (-) Parameterized tests (Jest `test.each`, RSpec shared examples) may produce multiple test IDs for what a developer considers "one test." This is acceptable -- each parameterized variant is tracked independently.
+
+### Amendment: Per-Suite Scoping (2026-04-11)
+
+With multi-suite support (see `docs/plans/multi-suite-support.md`), test IDs are
+no longer assumed to be globally unique across suites. Each suite has its own
+state file at `.quarantine/<suite-name>/state.json` on the `quarantine/state`
+branch (see ADR-032). Test ID uniqueness is scoped to a single suite's state
+file.
+
+**Rationale:** Two suites may run overlapping test files or have tests with
+identical `file_path::classname::name` composites (e.g., the same test file
+in both a "unit" and "integration" suite with different configurations).
+Scoping state files by suite name eliminates the need for global uniqueness.
+
+**Impact on issue dedup:** The issue dedup label format changes from
+`quarantine:{test_hash}` to `quarantine:<suite-name>:<test_hash>`, where
+`test_hash` is the first 8 hex characters of `SHA-256(test_id)`. This ensures
+a flaky test detected in two different suites creates separate issues. See
+ADR-032 for details.
+
+**Impact on dashboard indexing:** The dashboard's internal SHA-256 hash of
+`test_id` is now combined with `suite_name` for indexing. The hash remains
+an internal implementation detail.

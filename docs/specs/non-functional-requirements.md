@@ -6,15 +6,18 @@
 |----|-------------|---------|
 | NFR-2.1.1 | CLI overhead must be less than 5 seconds added to a test run, excluding retry time. | [v1] |
 | NFR-2.1.2 | Dashboard page load must be under 2 seconds. | [v1] |
-| NFR-2.1.3 | System must support 50+ concurrent CI builds without conflicts. | [v1] |
+| NFR-2.1.3 | System must support 50+ concurrent CI builds without conflicts. Per-suite state files (ADR-032) eliminate CAS contention between parallel suite runs. | [v1 M9] |
+| NFR-2.1.4 | Dashboard state enumeration cost scales linearly with suite count: 1 directory listing + N state file reads per poll cycle. For a repo with 5 suites on a 5-minute poll, this is approximately 72 API calls/hr — within `GITHUB_TOKEN` limits (1,000/hr). | [v1 M10] |
 
 ## 2.2 Reliability
 
 | ID | Requirement | Version |
 |----|-------------|---------|
-| NFR-2.2.1 | CLI must never break a build due to its own failure. | [v1] |
+| NFR-2.2.1 | CLI must never break a build due to its own failure. Quarantine errors (config, API, crash, timeout, unresolved tests) produce exit 2, not exit 1. Exit 1 is reserved exclusively for confirmed genuine test failures. | [v1] |
 | NFR-2.2.2 | Graceful degradation when GitHub API or dashboard is unreachable. | [v1] |
 | NFR-2.2.3 | Result ingestion must be idempotent (duplicate artifact processing is safe). | [v1] |
+| NFR-2.2.4 | `quarantine init` must be idempotent: re-running on an already-initialized repo skips existing artifacts without overwriting config or state. | [v1 M9] |
+| NFR-2.2.5 | Per-suite state files are independent: a failure in one suite's CAS update must not affect other suites' state (ADR-032). | [v1 M9] |
 
 ## 2.3 Security
 
@@ -47,7 +50,18 @@
 |----|-------------|---------|
 | NFR-2.6.1 | CI-provider agnostic: works in any CI environment that can run a binary. | [v1] |
 | NFR-2.6.2 | Native GitHub Actions integration for artifacts and cache. | [v1] |
-| NFR-2.6.3 | Supports JUnit XML output from any test framework. | [v1] |
+| NFR-2.6.3 | Supports JUnit XML output from any test framework. No framework field in config; quarantine is framework-agnostic (ADR-030). | [v1 M9] |
+| NFR-2.6.4 | Suite `command` is a YAML array executed via `exec.Command` (no shell). Works on Linux and macOS (linux/darwin, amd64/arm64). Windows out of scope for v1. | [v1 M9] |
+| NFR-2.6.5 | Suite names (`[a-z0-9][a-z0-9-]*`, max 30 chars) are safe for use as file system directory names, HTML comment markers, CLI arguments, and GitHub label components on all supported platforms. | [v1 M9] |
+
+## 2.11 Timeout and Signal Handling
+
+| ID | Requirement | Version |
+|----|-------------|---------|
+| NFR-2.11.1 | Per-suite `timeout` (default 30m) enforced for the suite command: SIGTERM sent at timeout, SIGKILL after 5-second grace period. Partial JUnit XML processed if present at kill time. | [v1 M10] |
+| NFR-2.11.2 | Per-suite `rerun_timeout` (default 5m) enforced for each individual rerun invocation: SIGKILL on timeout, test classified `"unresolved"`, run continues. | [v1 M10] |
+| NFR-2.11.3 | Signal forwarding: SIGINT/SIGTERM forwarded directly to the child process via `cmd.Process.Signal(sig)`. No shell layer; no process group management required. | [v1 M9] |
+| NFR-2.11.4 | All exit-2 error messages use a parseable prefix (`Error [config]:`, `Error [crash]:`, `Error [timeout]:`, `Error [rerun]:`) enabling log-based debugging without additional exit codes. | [v1 M10] |
 
 ## 2.7 App Auth Security
 

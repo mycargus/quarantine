@@ -43,27 +43,27 @@ Phase 3 -- Integration and polish (sequential)
   M7: Dashboard analytics and UI
   M8: Polish and hardening
 
-Phase 4 -- Init UX improvements (depends on M5, parallel with M6-M8)
-  M9: Init UX improvements
-
-Phase 5 -- GitHub App Integration (v2, depends on M5-M8 being complete)
-  Prerequisite: register dev GitHub App (M14 one-time setup step 1)
-  Sequential:
-    M10: Dashboard App auth foundation (JWT + InstallationTokenProvider + rate limit monitoring + contract tests)
-    M11: Dashboard OAuth login (@remix-run/auth, sessions, route protection, rate limiting) (ADR-029) (depends on M10)
-    M12: Installation discovery (depends on M11)
-    M13: github-app mode integration + user permission filtering (depends on M12)
-    M14: E2E integration + CI (depends on M13)
-
-Phase 6 -- Multi-Suite Conversion (depends on M1-M8 verified)
-    MS1a: Core conversion. Config (.quarantine/config.yml, test_suites array,
+Phase 4 -- Multi-Suite Conversion (depends on M1-M8 verified)
+    M9: Core conversion. Config (.quarantine/config.yml, test_suites array,
           junitxml/rerun_command always required), run [suite-name], per-suite
           state/notifications, init with framework detection, delete old format.
-    MS1b: Additive features. suite list/remove, quarantine status, timeouts,
+    M10: Additive features. suite list/remove, quarantine status, timeouts,
           quarantined-files.txt, dashboard migration, schema updates.
     See docs/plans/multi-suite-support.md.
 
-Phase 7 -- Webhooks (v3, depends on M14 and public endpoint ADR)
+Phase 5 -- Init UX improvements (depends on M9)
+  M11: Init UX improvements
+
+Phase 6 -- GitHub App Integration (v2, depends on M10 complete)
+  Prerequisite: register dev GitHub App (M16 one-time setup step 1)
+  Sequential:
+    M12: Dashboard App auth foundation (JWT + InstallationTokenProvider + rate limit monitoring + contract tests)
+    M13: Dashboard OAuth login (@remix-run/auth, sessions, route protection, rate limiting) (ADR-029) (depends on M12)
+    M14: Installation discovery (depends on M13)
+    M15: github-app mode integration + user permission filtering (depends on M14)
+    M16: E2E integration + CI (depends on M15)
+
+Phase 7 -- Webhooks (v3, depends on M16 and public endpoint ADR)
   issue.closed, installation lifecycle, artifact ingestion,
     state consolidation webhooks
     (see docs/plans/webhooks.md)
@@ -774,25 +774,189 @@ hardens and documents the entire system.
 
 ---
 
-## Phase 4 -- Init UX Improvements
+## Phase 4 -- Multi-Suite Conversion
 
-### M9: Init UX Improvements
+Phase 4 converts the single-framework CLI (M1--M8) to the multi-suite model
+defined in `docs/plans/multi-suite-support.md`. Two milestones: M9 changes
+the irreducibly coupled core; M10 adds features on the stable surface M9
+provides.
+
+---
+
+### M9: Core Conversion
 
 **Owner:** `cli-dev`
 
-**Dependencies:** M5 (quarantine init + GitHub client foundation).
+**Dependencies:** M1--M8 verified (current codebase as of 2026-04-11).
 
 **Scope -- included:**
 
-- Framework auto-detection from `package.json` and `Gemfile` in a new
-  `cli/internal/detect` package. Detection is advisory: never fatal, always
-  falls back to manual prompt.
-- Modified `quarantine init` framework prompt: one detected → default in
-  brackets; multiple → numbered list; none → current behavior.
-- `--yes`/`-y`, `--framework`, `--retries`, `--junitxml` flags on
-  `quarantine init`.
-- `--yes` mode: fully non-interactive; requires `--framework`; overwrites
-  existing config with a log message.
+- Config parsed from `.quarantine/config.yml` with `test_suites` array;
+  `junitxml` and `rerun_command` required per suite (ADR-010). No `framework`,
+  `exclude`, `rerun_command` top-level fields.
+- `quarantine run [suite-name]`: reads suite's `command` from config and
+  executes via `exec.Command` (no `--` separator, no CLI args for test command).
+  Suite command never modified or appended to (ADR-031).
+- Suite selection: single suite no-arg runs it; multiple suites require name;
+  no suites → exit 2 with guidance.
+- Per-suite state files at `.quarantine/<suite>/state.json` on state branch
+  (ADR-032).
+- Per-suite PR comment marker `<!-- quarantine:<suite-name> -->` (ADR-032).
+- Per-suite issue dedup label `quarantine:<suite-name>:<hash>` (ADR-032).
+- Command crash detection: non-zero exit + no JUnit XML → exit 2 + diagnostic
+  (ADR-031).
+- Rerun command failure: test classified as `"unresolved"`, run continues,
+  exit 2 (ADR-031).
+- `quarantine init`: creates `.quarantine/config.yml` with pre-filled suite
+  entries for detected frameworks; creates `.quarantine/.gitignore`; creates
+  state branch with `README.md`; idempotent (re-run skips existing artifacts).
+- `quarantine doctor`: validates `test_suites` array, suite name uniqueness and
+  format, required fields; warns on detected framework-level retry config (D9).
+- Delete old format: `quarantine.yml`, `--config`, `--`, `--output`,
+  `--exclude` flags, `Framework` type, exclusion logic, `SplitShellArgs`.
+
+**Scope -- explicitly excluded:**
+
+- New CLI commands (`suite list`, `suite remove`, `quarantine status`) — M10.
+- Timeout enforcement (`timeout`, `rerun_timeout` fields) — M10.
+- `.quarantine/<suite>/quarantined-files.txt` generation — M10.
+- Dashboard migration — M10.
+- Schema file updates — M10.
+- Full test exclusion — deferred to v2.
+
+**Acceptance criteria:**
+
+1. `.quarantine/config.yml` parsed with `test_suites` array; `junitxml` and
+   `rerun_command` are required per suite; missing fields → exit 2 with
+   diagnostic. (FR-1.4.1, ADR-010)
+2. `quarantine run [suite-name]` executes the suite's `command` unmodified via
+   `exec.Command`; no `--` separator; command never appended to. (FR-1.1.1,
+   ADR-031)
+3. Single suite configured + no name arg → runs the single suite. (FR-1.1.1)
+4. Multiple suites + no name arg → exit 2 with list of available suite names.
+   (FR-1.4.3)
+5. Per-suite state file created at `.quarantine/<suite>/state.json` on the
+   state branch on first run; subsequent runs update it via CAS. (FR-1.2.1,
+   ADR-032)
+6. PR comment for each suite uses `<!-- quarantine:<suite-name> -->` marker;
+   suites on same PR each have independent comments. (FR-1.3.2, ADR-032)
+7. Issue dedup label is `quarantine:<suite-name>:<hash>` for each suite;
+   same test in two suites creates two separate issues. (FR-1.3.1, FR-1.3.3,
+   ADR-032)
+8. `quarantine init` detects jest/vitest/rspec, pre-fills suite entries,
+   creates config + .gitignore + state branch; re-running is idempotent.
+   (FR-1.4.1, FR-1.4.2)
+9. `quarantine doctor` validates suite names (`[a-z0-9][a-z0-9-]*`, max 30),
+   required fields, non-empty `test_suites`; warns on detected
+   `retryTimes`/`retry`/`rspec-retry`. (FR-1.4.3)
+10. Command crash (non-zero exit + no JUnit XML) → exit 2 with
+    `Error [crash]: ...` diagnostic. (ADR-031, NFR-2.2.1)
+11. Rerun command failure → test classified `"unresolved"`, run continues,
+    exit 2; genuine failures still exit 1 (priority). (ADR-031)
+12. Old format artifacts removed: `quarantine.yml` support, `--config` flag,
+    `--` separator, `--output` flag, `--exclude` flag, `BuildExclusionArgs`,
+    `Framework` type. (ADR-010, ADR-030)
+13. `make cli-build && make cli-test && make cli-lint` pass.
+
+**Key implementation notes:**
+
+- See `docs/plans/multi-suite-support.md` for the complete migration impact
+  matrix and atomic commit sequence.
+- 68+ Go files reference old identifiers (`quarantine.yml`, `framework`,
+  `quarantine-bot`, `quarantine.json`, `BuildExclusionArgs`, `SplitShellArgs`).
+  All must be updated.
+- Run `/create-user-scenario` for all M9 scenarios before coding.
+- Run `/create-adr` for any design decisions not yet covered by ADR-010,
+  ADR-031, or ADR-032.
+
+---
+
+### M10: Additive Features
+
+**Owner:** `cli-dev` + `dashboard-dev`
+
+**Dependencies:** M9 complete.
+
+**Scope -- included:**
+
+- `quarantine suite list`: prints configured suites with name, command, junitxml.
+- `quarantine suite remove <name>`: removes suite from config with confirmation;
+  preserves state file on state branch; prints ramifications before confirming.
+- `quarantine status [suite-name]`: reads state + recent artifacts; shows
+  quarantined test count, avg duration, estimated CI time, oldest quarantined
+  tests (with age and issue number).
+- Timeout enforcement: `timeout` (default 30m) and `rerun_timeout` (default 5m)
+  per-suite config fields; SIGTERM then SIGKILL; partial XML processed on
+  command timeout; rerun timeout → `"unresolved"`. (ADR-031)
+- Writes `.quarantine/<suite>/quarantined-files.txt` before command execution:
+  newline-delimited quarantined file paths, deduplicated. (plan D5)
+- Error prefix convention for all exit-2 diagnostics:
+  `Error [config]:`, `Error [crash]:`, `Error [timeout]:`, `Error [rerun]:`.
+  (ADR-031)
+- Dashboard: enumerate per-suite state files from `.quarantine/` directory on
+  state branch (ADR-032); handle 404 gracefully.
+- Schema files updated: `schemas/test-result.schema.json` adds `suite_name`,
+  removes `framework`, adds `"unresolved"` status, `error`, `rerun_exit_code`;
+  `schemas/quarantine-state.schema.json` updated for per-suite path semantics.
+
+**Scope -- explicitly excluded:**
+
+- `quarantine suite add` — deferred; users edit YAML directly (plan D4).
+- Combined PR comment aggregation — deferred to v2.
+- Per-framework exclusion adapters — deferred to v2.
+- State consolidation (`quarantine state consolidate`) — deferred to v2.
+
+**Acceptance criteria:**
+
+1. `quarantine suite list` prints each suite's name, command, and junitxml
+   path. (FR-1.4.2)
+2. `quarantine suite remove backend` prints ramifications, asks `[y/N]`,
+   removes suite from config on confirmation; state file on branch preserved.
+   (FR-1.4.2)
+3. `quarantine status backend` shows quarantined count, estimated CI time,
+   oldest quarantined tests with age and issue numbers. (FR-1.1.1)
+4. `quarantine status` with no arg and multiple suites shows summary for all.
+   (FR-1.1.1)
+5. `timeout: 30m` enforced: SIGTERM sent at 30m, SIGKILL after 5s grace;
+   partial JUnit XML processed; exit 2 with `Error [timeout]: ...`. (ADR-031)
+6. `rerun_timeout: 5m` enforced: hanging rerun killed; test classified
+   `"unresolved"`; run continues; other tests processed. (ADR-031)
+7. `.quarantine/<suite>/quarantined-files.txt` written before command
+   execution; deduplicated; empty when no quarantined tests. (plan D5)
+8. Error prefix convention applied: all exit-2 messages use `Error [config]:`,
+   `Error [crash]:`, `Error [timeout]:`, or `Error [rerun]:`. (ADR-031)
+9. Dashboard enumerates `.quarantine/` on state branch; reads per-suite
+   `state.json`; handles 404 on `.quarantine/` gracefully. (ADR-032, FR-1.5.2)
+10. Results JSON has `suite_name` field, no `framework` field, `"unresolved"`
+    status, `error` and `rerun_exit_code` on unresolved tests. (ADR-031)
+11. Schema files updated and schema validation passes (`make contract-test`).
+    (NFR-2.6.3)
+12. `make test-all` passes (cli-test + dash-test + contract-test + e2e-test).
+    (NFR-2.5.1)
+
+**Key implementation notes:**
+
+- `quarantine status` reads duration data from recent artifacts (`duration_ms`
+  in results.json). Omit the duration line if no artifacts are available.
+- `quarantine suite remove` must NOT delete the state file on the state branch
+  (preserves history per plan decision D6).
+- Run `/create-user-scenario` for M10 scenarios before coding.
+
+---
+
+## Phase 5 -- Init UX Improvements
+
+### M11: Init UX Improvements
+
+**Owner:** `cli-dev`
+
+**Dependencies:** M9 (multi-suite init + framework detection foundation).
+
+**Scope -- included:**
+
+- `--yes`/`-y`, `--retries`, `--junitxml` flags on `quarantine init`.
+- `--yes` mode: fully non-interactive; overwrites existing config with a log
+  message.
 - Flags without `--yes`: each flag skips its prompt; others still appear.
 - Retries range validation (1–10) in both interactive and non-interactive paths.
 - TTY detection: warn when stdin is not a terminal and `--yes` is absent.
@@ -801,35 +965,24 @@ hardens and documents the entire system.
 
 - Package manager detection (no consumer in v1).
 - JUnit XML path detection from config files.
-- `--config` flag on `quarantine init`.
+- `--config` flag on `quarantine init` (removed per ADR-010 amendment).
+- `--framework` flag (framework field removed per ADR-030).
 - Changes to `quarantine run`, `quarantine doctor`, or `quarantine version`.
 
 **Acceptance criteria:**
 
-1. `quarantine init` detects jest/vitest from `package.json` and presents as
-   prompt default.
-2. `quarantine init` detects rspec from `Gemfile` and presents as prompt default.
-3. Multiple detected frameworks show a numbered list; vitest ordered before
-   jest; user selects by number or name.
-4. No detection falls back to current prompt behavior, unchanged.
-5. Malformed `package.json` silently falls back to undetected behavior.
-6. `quarantine init --yes --framework jest` creates `quarantine.yml` without
-   prompts, exits 0.
-7. `quarantine init --yes` without `--framework` exits 2 with actionable error.
-8. `quarantine init --framework jest` (no `--yes`) skips framework prompt;
-   still prompts retries and junitxml.
-9. Invalid `--framework` exits 2 immediately (no fallthrough to prompt).
-10. `quarantine init --yes --framework jest --retries 11` exits 2.
-11. Interactive retries prompt rejects out-of-range values and re-prompts.
-12. `make cli-build && make cli-test && make cli-lint` pass.
+1. `quarantine init --yes` creates config without prompts, exits 0.
+2. `quarantine init --yes --retries 11` exits 2 with actionable error.
+3. Interactive retries prompt rejects out-of-range values and re-prompts.
+4. `make cli-build && make cli-test && make cli-lint` pass.
 
 **Key implementation notes:**
 
 - See `docs/plans/auto-detect-framework.md` for the detect package design.
 - See `docs/plans/non-interactive-init.md` for flag semantics and TTY
   detection approach.
-- Run `/create-adr` for each feature's design decisions before coding.
-- Run `/create-user-scenario` to author scenarios before coding.
+- M9 already implements framework detection and pre-filling. M11 adds
+  non-interactive mode on top of that foundation.
 
 ---
 
@@ -855,33 +1008,44 @@ M5 (issues + PR comments) M7 (dashboard analytics)
   |           +-----------+
   |           |
   v           v
-  M9        M8 (polish + hardening)
-(init UX)
+            M8 (polish + hardening)
 
---- v2 begins after v1 is complete ---
+--- multi-suite conversion (foundational model change) ---
 
-M10 (App auth foundation)    M11 (OAuth login)
-  |                            |
-  +----------------------------+
-               |
-               v
-  M12 (installation discovery)
-               |
-               v
-  M13 (github-app mode integration)
-               |
-               v
-  M14 (E2E integration + CI)
+M9 (core conversion: config, run, state, notifications)
+  |
+  v
+M10 (additive: suite commands, timeouts, dashboard, schemas)
+  |
+  v
+M11 (init UX: --yes flag, TTY detection)
+
+--- v2 begins after multi-suite is stable ---
+
+M12 (App auth foundation)
+  |
+  v
+M13 (OAuth login)
+  |
+  v
+M14 (installation discovery)
+  |
+  v
+M15 (github-app mode integration)
+  |
+  v
+M16 (E2E integration + CI)
 ```
 
 ---
 
-## v2 -- GitHub App Integration
+## Phase 6 -- GitHub App Integration (v2)
 
 v2 adds GitHub App support for org-wide installation, fine-grained permissions,
 higher rate limits, dashboard OAuth login, and automatic repository discovery.
-v2 targets GitHub Actions only. See ADR-008 for the motivation behind the
-migration from PATs to GitHub App auth.
+v2 targets GitHub Actions only. Built on the multi-suite surface from Phase 5
+(M9/M10). See ADR-008 for the motivation behind the migration from PATs to
+GitHub App auth.
 
 **User stories driving v2:**
 

@@ -1,6 +1,24 @@
 # CLI Interface Specification
 
-> Last updated: 2026-03-17
+> Last updated: 2026-03-17 (M9 update pending)
+>
+> **IMPORTANT — M9 migration pending:** This document describes the pre-M9
+> CLI interface. The multi-suite plan (`docs/plans/multi-suite-support.md`) makes
+> the following breaking changes that supersede this document until M9 completes:
+>
+> - `quarantine run [flags] -- <test command>` → `quarantine run [suite-name] [flags]`
+>   (test command comes from config, not CLI; `--` separator removed)
+> - `quarantine.yml` → `.quarantine/config.yml` with `test_suites` array
+> - New commands: `quarantine suite list`, `quarantine suite remove`,
+>   `quarantine status`
+> - Removed flags: `--config`, `--exclude`, `--output`
+> - New flags: `--timeout`, `--rerun-timeout`
+> - PR comment marker: `<!-- quarantine-bot -->` → `<!-- quarantine:<suite-name> -->`
+> - Issue dedup label: `quarantine:{hash}` → `quarantine:<suite-name>:<hash>`
+> - State file path: `quarantine.json` → `.quarantine/<suite>/state.json`
+>
+> See `docs/milestones/m9.md` and `docs/milestones/m10.md` for the full
+> scope. This document will be rewritten as part of M9 implementation.
 >
 > This is the primary implementation reference for CLI development. Every
 > command, subcommand, flag, argument, exit code, and output format is defined

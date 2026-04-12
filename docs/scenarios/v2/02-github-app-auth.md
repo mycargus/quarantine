@@ -1,13 +1,13 @@
 # GitHub App Auth Scenarios
 
 Scenarios for GitHub App authentication, installation discovery, OAuth login,
-and dashboard `source: github-app` mode. Drives M10 through M14.
+and dashboard `source: github-app` mode. Drives M12 through M16.
 
 For general v2+ scenarios, see [01-v2-scenarios.md](01-v2-scenarios.md).
 
 ---
 
-## JWT Generation (M10)
+## JWT Generation (M12)
 
 ### Scenario 12: Dashboard generates a valid JWT for App authentication [v2]
 
@@ -27,7 +27,7 @@ For general v2+ scenarios, see [01-v2-scenarios.md](01-v2-scenarios.md).
 
 ---
 
-## Installation Token Exchange (M10)
+## Installation Token Exchange (M12)
 
 ### Scenario 14: Dashboard exchanges JWT for an installation token [v2]
 
@@ -63,7 +63,7 @@ For general v2+ scenarios, see [01-v2-scenarios.md](01-v2-scenarios.md).
 
 ---
 
-## OAuth Login (M11)
+## OAuth Login (M13)
 
 ### Scenario 18: Unauthenticated user is redirected to login [v2]
 
@@ -115,7 +115,7 @@ Removed: no refresh tokens. Session expiry is handled by cookie `Max-Age`.
 
 ---
 
-## Installation Discovery (M12)
+## Installation Discovery (M14)
 
 ### Scenario 25: Startup sync discovers installations before serving traffic [v2]
 
@@ -183,7 +183,7 @@ Removed: no refresh tokens. Session expiry is handled by cookie `Max-Age`.
 
 ---
 
-## github-app Mode Integration (M13)
+## github-app Mode Integration (M15)
 
 ### Scenario 33: Artifact polling uses installation tokens [v2]
 
@@ -219,7 +219,7 @@ Removed: no refresh tokens. Session expiry is handled by cookie `Max-Age`.
 
 ---
 
-## E2E Integration + CI (M14)
+## E2E Integration + CI (M16)
 
 ### Scenario 38: Real installation token exchange succeeds end-to-end [v2]
 
@@ -247,7 +247,7 @@ Removed: no refresh tokens. Session expiry is handled by cookie `Max-Age`.
 
 ---
 
-## Rate Limiting (M11)
+## Rate Limiting (M13)
 
 ### Scenario 41: Rate limit exceeded for unauthenticated request [v2]
 
@@ -267,7 +267,7 @@ Removed: no refresh tokens. Session expiry is handled by cookie `Max-Age`.
 
 ---
 
-## Startup Sync Timeout (M12)
+## Startup Sync Timeout (M14)
 
 ### Scenario 43: Startup sync timeout causes fast failure [v2]
 
@@ -279,7 +279,7 @@ Removed: no refresh tokens. Session expiry is handled by cookie `Max-Age`.
 
 ---
 
-## Concurrent Token Exchange (M10)
+## Concurrent Token Exchange (M12)
 
 ### Scenario 44: Concurrent callers coalesce into a single token exchange [v2]
 
@@ -291,7 +291,7 @@ Removed: no refresh tokens. Session expiry is handled by cookie `Max-Age`.
 
 ---
 
-## ~~Concurrent Token Refresh (M11)~~ REMOVED
+## ~~Concurrent Token Refresh (M13)~~ REMOVED
 
 ### ~~Scenario 45: Concurrent requests coalesce into a single token refresh [v2]~~ REMOVED
 
@@ -299,7 +299,7 @@ Removed: no refresh tokens. Session cookie expires after 8 hours. No concurrent 
 
 ---
 
-## Removed Installation Detection (M12)
+## Removed Installation Detection (M14)
 
 ### Scenario 46: Uninstalled App is detected and marked as removed [v2]
 
@@ -311,7 +311,7 @@ Removed: no refresh tokens. Session cookie expires after 8 hours. No concurrent 
 
 ---
 
-## Pagination (M12, M13)
+## Pagination (M14, M15)
 
 ### Scenario 47: Installation discovery paginates through all installations and repos [v2]
 
@@ -331,7 +331,7 @@ Removed: no refresh tokens. Session cookie expires after 8 hours. No concurrent 
 
 ---
 
-## Expired Session Logout (M11)
+## Expired Session Logout (M13)
 
 ### Scenario 49: Logout with expired or absent session does not error [v2]
 

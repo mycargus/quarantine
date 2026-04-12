@@ -7,19 +7,25 @@ Each v1 scenario is tagged with the milestone where it first becomes testable.
 
 | Section | Milestones |
 |---------|------------|
-| [Initialization](v1/01-initialization.md) | M1 | 
-| [Configuration Validation](v1/02-configuration.md) | M1
-| [Core Flows](v1/03-core-flows.md) | M2–M8
-| [Concurrency](v1/04-concurrency.md) | M4–M5
-| [Degraded Mode](v1/05-degraded-mode.md) | M4, M6
-| [Dashboard](v1/06-dashboard.md) | M6–M7
-| [Branch Protection](v1/07-branch-protection.md) | M4
-| [CLI Flags & Configuration](v1/08-cli-flags.md) | M2–M8
-| [Test Runner Edge Cases](v1/09-test-runner-edge-cases.md) | M2–M8
-| [GitHub API Edge Cases](v1/10-github-api-edge-cases.md) | M4–M8
-| [Configuration Edge Cases](v1/11-config-edge-cases.md) | M1–M2
-| [Schema Validation](v1/12-schema-validation.md) | M8
-| [Parameterized Tests](v1/13-parameterized-tests.md) | M8
+| [Initialization](v1/01-initialization.md) | M1 |
+| [Configuration Validation](v1/02-configuration.md) | M1 |
+| [Core Flows](v1/03-core-flows.md) | M2–M8 |
+| [Concurrency](v1/04-concurrency.md) | M4–M5 |
+| [Degraded Mode](v1/05-degraded-mode.md) | M4, M6 |
+| [Dashboard](v1/06-dashboard.md) | M6–M7 |
+| [Branch Protection](v1/07-branch-protection.md) | M4 |
+| [CLI Flags & Configuration](v1/08-cli-flags.md) | M2–M8 |
+| [Test Runner Edge Cases](v1/09-test-runner-edge-cases.md) | M2–M8 |
+| [GitHub API Edge Cases](v1/10-github-api-edge-cases.md) | M4–M8 |
+| [Configuration Edge Cases](v1/11-config-edge-cases.md) | M1–M2 |
+| [Schema Validation](v1/12-schema-validation.md) | M8 |
+| [Parameterized Tests](v1/13-parameterized-tests.md) | M8 |
+| [Multi-Suite Initialization](v1/14-multi-suite-init.md) | M9 |
+| [Multi-Suite Run & Errors](v1/15-multi-suite-run.md) | M9 |
+| [Suite Management](v1/17-suite-management.md) | M10 |
+| [Quarantine Status](v1/18-quarantine-status.md) | M10 |
+| [Timeout Enforcement](v1/19-timeouts.md) | M10 |
+| [Quarantined Files List](v1/20-quarantined-files.md) | M10 |
 
 ## v2+ Scenarios
 

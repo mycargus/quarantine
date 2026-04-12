@@ -1,6 +1,19 @@
 # Quarantine -- Architecture Document
 
-> Last updated: 2026-03-19
+> Last updated: 2026-03-19 (M9 update pending)
+>
+> **IMPORTANT — M9 migration pending:** The multi-suite plan
+> (`docs/plans/multi-suite-support.md`) makes significant changes to state paths,
+> artifact paths, and the sequence diagram. Key changes:
+>
+> - State: `quarantine.json` → `.quarantine/<suite-name>/state.json` (one per suite)
+> - Artifacts: `.quarantine/results.json` → `.quarantine/<suite-name>/results.json`
+> - PR comment marker: `<!-- quarantine-bot -->` → `<!-- quarantine:<suite-name> -->`
+> - Dashboard reads state by listing `.quarantine/` directory then N suite files
+> - Command execution: no shell; `exec.Command(command[0], command[1:]...)`
+>
+> This document will be updated as part of M9 implementation.
+> See `docs/milestones/m9.md` for the full scope.
 
 ## 1. Overview
 
