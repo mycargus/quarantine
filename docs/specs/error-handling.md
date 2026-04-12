@@ -105,7 +105,7 @@ visibility to the repo.
 **Behavior:**
 1. Re-read quarantine.json from the branch (get new SHA and content).
 2. Merge: union of both test sets. If the same test_id exists in both, keep
-   the entry with the later `last_flaky_at` timestamp. **Quarantine wins on
+   the entry with the later `last_failure_at` timestamp. **Quarantine wins on
    conflict** -- if one side has a test quarantined and the other removed it,
    keep it quarantined (ADR-012).
 3. Retry the write with the new SHA.

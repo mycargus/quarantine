@@ -952,9 +952,9 @@ Path: `.quarantine/<suite-name>/state.json`
 The per-suite state file retains all fields from the existing
 `quarantine-state.schema.json`. The `suite` field adopts a new semantic meaning:
 it now refers to the quarantine suite name (matching the suite's `name` in
-config) rather than the JUnit classname/describe block. `last_flaky_at` is
-renamed to `last_failure_at` because D18 updates this timestamp on every
-quarantined test failure, not only on new flaky detections.
+config) rather than the JUnit classname/describe block. `last_flaky_at` was
+renamed to `last_failure_at` (implemented in M9) because D18 updates this
+timestamp on every quarantined test failure, not only on new flaky detections.
 
 ```json
 {
@@ -1246,7 +1246,7 @@ guidance may be added later.
 | `docs/specs/cli-spec.md` | Update init, run, doctor; add suite subcommands (list, remove; add deferred); add `quarantine status`; per-suite output dirs; repo root discovery; command crash handling; timeout enforcement (D23); remove `quarantine run -- <cmd>` syntax (replaced by `quarantine run [suite-name]`); remove `--config` flag; remove `--exclude` flag; remove `--output` flag (results always at `.quarantine/<suite>/results.json`); add `--timeout`, `--rerun-timeout` flags; replace entire execution flow (steps 1--14) with new wrap-don't-augment model; both `command` and `rerun_command` as YAML arrays executed via `exec.Command` (no shell); update all CI workflow examples to new syntax; update exit code table (unresolved → exit 2, not exit 1); add error prefix convention for exit-2 diagnostics |
 | `docs/specs/architecture.md` | Update sequence diagram, config location, per-suite state files at `.quarantine/<suite>/state.json`, artifact schema with `suite_name`, remove `framework` field |
 | `docs/specs/contracts.md` | Update PR comment marker (`<!-- quarantine:<suite-name> -->` replaces `<!-- quarantine-bot -->`), issue dedup label format (`quarantine:<suite>:<hash>` replaces `quarantine:{hash}`), state file location, results artifact schema changes (add `suite_name`, `rerun_exit_code`; remove `framework`), config file location and name |
-| `schemas/quarantine-state.schema.json` | Per-suite file at `.quarantine/<suite>/state.json`; rename `last_flaky_at` → `last_failure_at`; update `suite` field description to quarantine suite name semantic |
+| `schemas/quarantine-state.schema.json` | Per-suite file at `.quarantine/<suite>/state.json`; `last_flaky_at` → `last_failure_at` (done, M9); update `suite` field description to quarantine suite name semantic |
 | `schemas/test-result.schema.json` | Add `suite_name`; remove `framework`; add `"unresolved"` to status enum; add `error` field to test_entry; add `rerun_exit_code` field to test_entry; remove `config.excluded_patterns` and `config.excluded_count`; remove `--output` flag reference |
 | `docs/adr/010-config-format.md` | Amend: `.quarantine/config.yml`, `test_suites` array, `junitxml` and `rerun_command` always required, no `--config` flag |
 | `docs/adr/016-v1-framework-scope.md` | Already superseded by ADR-030 (framework-agnostic design) |

@@ -231,7 +231,7 @@ but now passing in this run)
 
 ---
 
-### Scenario 89: Flaky detection increments flaky_count and updates last_flaky_at [M7]
+### Scenario 89: Flaky detection increments flaky_count and updates last_failure_at [M7]
 
 **Risk:** The "last flaky occurrence" column always shows "Never" and flaky count is always 0, because the ingest pipeline never processes `status: "flaky"` entries — making it impossible to gauge how often a quarantined test is still misbehaving. (FR-1.5.1)
 
@@ -245,13 +245,13 @@ but now passing in this run)
   a flaky detection)
 
 and `quarantined_tests` already has entries for both tests with `flaky_count: 2` and
-`last_flaky_at: "2026-02-20T10:00:00Z"`
+`last_failure_at: "2026-02-20T10:00:00Z"`
 
 **When** the ingestion pipeline processes the artifact
 
 **Then:**
-1. The `processes_payment` entry: `flaky_count` is incremented to `3` and `last_flaky_at` is updated to `"2026-03-15T14:00:00Z"`.
-2. The `login` entry: `flaky_count` remains `2` and `last_flaky_at` remains `"2026-02-20T10:00:00Z"` — `status: "quarantined"` is NOT a flaky detection.
+1. The `processes_payment` entry: `flaky_count` is incremented to `3` and `last_failure_at` is updated to `"2026-03-15T14:00:00Z"`.
+2. The `login` entry: `flaky_count` remains `2` and `last_failure_at` remains `"2026-02-20T10:00:00Z"` — `status: "quarantined"` is NOT a flaky detection.
 3. `last_run_status` for `processes_payment` is set to `"passing"` (a flaky test ultimately passed on retry).
 
 ---

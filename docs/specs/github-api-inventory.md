@@ -311,7 +311,7 @@ Per ADR-012, when a 409 is returned:
 
 - New quarantine entries: add to the merged result.
 - Removed entries (unquarantined): only remove if absent from BOTH versions.
-- Updated fields (e.g., `flaky_count`, `last_flaky_at`): take the higher/later value.
+- Updated fields (e.g., `flaky_count`, `last_failure_at`): take the higher/later value.
 
 **Degraded mode behavior:**
 

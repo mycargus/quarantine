@@ -664,7 +664,7 @@ hardens and documents the entire system.
   Sync failure degrades gracefully — page renders with existing data.
 - Ingest pipeline populates `quarantined_tests` from artifact test entries:
   `status: "quarantined"` → upsert with quarantined_at, last_run_status,
-  issue_url; `status: "flaky"` → increment flaky_count, update last_flaky_at.
+  issue_url; `status: "flaky"` → increment flaky_count, update last_failure_at.
 - Dashboard renders data pulled from real GitHub Artifacts via on-demand sync.
 - Responsive layout via CSS (no build step).
 
@@ -693,7 +693,7 @@ hardens and documents the entire system.
    env, and respects the debounce. (FR-1.5.3, NFR-2.3.4)
 10. Artifact ingestion populates `quarantined_tests` with `quarantined_at`
     preserved on conflict. (FR-1.5.1, FR-1.5.4)
-11. Flaky detections increment `flaky_count` and update `last_flaky_at`.
+11. Flaky detections increment `flaky_count` and update `last_failure_at`.
     (FR-1.5.1)
 12. On-demand sync failure degrades gracefully — page renders with existing
     SQLite data. (FR-1.6.1 analogy)
