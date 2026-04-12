@@ -19,7 +19,7 @@ const quarantineFixture: TestResult = {
   pr_number: null,
   timestamp: "2026-02-10T14:00:00Z",
   cli_version: "0.1.0",
-  framework: "rspec",
+  suite_name: "unit",
   config: {
     retry_count: 3,
   },
@@ -288,7 +288,7 @@ describe("ingestArtifact() — updating an existing quarantined_tests row (Scena
     pr_number: null,
     timestamp: "2026-03-01T10:00:00Z",
     cli_version: "0.1.0",
-    framework: "rspec",
+    suite_name: "unit",
     config: { retry_count: 3 },
     summary: {
       total: 1,

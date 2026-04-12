@@ -20,7 +20,7 @@ const flakyFixture: TestResult = {
   pr_number: null,
   timestamp: "2026-03-15T14:00:00Z",
   cli_version: "0.1.0",
-  framework: "rspec",
+  suite_name: "unit",
   config: {
     retry_count: 3,
   },

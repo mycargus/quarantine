@@ -15,7 +15,7 @@ const makeArtifactJson = (runId: string) =>
     pr_number: null,
     timestamp: "2026-02-10T14:00:00Z",
     cli_version: "0.1.0",
-    framework: "jest",
+    suite_name: "unit",
     config: { retry_count: 3 },
     summary: { total: 1, passed: 1, failed: 0, skipped: 0, quarantined: 0, flaky_detected: 0 },
     tests: [],

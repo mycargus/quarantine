@@ -12,7 +12,7 @@ const validFixture: TestResult = {
   pr_number: 99,
   timestamp: "2026-03-15T14:22:15Z",
   cli_version: "0.1.0",
-  framework: "jest",
+  suite_name: "unit",
   config: {
     retry_count: 3,
   },

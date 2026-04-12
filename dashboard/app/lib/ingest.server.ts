@@ -29,6 +29,7 @@ export interface ListArtifactsResult {
 
 export interface TestResult {
   version: number
+  suite_name: string
   run_id: string
   repo: string
   branch: string
@@ -36,11 +37,8 @@ export interface TestResult {
   pr_number: number | null
   timestamp: string
   cli_version: string
-  framework: string
   config: {
     retry_count: number
-    excluded_patterns?: string[]
-    excluded_count?: number
   }
   summary: {
     total: number
