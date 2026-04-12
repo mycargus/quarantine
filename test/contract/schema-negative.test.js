@@ -42,7 +42,7 @@ function validResult(overrides = {}) {
     commit_sha: "abc123",
     timestamp: "2026-01-15T10:00:00Z",
     cli_version: "0.1.0",
-    framework: "jest",
+    suite_name: "jest",
     config: { retry_count: 3 },
     summary: {
       total: 0,
@@ -51,6 +51,7 @@ function validResult(overrides = {}) {
       skipped: 0,
       quarantined: 0,
       flaky_detected: 0,
+      unresolved: 0,
     },
     tests: [],
     ...overrides,
@@ -112,11 +113,13 @@ describe("test-result.schema.json — negative regression", () => {
     })
   })
 
-  test("invalid 'framework' enum value is rejected", () => {
+  test("missing required field 'suite_name' is rejected", () => {
+    const doc = validResult()
+    delete doc.suite_name
     assert({
-      given: "test-result with framework: 'pytest' (not in enum)",
+      given: "test-result missing 'suite_name'",
       should: "fail schema validation",
-      actual: rejects(validResult({ framework: "pytest" })),
+      actual: rejects(doc),
       expected: true,
     })
   })
@@ -211,7 +214,7 @@ function validEntry(overrides = {}) {
     name: "logs in",
     suite: "AuthService",
     first_flaky_at: "2026-01-01T00:00:00Z",
-    last_flaky_at: "2026-01-01T00:00:00Z",
+    last_failure_at: "2026-01-01T00:00:00Z",
     flaky_count: 1,
     quarantined_at: "2026-01-01T00:00:00Z",
     quarantined_by: "cli-auto",
