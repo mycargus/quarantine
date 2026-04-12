@@ -424,3 +424,44 @@ func TestInitPutContentsFailure(t *testing.T) {
 		Expected: true,
 	})
 }
+
+// --- MkdirAll failure (file exists at .quarantine path) ---
+
+// TestInitMkdirAllFailure verifies that init returns an error when the
+// .quarantine directory cannot be created because the path is already a file.
+// Creating a file at the .quarantine path causes os.MkdirAll to return ENOTDIR
+// on all platforms without requiring elevated permissions.
+func TestInitMkdirAllFailure(t *testing.T) {
+	dir := t.TempDir()
+	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+
+	// Pre-create a regular file where .quarantine directory should be.
+	// os.MkdirAll(".quarantine", ...) will fail with ENOTDIR.
+	if err := os.WriteFile(dir+"/.quarantine", []byte("not a directory"), 0644); err != nil {
+		t.Fatalf("setup: write file at .quarantine path: %v", err)
+	}
+
+	// Add jest so the framework detection succeeds and reaches the mkdir step.
+	pkgJSON := `{"devDependencies":{"jest":"^29.0.0"}}`
+	if err := os.WriteFile(dir+"/package.json", []byte(pkgJSON), 0644); err != nil {
+		t.Fatalf("setup: write package.json: %v", err)
+	}
+
+	mockServer := newInitTestServer(t)
+
+	_, err := executeInitCmd(t,
+		"",
+		dir,
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": mockServer.server.URL,
+		},
+	)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a file exists at the .quarantine path",
+		Should:   "return an error (os.MkdirAll fails with ENOTDIR)",
+		Actual:   err != nil,
+		Expected: true,
+	})
+}

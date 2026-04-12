@@ -211,8 +211,8 @@ func TestInitBranchAlreadyExists(t *testing.T) {
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "quarantine/state branch already exists",
-		Should:   "print 'Skipping' in output",
-		Actual:   strings.Contains(stdout, "Skipping"),
+		Should:   "print 'skipping' in output",
+		Actual:   strings.Contains(stdout, "skipping"),
 		Expected: true,
 	})
 }
@@ -284,6 +284,111 @@ func TestInitNoFrameworksDetectedWritesCommentedConfig(t *testing.T) {
 		Given:    "no frameworks detected",
 		Should:   "create .quarantine/.gitignore",
 		Actual:   gitignoreErr == nil,
+		Expected: true,
+	})
+}
+
+// --- Scenario 112: quarantine init is idempotent ---
+
+func TestInitIdempotentSkipsExistingArtifacts(t *testing.T) {
+	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
+	mockServer := newInitTestServer(t, withExistingBranch())
+
+	// Pre-create .quarantine directory with user-customized config.
+	if err := os.MkdirAll(dir+"/.quarantine", 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	customConfig := "version: 1\n# my-custom-suite\n"
+	if err := os.WriteFile(dir+"/.quarantine/config.yml", []byte(customConfig), 0644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	if err := os.WriteFile(dir+"/.quarantine/.gitignore", []byte("*\n!.gitignore\n!config.yml\n"), 0644); err != nil {
+		t.Fatalf("write gitignore: %v", err)
+	}
+
+	stdout, err := executeInitCmd(t,
+		"",
+		dir,
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": mockServer.server.URL,
+		},
+	)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "all artifacts already exist (config, gitignore, branch)",
+		Should:   "exit with code 0",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	// Config must be unchanged — custom content preserved.
+	content, configReadErr := os.ReadFile(dir + "/.quarantine/config.yml")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config already exists with user-customized content",
+		Should:   "read config without error",
+		Actual:   configReadErr == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config already exists with user-customized content",
+		Should:   "preserve custom config content (not overwrite)",
+		Actual:   strings.Contains(string(content), "my-custom-suite"),
+		Expected: true,
+	})
+
+	// .gitignore must be unchanged — original content preserved.
+	gitignore, gitignoreReadErr := os.ReadFile(dir + "/.quarantine/.gitignore")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "gitignore already exists",
+		Should:   "read .gitignore without error",
+		Actual:   gitignoreReadErr == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "gitignore already exists",
+		Should:   "preserve .gitignore content (not overwrite)",
+		Actual:   strings.Contains(string(gitignore), "!config.yml"),
+		Expected: true,
+	})
+
+	// Output should mention each skipped artifact.
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config already exists",
+		Should:   "mention config.yml already exists in output",
+		Actual:   strings.Contains(stdout, "config.yml") && strings.Contains(stdout, "skipping"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "gitignore already exists",
+		Should:   "mention .gitignore already exists in output",
+		Actual:   strings.Contains(stdout, ".gitignore") && strings.Contains(stdout, "skipping"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "quarantine/state branch already exists",
+		Should:   "mention branch already exists in output",
+		Actual:   strings.Contains(stdout, "branch") && strings.Contains(stdout, "skipping"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "all artifacts already exist",
+		Should:   "print token validated in output",
+		Actual:   strings.Contains(stdout, "token validated") || strings.Contains(stdout, "GitHub token"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "all artifacts already exist",
+		Should:   "print already initialized message",
+		Actual:   strings.Contains(stdout, "already initialized"),
 		Expected: true,
 	})
 }

@@ -13,10 +13,18 @@ import (
 	ghclient "github.com/mycargus/quarantine/cli/internal/github"
 )
 
+// fileExists reports whether the file at path exists.
+// This is an I/O helper — not pure.
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 // runInit implements the `quarantine init` command.
 // It auto-detects test frameworks from package.json and Gemfile,
-// creates .quarantine/config.yml with per-suite entries, creates
-// .quarantine/.gitignore, and sets up the quarantine/state branch.
+// creates .quarantine/config.yml with per-suite entries (if not already present),
+// creates .quarantine/.gitignore (if not already present), and sets up the
+// quarantine/state branch. Re-running is safe — existing artifacts are skipped.
 func runInit(cmd *cobra.Command, args []string) error {
 	cmd.SetOut(cmd.OutOrStdout())
 
@@ -73,31 +81,40 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 		return fmt.Errorf("get repo: %w", err)
 	}
 
-	// Step 5: Write .quarantine/config.yml and .quarantine/.gitignore.
+	// Step 5: Write .quarantine/config.yml and .quarantine/.gitignore (skip if existing).
 	if err := os.MkdirAll(".quarantine", 0755); err != nil {
 		cmd.Printf("Error: failed to create .quarantine directory: %v\n", err)
 		return fmt.Errorf("mkdir .quarantine: %w", err)
 	}
 
-	var configContent string
-	if len(frameworks) == 0 {
-		configContent = formatNoFrameworkConfig(owner, repo)
+	configSkipped := fileExists(".quarantine/config.yml")
+	if configSkipped {
+		cmd.Printf(".quarantine/config.yml already exists — skipping.\n")
 	} else {
-		configContent = formatInitConfig(owner, repo, frameworks)
-	}
-	if err := os.WriteFile(".quarantine/config.yml", []byte(configContent), 0644); err != nil {
-		cmd.Printf("Error: failed to write .quarantine/config.yml: %v\n", err)
-		return fmt.Errorf("write config: %w", err)
+		var configContent string
+		if len(frameworks) == 0 {
+			configContent = formatNoFrameworkConfig(owner, repo)
+		} else {
+			configContent = formatInitConfig(owner, repo, frameworks)
+		}
+		if err := os.WriteFile(".quarantine/config.yml", []byte(configContent), 0644); err != nil {
+			cmd.Printf("Error: failed to write .quarantine/config.yml: %v\n", err)
+			return fmt.Errorf("write config: %w", err)
+		}
+		if len(frameworks) > 0 {
+			cmd.Printf("Pre-filled %d suite entries in .quarantine/config.yml\n", len(frameworks))
+		}
 	}
 
-	gitignoreContent := formatQuarantineGitignore()
-	if err := os.WriteFile(".quarantine/.gitignore", []byte(gitignoreContent), 0644); err != nil {
-		cmd.Printf("Error: failed to write .quarantine/.gitignore: %v\n", err)
-		return fmt.Errorf("write gitignore: %w", err)
-	}
-
-	if len(frameworks) > 0 {
-		cmd.Printf("Pre-filled %d suite entries in .quarantine/config.yml\n", len(frameworks))
+	gitignoreSkipped := fileExists(".quarantine/.gitignore")
+	if gitignoreSkipped {
+		cmd.Printf(".quarantine/.gitignore already exists — skipping.\n")
+	} else {
+		gitignoreContent := formatQuarantineGitignore()
+		if err := os.WriteFile(".quarantine/.gitignore", []byte(gitignoreContent), 0644); err != nil {
+			cmd.Printf("Error: failed to write .quarantine/.gitignore: %v\n", err)
+			return fmt.Errorf("write gitignore: %w", err)
+		}
 	}
 
 	// Step 6: Check and create the quarantine/state branch.
@@ -108,7 +125,7 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 	}
 
 	if branchExists {
-		cmd.Printf("Branch 'quarantine/state' already exists. Skipping branch creation.\n")
+		cmd.Printf("quarantine/state branch already exists — skipping.\n")
 	} else {
 		defaultBranch := repoInfo.DefaultBranch
 		if defaultBranch == "" {
@@ -136,7 +153,13 @@ Do not edit files on this branch manually.
 		}
 	}
 
-	cmd.Printf("%s", formatInitSummary(owner, repo, frameworks, branchExists))
+	cmd.Printf("GitHub token validated.\n")
+
+	if configSkipped && gitignoreSkipped && branchExists {
+		cmd.Printf("\n%s", formatAlreadyInitializedSummary())
+	} else {
+		cmd.Printf("%s", formatInitSummary(owner, repo, frameworks, branchExists))
+	}
 
 	return nil
 }
@@ -316,6 +339,13 @@ func formatQuarantineGitignore() string {
 !.gitignore
 !config.yml
 `
+}
+
+// formatAlreadyInitializedSummary returns the output when all quarantine
+// artifacts already exist and no changes were made.
+// This is a pure function — no I/O.
+func formatAlreadyInitializedSummary() string {
+	return "Quarantine is already initialized. Edit .quarantine/config.yml to add test suites.\n"
 }
 
 // formatInitSummary returns the success output for quarantine init.
