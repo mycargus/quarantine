@@ -36,6 +36,7 @@ type Summary struct {
 	Skipped       int `json:"skipped"`
 	Quarantined   int `json:"quarantined"`
 	FlakyDetected int `json:"flaky_detected"`
+	Unresolved    int `json:"unresolved"`
 }
 
 // RetryEntry records the outcome of a single retry attempt.
@@ -116,8 +117,11 @@ func Build(tests []parser.TestResult, meta Metadata) Result {
 }
 
 // RetryOutcome holds the retry attempts for a single test (keyed by TestID).
+// Unresolved is set to true when the rerun command itself crashed (e.g. binary
+// not found, exit 127) — distinguishing infrastructure failure from test failure.
 type RetryOutcome struct {
-	Attempts []RetryEntry
+	Attempts   []RetryEntry
+	Unresolved bool
 }
 
 // BuildAtWithRetries constructs a Result incorporating retry outcomes.
@@ -142,21 +146,28 @@ func BuildAtWithRetries(tests []parser.TestResult, retries map[string]RetryOutco
 			IssueNumber:    nil,
 		}
 
-		if outcome, ok := retries[t.TestID]; ok && len(outcome.Attempts) > 0 {
+		if outcome, ok := retries[t.TestID]; ok && (len(outcome.Attempts) > 0 || outcome.Unresolved) {
 			orig := t.Status
 			entry.OriginalStatus = &orig
-			entry.Retries = outcome.Attempts
-
-			// If any retry passed, classify as flaky.
-			passedOnRetry := false
-			for _, a := range outcome.Attempts {
-				if a.Status == "passed" {
-					passedOnRetry = true
-					break
-				}
+			if len(outcome.Attempts) > 0 {
+				entry.Retries = outcome.Attempts
 			}
-			if passedOnRetry {
-				entry.Status = "flaky"
+
+			if outcome.Unresolved {
+				// Rerun command crashed (infrastructure failure): classify as unresolved.
+				entry.Status = "unresolved"
+			} else {
+				// If any retry passed, classify as flaky.
+				passedOnRetry := false
+				for _, a := range outcome.Attempts {
+					if a.Status == "passed" {
+						passedOnRetry = true
+						break
+					}
+				}
+				if passedOnRetry {
+					entry.Status = "flaky"
+				}
 			}
 		}
 
@@ -171,6 +182,8 @@ func BuildAtWithRetries(tests []parser.TestResult, retries map[string]RetryOutco
 			summary.FlakyDetected++
 		case "quarantined":
 			summary.Quarantined++
+		case "unresolved":
+			summary.Unresolved++
 		}
 
 		entries[i] = entry

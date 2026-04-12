@@ -238,7 +238,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 	excludePatterns := mergeExcludePatterns(cfg.Exclude, excludeFlag)
 
 	// Retry failing tests individually (skip quarantined and excluded tests).
-	retryOutcomes, retryWarnings := retryFailingTests(ctx, testResults, cfg, excludePatterns)
+	// Legacy mode: rerun command crash is treated as genuine failure (not unresolved).
+	retryOutcomes, retryWarnings := retryFailingTests(ctx, testResults, cfg, excludePatterns, false)
 	for _, w := range retryWarnings {
 		cmd.PrintErrf("[quarantine] WARNING: %s", w)
 	}
@@ -433,6 +434,13 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		return fmt.Errorf("test command execution failed")
 	}
 
+	// Crash detection: if the command exited non-zero and no JUnit XML file was
+	// produced, the test runner itself crashed before generating results.
+	if exitCode != 0 && !xmlFileExists(suite.JUnitXML) {
+		cmd.PrintErrf("Error [crash]: test command exited with code %d but no JUnit XML files found at '%s'. This usually means the test runner crashed before producing results.\n", exitCode, suite.JUnitXML)
+		return exitCodeError(2)
+	}
+
 	// Parse JUnit XML using the suite's junitxml path.
 	testResults, parseWarnings := parseJUnitXML(suite.JUnitXML)
 	for _, w := range parseWarnings {
@@ -467,7 +475,8 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		RerunCommand: strings.Join(suite.RerunCommand, " "),
 	}
 
-	retryOutcomes, retryWarnings := retryFailingTests(ctx, testResults, retryCfg, excludePatterns)
+	// Suite mode: rerun command crash is classified as unresolved (infrastructure failure).
+	retryOutcomes, retryWarnings := retryFailingTests(ctx, testResults, retryCfg, excludePatterns, true)
 	for _, w := range retryWarnings {
 		cmd.PrintErrf("[quarantine] WARNING: %s", w)
 	}
@@ -537,13 +546,10 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		cmd.PrintErrf("  Quarantined:  %d\n", res.Summary.Quarantined)
 	}
 
-	if res.Summary.Failed > 0 {
-		return exitCodeError(1)
+	code := resolveExitCode(res)
+	if code != 0 {
+		return exitCodeError(code)
 	}
-	if exitCode != 0 && len(testResults) == 0 {
-		return exitCodeError(exitCode)
-	}
-
 	return nil
 }
 
@@ -734,7 +740,9 @@ func writeUpdatedQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *c
 // Exits the retry loop early on the first passing attempt or if the rerun
 // command itself fails to execute. Tests whose TestID matches any excludePattern
 // are skipped entirely.
-func retryFailingTests(ctx context.Context, tests []parser.TestResult, cfg *config.Config, excludePatterns []string) (map[string]result.RetryOutcome, []string) {
+// When classifyRerunCrashAsUnresolved is true (suite mode), a rerun command that
+// fails to execute marks the outcome as Unresolved rather than as a failed attempt.
+func retryFailingTests(ctx context.Context, tests []parser.TestResult, cfg *config.Config, excludePatterns []string, classifyRerunCrashAsUnresolved bool) (map[string]result.RetryOutcome, []string) {
 	outcomes := make(map[string]result.RetryOutcome)
 	var warnings []string
 
@@ -753,14 +761,23 @@ func retryFailingTests(ctx context.Context, tests []parser.TestResult, cfg *conf
 		)
 
 		var attempts []result.RetryEntry
+		unresolved := false
 		for attempt := 1; attempt <= cfg.Retries; attempt++ {
 			rerunExitCode, runErr := runner.Run(ctx, rerunCmd, rerunArgs, os.Stdout, os.Stderr)
-			if runErr != nil {
+			// Treat two conditions as rerun infrastructure failures (not test failures):
+			//  1. runErr != nil — the binary failed to start at all (ENOENT)
+			//  2. rerunExitCode == 127 — the command ran but "command not found" (shell convention)
+			rerunCrash := runErr != nil || (classifyRerunCrashAsUnresolved && rerunExitCode == 127)
+			if rerunCrash {
 				warnings = append(warnings, rerunFailureWarning(t.Name, rerunCmd, runner.Framework(cfg.Framework)))
-				attempts = append(attempts, result.RetryEntry{
-					Attempt: attempt,
-					Status:  "failed",
-				})
+				if classifyRerunCrashAsUnresolved {
+					unresolved = true
+				} else {
+					attempts = append(attempts, result.RetryEntry{
+						Attempt: attempt,
+						Status:  "failed",
+					})
+				}
 				break
 			}
 			status := "failed"
@@ -776,7 +793,7 @@ func retryFailingTests(ctx context.Context, tests []parser.TestResult, cfg *conf
 			}
 		}
 
-		outcomes[t.TestID] = result.RetryOutcome{Attempts: attempts}
+		outcomes[t.TestID] = result.RetryOutcome{Attempts: attempts, Unresolved: unresolved}
 	}
 
 	return outcomes, warnings
@@ -870,6 +887,26 @@ func checkBranchExists(cfg *config.Config) (branchCheckResult, error) {
 		elapsed:  elapsed,
 		exists:   exists,
 	}, nil
+}
+
+// xmlFileExists reports whether a file exists at path (non-glob, exact path).
+// Returns false for any stat error. This is an I/O helper used by crash detection.
+func xmlFileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// resolveExitCode determines the process exit code for suite mode based on
+// result priorities: genuine failure (1) > unresolved (2) > all pass (0).
+// This is a pure function — no I/O.
+func resolveExitCode(res result.Result) int {
+	if res.Summary.Failed > 0 {
+		return 1
+	}
+	if res.Summary.Unresolved > 0 {
+		return 2
+	}
+	return 0
 }
 
 // parseAttempt holds the outcome of attempting to parse one JUnit XML file.
