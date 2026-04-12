@@ -20,13 +20,13 @@ go build -ldflags "-X main.version=v0.1.0" -o bin/quarantine ./cli/cmd/quarantin
 |---------|---------|
 | `cmd/quarantine` | Entry point, cobra subcommands: `init`, `run`, `doctor`, `version` |
 | `internal/cas` | Compare-and-swap write logic for `quarantine.json` via GitHub Contents API (SHA-based retry on 409) |
-| `internal/config` | `quarantine.yml` parsing, validation, unknown-field tracking (forward-compatible) |
+| `internal/config` | `.quarantine/config.yml` parsing, validation, unknown-field tracking (forward-compatible) |
 | `internal/git` | Git remote URL parsing |
 | `internal/github` | GitHub API client (Contents, Issues, Search, Comments); rate-limit warning callbacks |
 | `internal/parser` | JUnit XML parsing, deterministic `test_id` construction (`<file>::<classname>::<name>`) |
 | `internal/quarantine` | `quarantine.json` read/write/merge; pure functions only — no I/O |
 | `internal/result` | Builds structured JSON output for `.quarantine/results.json` |
-| `internal/runner` | Test command execution, signal forwarding, framework detection, rerun command construction, glob exclude patterns |
+| `internal/runner` | Test command execution, signal forwarding, rerun command construction |
 
 ## Conventions
 
@@ -36,5 +36,5 @@ go build -ldflags "-X main.version=v0.1.0" -o bin/quarantine ./cli/cmd/quarantin
 - Error handling: never break the build. See `docs/specs/error-handling.md`.
 - Exit codes: 0 = success, 1 = test failures (never used for quarantine errors), 2 = quarantine error.
 - **Output routing:** `init` writes to stdout. `run` writes diagnostic/status output to stderr so it doesn't contaminate the test runner's stdout.
-- **`--` separator:** `quarantine run` requires `--` before the test command (e.g., `quarantine run -- go test ./...`). Missing `--` triggers a helpful error.
+- **Suite mode:** `quarantine run <suite-name>` executes the named suite's command from `.quarantine/config.yml`. The `--` separator is rejected.
 - **Signal forwarding:** `runner.Run()` forwards SIGINT/SIGTERM to the child test process so interrupts work naturally.
