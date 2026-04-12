@@ -350,10 +350,12 @@ func createIssuesForNewFlakyTests(
 			continue
 		}
 
-		hash := testHash(t.TestID)
+		// Build dedup label (suite-aware) before searching, so the search query
+		// matches the label that would be applied on creation.
+		dedupLabel := suiteIssueLabel(suiteName, t.TestID)
 
 		// Dedup: search for open issue first.
-		existingNum, existingURL, found, searchErr := client.SearchOpenIssue(ctx, hash)
+		existingNum, existingURL, found, searchErr := client.SearchOpenIssue(ctx, dedupLabel)
 		if searchErr != nil {
 			cmd.PrintErrf("[quarantine] WARNING: dedup search failed for %q: %v. Proceeding to create issue.\n", t.Name, searchErr)
 		}
@@ -381,13 +383,6 @@ func createIssuesForNewFlakyTests(
 			Retries:        t.Retries,
 		})
 
-		// Build labels: base label + dedup label (suite-aware).
-		var dedupLabel string
-		if suiteName != "" {
-			dedupLabel = suiteIssueLabel(suiteName, t.TestID)
-		} else {
-			dedupLabel = IssueLabelPrefix + hash
-		}
 		labels := []string{IssueLabelBase, dedupLabel}
 
 		issueNum, issueURL, createErr := client.CreateIssue(ctx, title, body, labels)

@@ -33,11 +33,11 @@ type PRComment struct {
 	Body string `json:"body"`
 }
 
-// SearchOpenIssue checks whether an open issue already exists for the given
-// test hash. Returns (issueNumber, issueURL, found, error).
+// SearchOpenIssue checks whether an open issue already exists with the given
+// dedup label (e.g. "quarantine:unit:2cf24dba"). Returns (issueNumber, issueURL, found, error).
 // On search error, returns found=false so the caller can proceed to create.
-func (c *Client) SearchOpenIssue(ctx context.Context, testHash string) (issueNumber int, issueURL string, found bool, err error) {
-	q := fmt.Sprintf("repo:%s/%s is:issue is:open label:quarantine label:quarantine:%s", c.owner, c.repo, testHash)
+func (c *Client) SearchOpenIssue(ctx context.Context, dedupLabel string) (issueNumber int, issueURL string, found bool, err error) {
+	q := fmt.Sprintf("repo:%s/%s is:issue is:open label:quarantine label:%s", c.owner, c.repo, dedupLabel)
 	params := url.Values{
 		"q":        {q},
 		"per_page": {"1"},

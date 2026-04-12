@@ -152,7 +152,13 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 This branch stores quarantine state managed by the quarantine CLI.
 Do not edit files on this branch manually.
 `)
-		if err := client.PutContents(ctx, "README.md", "quarantine: initialize state branch", readmeContent, ""); err != nil {
+		// The new branch inherits all files from the default branch (including any
+		// existing README.md). Fetch the SHA so we update rather than create.
+		_, existingReadmeSHA, getErr := client.GetContents(ctx, "README.md", "quarantine/state")
+		if getErr != nil {
+			existingReadmeSHA = ""
+		}
+		if err := client.PutContents(ctx, "README.md", "quarantine: initialize state branch", readmeContent, existingReadmeSHA); err != nil {
 			cmd.Printf("Error: failed to write README.md: %v\n", err)
 			return fmt.Errorf("put contents: %w", err)
 		}
