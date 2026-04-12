@@ -183,7 +183,7 @@ func TestRenderPRCommentOmitsNewlyFlakySectionWhenEmpty(t *testing.T) {
 		Passed:     3,
 		NewlyFlaky: []FlakyEntry{},
 		Version:    "0.1.0",
-	})
+	}, PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "an empty NewlyFlaky slice",
@@ -201,7 +201,7 @@ func TestRenderPRCommentOmitsQuarantinedSectionWhenEmpty(t *testing.T) {
 		Passed:           2,
 		QuarantinedTests: []QuarantinedEntry{},
 		Version:          "0.1.0",
-	})
+	}, PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "an empty QuarantinedTests slice",
@@ -221,7 +221,7 @@ func TestRenderPRCommentIncludesQuarantinedSectionWhenNonEmpty(t *testing.T) {
 		QuarantinedTests: []QuarantinedEntry{
 			{Name: "some flaky test", IssueURL: "https://github.com/o/r/issues/5", IssueNum: 5, Since: "2026-01-01"},
 		},
-	})
+	}, PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a non-empty QuarantinedTests slice",
@@ -239,7 +239,7 @@ func TestRenderPRCommentOmitsFailuresSectionWhenEmpty(t *testing.T) {
 		Passed:   2,
 		Failures: []FailureEntry{},
 		Version:  "0.1.0",
-	})
+	}, PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "an empty Failures slice",
@@ -259,7 +259,7 @@ func TestRenderPRCommentIncludesFailuresSectionWhenNonEmpty(t *testing.T) {
 		Failures: []FailureEntry{
 			{Name: "should not crash", Message: "panic: nil pointer"},
 		},
-	})
+	}, PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a non-empty Failures slice",

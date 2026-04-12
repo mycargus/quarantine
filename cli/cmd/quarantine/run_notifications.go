@@ -45,6 +45,27 @@ func testHash(testID string) string {
 	return fmt.Sprintf("%x", h[:4])
 }
 
+// suiteStatePath returns the per-suite state file path on the quarantine/state branch.
+// Format: ".quarantine/{suiteName}/state.json"
+// This is a pure function — no I/O, deterministic.
+func suiteStatePath(suiteName string) string {
+	return fmt.Sprintf(".quarantine/%s/state.json", suiteName)
+}
+
+// suitePRCommentMarker returns the HTML comment marker for a suite's PR comment.
+// Format: "<!-- quarantine:{suiteName} -->"
+// This is a pure function — no I/O, deterministic.
+func suitePRCommentMarker(suiteName string) string {
+	return fmt.Sprintf("<!-- quarantine:%s -->", suiteName)
+}
+
+// suiteIssueLabel returns the dedup label for a suite flaky-test issue.
+// Format: "quarantine:{suiteName}:{first8ofSHA256(testID)}"
+// This is a pure function — no I/O, deterministic.
+func suiteIssueLabel(suiteName, testID string) string {
+	return fmt.Sprintf("quarantine:%s:%s", suiteName, testHash(testID))
+}
+
 // detectPRNumber resolves the PR number from the --pr flag or GITHUB_EVENT_PATH.
 // Returns 0 with no error when neither source is available.
 // This is a pure function in terms of logic; it reads a file when prFlag==0 and
@@ -190,12 +211,14 @@ type PRCommentData struct {
 }
 
 // renderPRComment renders the PR comment body from the given data.
-// The first line MUST be <!-- quarantine-bot --> per spec.
+// marker is the HTML comment placed on the first line (e.g. PRCommentMarker for
+// legacy mode, or suitePRCommentMarker(suiteName) for suite mode). It MUST be
+// the first line so that postOrUpdatePRComment can detect existing bot comments.
 // This is a pure function — no I/O.
-func renderPRComment(data PRCommentData) string {
+func renderPRComment(data PRCommentData, marker string) string {
 	var sb strings.Builder
 
-	sb.WriteString(PRCommentMarker + "\n")
+	sb.WriteString(marker + "\n")
 	sb.WriteString("## Quarantine Summary\n\n")
 
 	sb.WriteString("| Metric | Count |\n")
@@ -267,8 +290,10 @@ func renderPRComment(data PRCommentData) string {
 }
 
 // postOrUpdatePRComment posts or updates the quarantine-bot PR comment.
+// marker is the HTML comment that identifies the bot's comment (e.g. PRCommentMarker
+// for legacy mode, or suitePRCommentMarker(suiteName) for suite mode).
 // This is an I/O function — best-effort, never breaks the build.
-func postOrUpdatePRComment(ctx context.Context, cmd *cobra.Command, client *gh.Client, prNumber int, body string) {
+func postOrUpdatePRComment(ctx context.Context, cmd *cobra.Command, client *gh.Client, prNumber int, body string, marker string) {
 	if client == nil || prNumber == 0 {
 		return
 	}
@@ -281,7 +306,7 @@ func postOrUpdatePRComment(ctx context.Context, cmd *cobra.Command, client *gh.C
 	}
 
 	for _, c := range comments {
-		if strings.HasPrefix(c.Body, PRCommentMarker) {
+		if strings.HasPrefix(c.Body, marker) {
 			// Found existing comment — update it.
 			if updateErr := client.UpdatePRComment(ctx, c.ID, body); updateErr != nil {
 				cmd.PrintErrf("[quarantine] WARNING: Could not update PR comment: %v\n", updateErr)
@@ -302,6 +327,9 @@ func postOrUpdatePRComment(ctx context.Context, cmd *cobra.Command, client *gh.C
 // was found or created.
 // skipReasons: testID -> skipReason for tests that should not get a GitHub Issue
 // (e.g. new-to-PR tests per ADR-022). Those tests are skipped entirely.
+// suiteName: when non-empty (suite mode), the dedup label includes the suite name
+// (e.g. "quarantine:backend:XXXXXXXX"). When empty (legacy mode), the label is
+// "quarantine:XXXXXXXX".
 // This is an I/O orchestrator — best-effort, never breaks the build.
 func createIssuesForNewFlakyTests(
 	ctx context.Context,
@@ -312,6 +340,7 @@ func createIssuesForNewFlakyTests(
 	branch, commitSHA string,
 	prNumber int,
 	skipReasons map[string]string,
+	suiteName string,
 ) map[string]issueRef {
 	refs := make(map[string]issueRef)
 	if client == nil {
@@ -356,7 +385,15 @@ func createIssuesForNewFlakyTests(
 			FailureMessage: fm,
 			Retries:        t.Retries,
 		})
-		labels := []string{IssueLabelBase, IssueLabelPrefix + hash}
+
+		// Build labels: base label + dedup label (suite-aware).
+		var dedupLabel string
+		if suiteName != "" {
+			dedupLabel = suiteIssueLabel(suiteName, t.TestID)
+		} else {
+			dedupLabel = IssueLabelPrefix + hash
+		}
+		labels := []string{IssueLabelBase, dedupLabel}
 
 		issueNum, issueURL, createErr := client.CreateIssue(ctx, title, body, labels)
 		if createErr != nil {

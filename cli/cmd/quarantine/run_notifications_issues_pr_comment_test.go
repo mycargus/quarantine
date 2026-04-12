@@ -109,7 +109,7 @@ func TestPostOrUpdatePRCommentNilClientIsNoOp(t *testing.T) {
 	// The test passes by not panicking and not making any network calls.
 	cmd := discardCmd()
 	// prNumber=5 (non-zero), client=nil → must be a no-op.
-	postOrUpdatePRComment(context.Background(), cmd, nil, 5, "body")
+	postOrUpdatePRComment(context.Background(), cmd, nil, 5, "body", PRCommentMarker)
 	// Reaching here means it returned early; test passes.
 }
 
@@ -130,7 +130,7 @@ func TestPostOrUpdatePRCommentZeroPRNumberIsNoOp(t *testing.T) {
 	cmd := discardCmd()
 
 	// prNumber=0 with a valid client → must be a no-op (no HTTP requests).
-	postOrUpdatePRComment(context.Background(), cmd, client, 0, "body")
+	postOrUpdatePRComment(context.Background(), cmd, client, 0, "body", PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[int32]{
 		Given:    "prNumber is 0 with a non-nil client",
@@ -181,7 +181,7 @@ func TestPostOrUpdatePRCommentUpdatesExistingMarkedComment(t *testing.T) {
 	client := newNotifTestClient(t, server.URL)
 	cmd := discardCmd()
 
-	postOrUpdatePRComment(context.Background(), cmd, client, 7, PRCommentMarker+"\n## Updated Summary")
+	postOrUpdatePRComment(context.Background(), cmd, client, 7, PRCommentMarker+"\n## Updated Summary", PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[int32]{
 		Given:    "an existing PR comment that starts with PRCommentMarker",
@@ -235,7 +235,7 @@ func TestPostOrUpdatePRCommentCreatesWhenNoMarkedComment(t *testing.T) {
 	client := newNotifTestClient(t, server.URL)
 	cmd := discardCmd()
 
-	postOrUpdatePRComment(context.Background(), cmd, client, 7, PRCommentMarker+"\n## Summary")
+	postOrUpdatePRComment(context.Background(), cmd, client, 7, PRCommentMarker+"\n## Summary", PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[int32]{
 		Given:    "no existing comment with PRCommentMarker",

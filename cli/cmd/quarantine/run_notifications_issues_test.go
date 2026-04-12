@@ -94,7 +94,7 @@ func TestCreateIssuesSkipsNonFlakyTests(t *testing.T) {
 
 	refs := createIssuesForNewFlakyTests(
 		context.Background(), discardCmd(), client,
-		res, nil, "main", "abc123", 0, nil,
+		res, nil, "main", "abc123", 0, nil, "",
 	)
 
 	riteway.Assert(t, riteway.Case[int]{
@@ -130,7 +130,7 @@ func TestCreateIssuesOnlyProcessesFlakyStatus(t *testing.T) {
 
 	refs := createIssuesForNewFlakyTests(
 		context.Background(), discardCmd(), client,
-		res, nil, "main", "abc123", 0, nil,
+		res, nil, "main", "abc123", 0, nil, "",
 	)
 
 	riteway.Assert(t, riteway.Case[int]{
@@ -179,7 +179,7 @@ func TestCreateIssuesSkipsCreationWhenDedupFindsExistingIssue(t *testing.T) {
 
 	refs := createIssuesForNewFlakyTests(
 		context.Background(), discardCmd(), client,
-		res, nil, "main", "abc123", 0, nil,
+		res, nil, "main", "abc123", 0, nil, "",
 	)
 
 	riteway.Assert(t, riteway.Case[int]{
@@ -245,7 +245,7 @@ func TestCreateIssues410BreaksLoopAfterFirstAttempt(t *testing.T) {
 
 	refs := createIssuesForNewFlakyTests(
 		context.Background(), cmd, client,
-		res, nil, "main", "abc123", 0, nil,
+		res, nil, "main", "abc123", 0, nil, "",
 	)
 
 	riteway.Assert(t, riteway.Case[int]{
@@ -307,7 +307,7 @@ func TestCreateIssuesNon410ErrorContinuesLoop(t *testing.T) {
 
 	createIssuesForNewFlakyTests(
 		context.Background(), discardCmd(), client,
-		res, nil, "main", "abc123", 0, nil,
+		res, nil, "main", "abc123", 0, nil, "",
 	)
 
 	riteway.Assert(t, riteway.Case[int]{

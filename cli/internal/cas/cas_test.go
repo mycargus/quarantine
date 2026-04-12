@@ -51,7 +51,7 @@ func TestWriteStateWithCASSucceedsOnFirstAttempt(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	c := newTestGHClient(t, server.URL)
-	reQuarantined, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "sha-initial", "quarantine/state", 3, nil)
+	reQuarantined, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "sha-initial", "quarantine/state", 3, nil, "quarantine.json")
 
 	riteway.Assert(t, riteway.Case[error]{
 		Given:    "UpdateContents returns 200 on first attempt",
@@ -101,7 +101,7 @@ func TestWriteStateWithCASRetriesOn409AndSucceeds(t *testing.T) {
 	content := marshalState(t, localState)
 
 	c := newTestGHClient(t, server.URL)
-	reQuarantined, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "stale-sha", "quarantine/state", 3, nil)
+	reQuarantined, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "stale-sha", "quarantine/state", 3, nil, "quarantine.json")
 
 	riteway.Assert(t, riteway.Case[error]{
 		Given:    "first UpdateContents returns 409, re-read succeeds, second UpdateContents returns 200",
@@ -168,7 +168,7 @@ func TestWriteStateWithCASMergedContentContainsBothBuildsTests(t *testing.T) {
 	content := marshalState(t, localState)
 
 	c := newTestGHClient(t, server.URL)
-	_, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "abc123", "quarantine/state", 3, nil)
+	_, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "abc123", "quarantine/state", 3, nil, "quarantine.json")
 	if err != nil {
 		t.Fatalf("WriteStateWithCAS: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestWriteStateWithCASReturnsErrorAfterExhaustingRetries(t *testing.T) {
 	content := marshalState(t, localState)
 
 	c := newTestGHClient(t, server.URL)
-	_, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "sha", "quarantine/state", 3, nil)
+	_, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "sha", "quarantine/state", 3, nil, "quarantine.json")
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "all 3 UpdateContents attempts return 409",
@@ -243,7 +243,7 @@ func TestWriteStateWithCASReturnsErrorOnNon409Failure(t *testing.T) {
 	content := marshalState(t, localState)
 
 	c := newTestGHClient(t, server.URL)
-	_, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "sha", "quarantine/state", 3, nil)
+	_, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "sha", "quarantine/state", 3, nil, "quarantine.json")
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "UpdateContents returns 403 (non-retryable error)",
@@ -300,7 +300,7 @@ func TestWriteStateWithCASQuarantineWinsOnUnquarantineRace(t *testing.T) {
 	removedByB := []string{"cache_test.js::CacheService::should handle eviction"}
 
 	c := newTestGHClient(t, server.URL)
-	reQuarantined, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "abc123", "quarantine/state", 3, removedByB)
+	reQuarantined, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "abc123", "quarantine/state", 3, removedByB, "quarantine.json")
 
 	riteway.Assert(t, riteway.Case[error]{
 		Given:    "Build B unquarantined eviction test; Build A wrote it back; 409 forces merge",
@@ -338,7 +338,7 @@ func TestDetectReQuarantinedIsZeroWhenNoConflict(t *testing.T) {
 	content := marshalState(t, localState)
 
 	c := newTestGHClient(t, server.URL)
-	reQuarantined, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "abc123", "quarantine/state", 3, nil)
+	reQuarantined, err := cas.WriteStateWithCAS(context.Background(), c, localState, content, "abc123", "quarantine/state", 3, nil, "quarantine.json")
 
 	riteway.Assert(t, riteway.Case[error]{
 		Given:    "UpdateContents returns 200 on first attempt (no conflict)",
@@ -392,7 +392,7 @@ func TestWriteStateWithCASNon409ErrorIsNonRetryable(t *testing.T) {
 	localState := quarantine.NewEmptyState()
 	content, _ := localState.Marshal()
 
-	_, err := cas.WriteStateWithCAS(context.Background(), client, localState, content, "sha", "branch", 3, nil)
+	_, err := cas.WriteStateWithCAS(context.Background(), client, localState, content, "sha", "branch", 3, nil, "quarantine.json")
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "UpdateContents returns a non-APIError (connection reset by peer)",
@@ -436,7 +436,7 @@ func TestWriteStateWithCASExhaustsExactlyMaxRetriesPUTs(t *testing.T) {
 	content, _ := localState.Marshal()
 
 	const maxRetries = 3
-	_, err := cas.WriteStateWithCAS(context.Background(), client, localState, content, "sha", "branch", maxRetries, nil)
+	_, err := cas.WriteStateWithCAS(context.Background(), client, localState, content, "sha", "branch", maxRetries, nil, "quarantine.json")
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "all UpdateContents calls return 409",

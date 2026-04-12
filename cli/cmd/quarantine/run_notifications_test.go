@@ -113,7 +113,7 @@ func TestRenderPRComment(t *testing.T) {
 			},
 		},
 	}
-	comment := renderPRComment(data)
+	comment := renderPRComment(data, PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "PR comment rendered",

@@ -23,7 +23,7 @@ import (
 // Contract: the marker MUST be the first line for update-vs-create detection.
 func TestContractPRCommentMarkerIsFirstLine(t *testing.T) {
 	data := PRCommentData{Total: 1, Passed: 1, Version: "0.1.0"}
-	comment := renderPRComment(data)
+	comment := renderPRComment(data, PRCommentMarker)
 	firstLine := strings.SplitN(comment, "\n", 2)[0]
 
 	riteway.Assert(t, riteway.Case[string]{
@@ -38,7 +38,7 @@ func TestContractPRCommentMarkerIsFirstLine(t *testing.T) {
 // body starting with PRCommentMarker is recognised as an existing bot comment.
 // This is the update-vs-create heuristic used in postOrUpdatePRComment.
 func TestContractPRCommentMarkerDetectsExistingComment(t *testing.T) {
-	body := renderPRComment(PRCommentData{Total: 1, Passed: 1, Version: "0.1.0"})
+	body := renderPRComment(PRCommentData{Total: 1, Passed: 1, Version: "0.1.0"}, PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a PR comment rendered by renderPRComment",

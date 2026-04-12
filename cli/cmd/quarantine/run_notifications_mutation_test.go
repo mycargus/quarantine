@@ -56,7 +56,7 @@ func TestRenderPRCommentMarkerIsFirstLine(t *testing.T) {
 		Passed:  1,
 		Version: "0.1.0",
 	}
-	comment := renderPRComment(data)
+	comment := renderPRComment(data, PRCommentMarker)
 	firstLine := strings.SplitN(comment, "\n", 2)[0]
 
 	riteway.Assert(t, riteway.Case[string]{
@@ -75,7 +75,7 @@ func TestRenderPRCommentNilFlakySection(t *testing.T) {
 		NewlyFlaky: nil,
 		Version:    "0.1.0",
 	}
-	comment := renderPRComment(data)
+	comment := renderPRComment(data, PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "PR comment with no flaky tests",
@@ -235,7 +235,7 @@ func TestRenderPRCommentOmitsNewToPRFlakySectionWhenEmpty(t *testing.T) {
 		Passed:       3,
 		NewToPRFlaky: []FlakyEntry{},
 		Version:      "0.1.0",
-	})
+	}, PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "an empty NewToPRFlaky slice",
@@ -255,7 +255,7 @@ func TestRenderPRCommentIncludesNewToPRFlakySectionWhenNonEmpty(t *testing.T) {
 		NewToPRFlaky: []FlakyEntry{
 			{Name: "brand new flaky test"},
 		},
-	})
+	}, PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a non-empty NewToPRFlaky slice",
@@ -275,7 +275,7 @@ func TestRenderPRCommentOmitsUnquarantinedSectionWhenEmpty(t *testing.T) {
 		Passed:             2,
 		UnquarantinedTests: []UnquarantinedEntry{},
 		Version:            "0.1.0",
-	})
+	}, PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "an empty UnquarantinedTests slice",
@@ -295,7 +295,7 @@ func TestRenderPRCommentIncludesUnquarantinedSectionWhenNonEmpty(t *testing.T) {
 		UnquarantinedTests: []UnquarantinedEntry{
 			{Name: "formerly-flaky-test", IssueURL: "https://github.com/o/r/issues/9", IssueNum: 9},
 		},
-	})
+	}, PRCommentMarker)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a non-empty UnquarantinedTests slice",

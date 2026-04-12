@@ -60,7 +60,7 @@ func TestWriteUpdatedQuarantineState403EmitsWarning(t *testing.T) {
 	state, originalContent := dirtyState(t)
 	cfg := &config.Config{Storage: config.StorageConfig{Branch: "quarantine/state"}}
 
-	writeUpdatedQuarantineState(context.Background(), cmd, cfg, state, originalContent, "", client, nil)
+	writeUpdatedQuarantineState(context.Background(), cmd, cfg, state, originalContent, "", client, nil, "quarantine.json")
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "PUT /contents returns 403 (branch protection)",
@@ -90,7 +90,7 @@ func TestWriteUpdatedQuarantineState422EmitsWarning(t *testing.T) {
 	state, originalContent := dirtyState(t)
 	cfg := &config.Config{Storage: config.StorageConfig{Branch: "quarantine/state"}}
 
-	writeUpdatedQuarantineState(context.Background(), cmd, cfg, state, originalContent, "", client, nil)
+	writeUpdatedQuarantineState(context.Background(), cmd, cfg, state, originalContent, "", client, nil, "quarantine.json")
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "PUT /contents returns 422 (oversized state)",

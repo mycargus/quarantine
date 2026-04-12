@@ -28,6 +28,9 @@ type githubContentsClient interface {
 // It retries up to maxRetries times total. On non-409 errors or after
 // exhausting retries, it returns an error.
 //
+// path is the file path within the repository (e.g. "quarantine.json" for
+// legacy mode, or ".quarantine/backend/state.json" for suite mode).
+//
 // removedTestIDs is the set of test IDs that the caller explicitly removed from
 // the local state (e.g., via unquarantine). After a CAS conflict and merge,
 // any of these IDs that reappear in the merged result are returned as
@@ -46,6 +49,7 @@ func WriteStateWithCAS(
 	branch string,
 	maxRetries int,
 	removedTestIDs []string,
+	path string,
 ) ([]string, error) {
 	currentContent := content
 	currentSHA := sha
@@ -53,7 +57,7 @@ func WriteStateWithCAS(
 	var lastReQuarantined []string
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		err := client.UpdateContents(ctx, "quarantine.json", branch, "chore: update quarantine state", currentContent, currentSHA)
+		err := client.UpdateContents(ctx, path, branch, "chore: update quarantine state", currentContent, currentSHA)
 		if err == nil {
 			return lastReQuarantined, nil
 		}
@@ -67,7 +71,7 @@ func WriteStateWithCAS(
 		lastErr = err
 
 		// 409 conflict: re-read and merge.
-		remoteContent, remoteSHA, readErr := client.GetContents(ctx, "quarantine.json", branch)
+		remoteContent, remoteSHA, readErr := client.GetContents(ctx, path, branch)
 		if readErr != nil {
 			return nil, fmt.Errorf("re-read after CAS conflict: %w", readErr)
 		}

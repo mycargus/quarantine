@@ -34,7 +34,7 @@ func TestCreateIssuesSkipsFailedTests(t *testing.T) {
 
 	refs := createIssuesForNewFlakyTests(
 		context.Background(), discardCmd(), client,
-		res, nil, "main", "abc123", 0, nil,
+		res, nil, "main", "abc123", 0, nil, "",
 	)
 
 	riteway.Assert(t, riteway.Case[int]{
@@ -75,7 +75,7 @@ func TestCreateIssuesSkipsTestsWithSkipReasons(t *testing.T) {
 
 	refs := createIssuesForNewFlakyTests(
 		context.Background(), discardCmd(), client,
-		res, nil, "main", "abc123", 0, skipReasons,
+		res, nil, "main", "abc123", 0, skipReasons, "",
 	)
 
 	riteway.Assert(t, riteway.Case[int]{
@@ -112,7 +112,7 @@ func TestCreateIssuesProcessesTestsWithoutSkipReasons(t *testing.T) {
 
 	refs := createIssuesForNewFlakyTests(
 		context.Background(), discardCmd(), client,
-		res, nil, "main", "abc123", 0, skipReasons,
+		res, nil, "main", "abc123", 0, skipReasons, "",
 	)
 
 	riteway.Assert(t, riteway.Case[int]{
@@ -163,7 +163,7 @@ func TestCreateIssuesExistingIssueReturnsItsRef(t *testing.T) {
 
 	refs := createIssuesForNewFlakyTests(
 		context.Background(), discardCmd(), client,
-		res, nil, "main", "abc123", 0, nil,
+		res, nil, "main", "abc123", 0, nil, "",
 	)
 
 	riteway.Assert(t, riteway.Case[int]{
@@ -230,7 +230,7 @@ func TestCreateIssuesIncludesFailureMessageInIssueBody(t *testing.T) {
 
 	createIssuesForNewFlakyTests(
 		context.Background(), discardCmd(), client,
-		res, nil, "main", "abc123", 0, nil,
+		res, nil, "main", "abc123", 0, nil, "",
 	)
 
 	riteway.Assert(t, riteway.Case[bool]{
@@ -287,7 +287,7 @@ func TestCreateIssuesNilFailureMessageProducesEmptyBodySection(t *testing.T) {
 
 	createIssuesForNewFlakyTests(
 		context.Background(), discardCmd(), client,
-		res, nil, "main", "abc123", 0, nil,
+		res, nil, "main", "abc123", 0, nil, "",
 	)
 
 	riteway.Assert(t, riteway.Case[bool]{
@@ -347,7 +347,7 @@ func TestCreateIssues410LogsDisabledWarning(t *testing.T) {
 
 	createIssuesForNewFlakyTests(
 		context.Background(), cmd, client,
-		res, nil, "main", "abc123", 0, nil,
+		res, nil, "main", "abc123", 0, nil, "",
 	)
 
 	riteway.Assert(t, riteway.Case[bool]{
@@ -395,7 +395,7 @@ func TestCreateIssuesNon410LogsPerTestWarning(t *testing.T) {
 
 	createIssuesForNewFlakyTests(
 		context.Background(), cmd, client,
-		res, nil, "main", "abc123", 0, nil,
+		res, nil, "main", "abc123", 0, nil, "",
 	)
 
 	riteway.Assert(t, riteway.Case[bool]{

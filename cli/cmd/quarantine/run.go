@@ -173,7 +173,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	// Read quarantine state from the quarantine/state branch.
-	qState, qStateContent, qStateSHA := loadQuarantineState(ctx, cmd, cfg, ghClient)
+	qState, qStateContent, qStateSHA := loadQuarantineState(ctx, cmd, cfg, ghClient, "quarantine.json")
 
 	// In --strict mode, a nil state from a non-nil client means the API was unreachable.
 	if strict && ghClient != nil && qState == nil {
@@ -267,7 +267,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		flakyAdded := addNewFlakyTests(qState, res, excludePatterns, skipReasons)
 		stateChanged := flakyAdded || len(removedTestIDs) > 0
 		if stateChanged {
-			writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA, ghClient, removedTestIDs)
+			writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA, ghClient, removedTestIDs, "quarantine.json")
 		}
 	} else if dryRun && res.Summary.FlakyDetected > 0 {
 		printDryRunSummary(cmd, res)
@@ -282,7 +282,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		branch := meta.Branch
 		commitSHA := meta.CommitSHA
 
-		issueRefs := createIssuesForNewFlakyTests(ctx, cmd, ghClient, res, excludePatterns, branch, commitSHA, prNumber, skipReasons)
+		issueRefs := createIssuesForNewFlakyTests(ctx, cmd, ghClient, res, excludePatterns, branch, commitSHA, prNumber, skipReasons, "")
 
 		// Backfill issue numbers into result entries so results.json includes them.
 		backfillIssueNumbers(res.Tests, issueRefs)
@@ -303,8 +303,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 				UnquarantinedTests: buildUnquarantinedEntries(removedEntries),
 				Failures:           buildFailureEntries(res),
 			}
-			commentBody := renderPRComment(commentData)
-			postOrUpdatePRComment(ctx, cmd, ghClient, prNumber, commentBody)
+			commentBody := renderPRComment(commentData, PRCommentMarker)
+			postOrUpdatePRComment(ctx, cmd, ghClient, prNumber, commentBody, PRCommentMarker)
 		}
 	}
 
@@ -408,8 +408,9 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		}
 	}
 
-	// Load quarantine state.
-	qState, qStateContent, qStateSHA := loadQuarantineState(ctx, cmd, cfg, ghClient)
+	// Load quarantine state from the per-suite state path.
+	statePath := suiteStatePath(suiteName)
+	qState, qStateContent, qStateSHA := loadQuarantineState(ctx, cmd, cfg, ghClient, statePath)
 
 	// Batch-check closed issues and remove unquarantined tests.
 	var removedEntries []qstate.Entry
@@ -484,19 +485,37 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		flakyAdded := addNewFlakyTests(qState, res, excludePatterns, skipReasons)
 		stateChanged := flakyAdded || len(removedTestIDs) > 0
 		if stateChanged {
-			writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA, ghClient, removedTestIDs)
+			writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA, ghClient, removedTestIDs, statePath)
 		}
 	}
 
-	// Create GitHub issues.
+	// Create GitHub issues and post PR comment.
 	if !dryRun && ghClient != nil {
 		prFlag, _ := cmd.Flags().GetInt("pr")
 		eventPath := os.Getenv("GITHUB_EVENT_PATH")
 		prNumber, _ := detectPRNumber(prFlag, eventPath)
 		branch := meta.Branch
 		commitSHA := meta.CommitSHA
-		issueRefs := createIssuesForNewFlakyTests(ctx, cmd, ghClient, res, excludePatterns, branch, commitSHA, prNumber, skipReasons)
+		issueRefs := createIssuesForNewFlakyTests(ctx, cmd, ghClient, res, excludePatterns, branch, commitSHA, prNumber, skipReasons, suiteName)
 		backfillIssueNumbers(res.Tests, issueRefs)
+
+		// Post PR comment with suite-specific marker.
+		if prNumber > 0 {
+			suiteMarker := suitePRCommentMarker(suiteName)
+			flakyWithIssue, flakyNewToPR := buildFlakyEntries(res, issueRefs, skipReasons)
+			commentData := PRCommentData{
+				Total:       res.Summary.Total,
+				Passed:      res.Summary.Passed,
+				Failed:      res.Summary.Failed,
+				Flaky:       res.Summary.FlakyDetected,
+				Quarantined: res.Summary.Quarantined,
+				Version:     version,
+				NewlyFlaky:  flakyWithIssue,
+				NewToPRFlaky: flakyNewToPR,
+			}
+			commentBody := renderPRComment(commentData, suiteMarker)
+			postOrUpdatePRComment(ctx, cmd, ghClient, prNumber, commentBody, suiteMarker)
+		}
 	}
 
 	// Write results.json.
@@ -540,17 +559,19 @@ func assembleSuiteMetadata(cfg *config.Config, suiteName string, retries int) re
 	return assembleMetadata(owner, repo, branch, commitSHA, runID, suiteName, retries)
 }
 
-// loadQuarantineState reads the quarantine.json file from the quarantine/state branch.
+// loadQuarantineState reads the state file at statePath from the quarantine/state branch.
 // Returns nil state on error (degraded mode — operation continues without quarantine awareness).
 // Also returns raw content and SHA for subsequent CAS writes.
 // client may be nil (no token / not configured) — degraded mode in that case.
-func loadQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *config.Config, client *gh.Client) (*qstate.State, []byte, string) {
+// statePath is the file path within the repo (e.g. "quarantine.json" for legacy mode,
+// or ".quarantine/backend/state.json" for suite mode).
+func loadQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *config.Config, client *gh.Client, statePath string) (*qstate.State, []byte, string) {
 	if client == nil {
 		return nil, nil, ""
 	}
 
 	branch := cfg.Storage.Branch
-	content, sha, err := client.GetContents(ctx, "quarantine.json", branch)
+	content, sha, err := client.GetContents(ctx, statePath, branch)
 	if err != nil {
 		emitDegradedWarning(cmd, degradedMsg(err))
 		return nil, nil, ""
@@ -669,7 +690,9 @@ func addNewFlakyTests(state *qstate.State, res result.Result, excludePatterns []
 // removedTestIDs is the list of test IDs that were unquarantined this run; used to
 // detect re-quarantine after CAS conflict and emit a warning per ADR-012.
 // client may be nil — in that case the write is skipped silently.
-func writeUpdatedQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *config.Config, state *qstate.State, originalContent []byte, sha string, client *gh.Client, removedTestIDs []string) {
+// statePath is the file path within the repo (e.g. "quarantine.json" for legacy mode,
+// or ".quarantine/backend/state.json" for suite mode).
+func writeUpdatedQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *config.Config, state *qstate.State, originalContent []byte, sha string, client *gh.Client, removedTestIDs []string, statePath string) {
 	if client == nil {
 		return
 	}
@@ -686,7 +709,7 @@ func writeUpdatedQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *c
 	}
 
 	branch := cfg.Storage.Branch
-	reQuarantined, writeErr := cas.WriteStateWithCAS(ctx, client, state, content, sha, branch, 3, removedTestIDs)
+	reQuarantined, writeErr := cas.WriteStateWithCAS(ctx, client, state, content, sha, branch, 3, removedTestIDs, statePath)
 	if writeErr != nil {
 		var apiErr *gh.APIError
 		switch {
