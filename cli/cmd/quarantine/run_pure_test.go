@@ -364,8 +364,8 @@ func TestAddNewFlakyTestsUpdatesExistingEntry(t *testing.T) {
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a flaky test already present in quarantine state",
-		Should:   "update LastFlakyAt to a non-empty timestamp",
-		Actual:   entry.LastFlakyAt != "",
+		Should:   "update LastFailureAt to a non-empty timestamp",
+		Actual:   entry.LastFailureAt != "",
 		Expected: true,
 	})
 }

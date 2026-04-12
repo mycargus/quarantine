@@ -108,8 +108,8 @@ framework: jest
 
 			riteway.Assert(t, riteway.Case[string]{
 				Given:    "all Jest tests pass",
-				Should:   "set framework to jest",
-				Actual:   results["framework"].(string),
+				Should:   "set suite_name to jest",
+				Actual:   results["suite_name"].(string),
 				Expected: "jest",
 			})
 		}
@@ -195,7 +195,7 @@ framework: rspec
 			riteway.Assert(t, riteway.Case[string]{
 				Given:    "RSpec run",
 				Should:   "set framework to rspec",
-				Actual:   results["framework"].(string),
+				Actual:   results["suite_name"].(string),
 				Expected: "rspec",
 			})
 		}
@@ -275,7 +275,7 @@ framework: vitest
 			riteway.Assert(t, riteway.Case[string]{
 				Given:    "Vitest run",
 				Should:   "set framework to vitest",
-				Actual:   results["framework"].(string),
+				Actual:   results["suite_name"].(string),
 				Expected: "vitest",
 			})
 		}
@@ -400,7 +400,7 @@ junitxml: junit-report.xml
 			riteway.Assert(t, riteway.Case[string]{
 				Given:    "quarantine.yml has framework: vitest",
 				Should:   "use vitest as the framework in results.json",
-				Actual:   results["framework"].(string),
+				Actual:   results["suite_name"].(string),
 				Expected: "vitest",
 			})
 		}

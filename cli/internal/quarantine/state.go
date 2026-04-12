@@ -34,7 +34,7 @@ type Entry struct {
 	Name            string `json:"name"`
 	Suite           string `json:"suite"`
 	FirstFlakyAt    string `json:"first_flaky_at"`
-	LastFlakyAt     string `json:"last_flaky_at"`
+	LastFailureAt   string `json:"last_failure_at"`
 	FlakyCount      int    `json:"flaky_count"`
 	IssueNumber     *int   `json:"issue_number,omitempty"`
 	IssueURL        string `json:"issue_url,omitempty"`

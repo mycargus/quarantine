@@ -443,7 +443,7 @@ func addNewFlakyTests(state *qstate.State, res result.Result, excludePatterns []
 		if state.HasTest(t.TestID) {
 			// Already quarantined — update last_flaky_at and flaky count.
 			entry := state.Tests[t.TestID]
-			entry.LastFlakyAt = now
+			entry.LastFailureAt = now
 			entry.FlakyCount++
 			state.AddTest(entry)
 			changed = true
@@ -457,7 +457,7 @@ func addNewFlakyTests(state *qstate.State, res result.Result, excludePatterns []
 			Classname:     t.Classname,
 			Name:          t.Name,
 			FirstFlakyAt:  now,
-			LastFlakyAt:   now,
+			LastFailureAt:   now,
 			FlakyCount:    1,
 			QuarantinedAt: now,
 			QuarantinedBy: "auto",
@@ -743,7 +743,7 @@ func assembleMetadata(owner, repo, branch, commitSHA, runID, framework string, r
 		Branch:     branch,
 		CommitSHA:  commitSHA,
 		CLIVersion: version,
-		Framework:  framework,
+		SuiteName:  framework,
 		RetryCount: retries,
 	}
 }

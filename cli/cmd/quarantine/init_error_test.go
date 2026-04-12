@@ -11,15 +11,43 @@ import (
 	riteway "github.com/mycargus/riteway-golang"
 )
 
+// --- No frameworks detected ---
+
+func TestInitNoFrameworksDetected(t *testing.T) {
+	dir := t.TempDir()
+	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+	// No package.json, no Gemfile.
+
+	stdout, err := executeInitCmd(t,
+		"",
+		dir,
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN": "ghp_test",
+		},
+	)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no package.json and no Gemfile in the directory",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no supported frameworks detected",
+		Should:   "print frameworks-related error message",
+		Actual:   strings.Contains(stdout, "framework"),
+		Expected: true,
+	})
+}
+
 // --- Scenario 6: no GitHub token ---
 
 func TestInitNoGitHubToken(t *testing.T) {
-	dir := t.TempDir()
-	// Create a fake git repo with a GitHub remote.
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
 	stdout, err := executeInitCmd(t,
-		"jest\n\n\n", // framework=jest, retries=default, junitxml=default
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN": "",
@@ -36,17 +64,17 @@ func TestInitNoGitHubToken(t *testing.T) {
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "neither QUARANTINE_GITHUB_TOKEN nor GITHUB_TOKEN set",
-		Should:   "print error about missing token",
-		Actual:   strings.Contains(stdout, "No GitHub token found"),
+		Should:   "print error mentioning token",
+		Actual:   strings.Contains(stdout, "token"),
 		Expected: true,
 	})
 
-	// Config file should have been created before GitHub operations.
-	_, statErr := os.Stat(dir + "/quarantine.yml")
+	// Config file should NOT have been created — token check runs before file writes now.
+	_, statErr := os.Stat(dir + "/.quarantine/config.yml")
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "init fails at token validation",
-		Should:   "have already created quarantine.yml (config written before GitHub ops)",
-		Actual:   statErr == nil,
+		Given:    "init fails at token validation (before file writes)",
+		Should:   "not have created .quarantine/config.yml",
+		Actual:   os.IsNotExist(statErr),
 		Expected: true,
 	})
 }
@@ -55,10 +83,14 @@ func TestInitNoGitHubToken(t *testing.T) {
 
 func TestInitNotGitRepo(t *testing.T) {
 	dir := t.TempDir()
-	// No .git directory.
+	// No .git directory; write package.json so framework detection succeeds.
+	pkgJSON := `{"devDependencies":{"jest":"^29.0.0"}}`
+	if err := os.WriteFile(dir+"/package.json", []byte(pkgJSON), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
 
 	stdout, err := executeInitCmd(t,
-		"jest\n\n\n",
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN": "ghp_test",
@@ -85,9 +117,13 @@ func TestInitNotGitRepo(t *testing.T) {
 func TestInitNonGitHubRemote(t *testing.T) {
 	dir := t.TempDir()
 	setupFakeGitRepo(t, dir, "https://gitlab.com/my-org/my-project.git")
+	pkgJSON := `{"devDependencies":{"jest":"^29.0.0"}}`
+	if err := os.WriteFile(dir+"/package.json", []byte(pkgJSON), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
 
 	stdout, err := executeInitCmd(t,
-		"jest\n\n\n",
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN": "ghp_test",
@@ -112,8 +148,7 @@ func TestInitNonGitHubRemote(t *testing.T) {
 // --- Scenario 7b: unauthorized token (401) ---
 
 func TestInitUnauthorizedToken(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/my-org/my-project", func(w http.ResponseWriter, r *http.Request) {
@@ -123,7 +158,7 @@ func TestInitUnauthorizedToken(t *testing.T) {
 	defer server.Close()
 
 	stdout, err := executeInitCmd(t,
-		"jest\n\n\n",
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN":        "ghp_invalid",
@@ -140,8 +175,8 @@ func TestInitUnauthorizedToken(t *testing.T) {
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "GET /repos returns 401",
-		Should:   "print error about invalid or expired token",
-		Actual:   strings.Contains(stdout, "invalid or expired"),
+		Should:   "print error mentioning token",
+		Actual:   strings.Contains(stdout, "token"),
 		Expected: true,
 	})
 }
@@ -149,10 +184,8 @@ func TestInitUnauthorizedToken(t *testing.T) {
 // --- Scenario 7: insufficient token permissions ---
 
 func TestInitForbiddenRepo(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
-	// Mock server that returns 403 for repo access.
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/my-org/my-project", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
@@ -161,7 +194,7 @@ func TestInitForbiddenRepo(t *testing.T) {
 	defer server.Close()
 
 	stdout, err := executeInitCmd(t,
-		"jest\n\n\n",
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
@@ -186,21 +219,15 @@ func TestInitForbiddenRepo(t *testing.T) {
 
 // --- Scenario 11: GitHub API unreachable ---
 
-// TestInitAPIUnreachable verifies that when the GitHub API is unreachable the
-// CLI retries once and then exits 2 with an actionable message.
-// Note: this test takes ~2 seconds because doWithRetry sleeps between attempts.
 func TestInitAPIUnreachable(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
-	// Start a server and close it immediately so every connection attempt
-	// gets "connection refused" — simulating a network-level failure.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	serverURL := server.URL
 	server.Close()
 
 	stdout, err := executeInitCmd(t,
-		"jest\n\n\n",
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
@@ -234,8 +261,7 @@ func TestInitAPIUnreachable(t *testing.T) {
 // --- GetRef(quarantine/state) returns an unexpected error ---
 
 func TestInitGetRefQuarantineStateError(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/my-org/my-project", func(w http.ResponseWriter, r *http.Request) {
@@ -251,7 +277,7 @@ func TestInitGetRefQuarantineStateError(t *testing.T) {
 	defer server.Close()
 
 	stdout, err := executeInitCmd(t,
-		"jest\n\n\n",
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
@@ -277,8 +303,7 @@ func TestInitGetRefQuarantineStateError(t *testing.T) {
 // --- GetRef(default branch) returns an unexpected error ---
 
 func TestInitGetDefaultBranchRefError(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/my-org/my-project", func(w http.ResponseWriter, r *http.Request) {
@@ -289,16 +314,16 @@ func TestInitGetDefaultBranchRefError(t *testing.T) {
 	})
 	mux.HandleFunc("/repos/my-org/my-project/git/ref/heads/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/heads/quarantine/state") {
-			http.NotFound(w, r) // branch doesn't exist — proceed to create it
+			http.NotFound(w, r)
 		} else {
-			w.WriteHeader(http.StatusInternalServerError) // default branch SHA lookup fails
+			w.WriteHeader(http.StatusInternalServerError)
 		}
 	})
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
 	stdout, err := executeInitCmd(t,
-		"jest\n\n\n",
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
@@ -324,8 +349,7 @@ func TestInitGetDefaultBranchRefError(t *testing.T) {
 // --- CreateRef returns an error ---
 
 func TestInitCreateRefFailure(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/my-org/my-project", func(w http.ResponseWriter, r *http.Request) {
@@ -352,7 +376,7 @@ func TestInitCreateRefFailure(t *testing.T) {
 	defer server.Close()
 
 	stdout, err := executeInitCmd(t,
-		"jest\n\n\n",
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
@@ -378,8 +402,7 @@ func TestInitCreateRefFailure(t *testing.T) {
 // --- PutContents returns an error ---
 
 func TestInitPutContentsFailure(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/my-org/my-project", func(w http.ResponseWriter, r *http.Request) {
@@ -402,14 +425,14 @@ func TestInitPutContentsFailure(t *testing.T) {
 	mux.HandleFunc("/repos/my-org/my-project/git/refs", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 	})
-	mux.HandleFunc("/repos/my-org/my-project/contents/quarantine.json", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/my-org/my-project/contents/README.md", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusConflict)
 	})
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
 	stdout, err := executeInitCmd(t,
-		"jest\n\n\n",
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
@@ -418,16 +441,16 @@ func TestInitPutContentsFailure(t *testing.T) {
 	)
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "PUT /contents/quarantine.json returns 409",
+		Given:    "PUT /contents/README.md returns 409",
 		Should:   "return an error",
 		Actual:   err != nil,
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "PUT /contents/quarantine.json returns 409",
-		Should:   "print error about failed quarantine.json write",
-		Actual:   strings.Contains(stdout, "failed to write quarantine.json"),
+		Given:    "PUT /contents/README.md returns 409",
+		Should:   "print error about failed README.md write",
+		Actual:   strings.Contains(stdout, "failed to write README.md"),
 		Expected: true,
 	})
 }

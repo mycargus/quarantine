@@ -60,7 +60,7 @@ func TestBuildEmptyTests(t *testing.T) {
 	meta := result.Metadata{
 		RunID:     "run-1",
 		Repo:      "owner/repo",
-		Framework: "jest",
+		SuiteName: "jest",
 	}
 
 	res := result.Build([]parser.TestResult{}, meta)
@@ -444,7 +444,7 @@ func TestBuild(t *testing.T) {
 		Branch:     "main",
 		CommitSHA:  "abc123",
 		CLIVersion: "0.1.0",
-		Framework:  "jest",
+		SuiteName:  "jest",
 		RetryCount: 2,
 	}
 
@@ -474,7 +474,7 @@ func TestBuild(t *testing.T) {
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "metadata with framework jest",
 		Should:   "set framework from metadata",
-		Actual:   res.Framework,
+		Actual:   res.SuiteName,
 		Expected: "jest",
 	})
 

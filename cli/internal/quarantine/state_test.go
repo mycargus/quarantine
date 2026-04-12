@@ -47,7 +47,7 @@ func TestParseState(t *testing.T) {
 				"name":           "logs in",
 				"suite":          "AuthService",
 				"first_flaky_at": "2026-03-10T08:30:00Z",
-				"last_flaky_at":  "2026-03-14T11:45:00Z",
+				"last_failure_at":  "2026-03-14T11:45:00Z",
 				"flaky_count":    7,
 				"issue_number":   42,
 				"issue_url":      "https://github.com/org/repo/issues/42",
@@ -98,8 +98,8 @@ func TestParseState(t *testing.T) {
 
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "the parsed entry",
-		Should:   "have the correct last_flaky_at",
-		Actual:   entry.LastFlakyAt,
+		Should:   "have the correct last_failure_at",
+		Actual:   entry.LastFailureAt,
 		Expected: "2026-03-14T11:45:00Z",
 	})
 
@@ -153,7 +153,7 @@ func TestParseStateWithoutOptionalIssueFields(t *testing.T) {
 				"name":           "logs in",
 				"suite":          "AuthService",
 				"first_flaky_at": "2026-03-14T12:00:00Z",
-				"last_flaky_at":  "2026-03-14T12:00:00Z",
+				"last_failure_at":  "2026-03-14T12:00:00Z",
 				"flaky_count":    1,
 				"quarantined_at": "2026-03-14T12:00:00Z",
 				"quarantined_by": "cli-auto"
@@ -197,7 +197,7 @@ func TestMarshalRoundTrip(t *testing.T) {
 		Name:          "bar",
 		Suite:         "Foo",
 		FirstFlakyAt:  "2026-03-01T00:00:00Z",
-		LastFlakyAt:   "2026-03-14T00:00:00Z",
+		LastFailureAt:   "2026-03-14T00:00:00Z",
 		FlakyCount:    3,
 		IssueNumber:   &num,
 		IssueURL:      "https://github.com/org/repo/issues/99",
@@ -241,8 +241,8 @@ func TestMarshalRoundTrip(t *testing.T) {
 
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "the round-tripped entry",
-		Should:   "preserve last_flaky_at",
-		Actual:   entry.LastFlakyAt,
+		Should:   "preserve last_failure_at",
+		Actual:   entry.LastFailureAt,
 		Expected: "2026-03-14T00:00:00Z",
 	})
 

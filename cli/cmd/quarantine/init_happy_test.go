@@ -8,16 +8,50 @@ import (
 	riteway "github.com/mycargus/riteway-golang"
 )
 
+// setupJestRepo creates a temp dir with a git repo and package.json containing jest.
+func setupJestRepo(t *testing.T, remoteURL string) string {
+	t.Helper()
+	dir := t.TempDir()
+	setupFakeGitRepo(t, dir, remoteURL)
+	pkgJSON := `{"devDependencies":{"jest":"^29.0.0"}}`
+	if err := os.WriteFile(dir+"/package.json", []byte(pkgJSON), 0644); err != nil {
+		t.Fatalf("write package.json: %v", err)
+	}
+	return dir
+}
+
+// setupRSpecRepo creates a temp dir with a git repo and Gemfile containing rspec.
+func setupRSpecRepo(t *testing.T, remoteURL string) string {
+	t.Helper()
+	dir := t.TempDir()
+	setupFakeGitRepo(t, dir, remoteURL)
+	gemfile := "gem 'rspec', '~> 3.12'\n"
+	if err := os.WriteFile(dir+"/Gemfile", []byte(gemfile), 0644); err != nil {
+		t.Fatalf("write Gemfile: %v", err)
+	}
+	return dir
+}
+
+// setupVitestRepo creates a temp dir with a git repo and package.json containing vitest.
+func setupVitestRepo(t *testing.T, remoteURL string) string {
+	t.Helper()
+	dir := t.TempDir()
+	setupFakeGitRepo(t, dir, remoteURL)
+	pkgJSON := `{"devDependencies":{"vitest":"^1.0.0"}}`
+	if err := os.WriteFile(dir+"/package.json", []byte(pkgJSON), 0644); err != nil {
+		t.Fatalf("write package.json: %v", err)
+	}
+	return dir
+}
+
 // --- Scenario 1: First-time setup with Jest ---
 
 func TestInitJestFirstTime(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
-
+	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 	mockServer := newInitTestServer(t)
 
 	stdout, err := executeInitCmd(t,
-		"jest\n\n\n", // framework=jest, retries=default, junitxml=default
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
@@ -34,39 +68,38 @@ func TestInitJestFirstTime(t *testing.T) {
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "first-time jest setup",
-		Should:   "print success message",
-		Actual:   strings.Contains(stdout, "Quarantine initialized successfully"),
+		Should:   "print Quarantine initialized message",
+		Actual:   strings.Contains(stdout, "Quarantine initialized."),
 		Expected: true,
 	})
 
-	// Verify quarantine.yml was created.
-	content, readErr := os.ReadFile(dir + "/quarantine.yml")
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "first-time jest setup",
-		Should:   "create quarantine.yml",
+		Should:   "mention detected jest framework in output",
+		Actual:   strings.Contains(stdout, "jest"),
+		Expected: true,
+	})
+
+	// Verify .quarantine/config.yml was created.
+	content, readErr := os.ReadFile(dir + "/.quarantine/config.yml")
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "first-time jest setup",
+		Should:   "create .quarantine/config.yml",
 		Actual:   readErr == nil,
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "quarantine.yml written by init",
+		Given:    ".quarantine/config.yml written by init",
 		Should:   "contain version: 1",
 		Actual:   strings.Contains(string(content), "version: 1"),
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "quarantine.yml written by init",
-		Should:   "contain framework: jest",
-		Actual:   strings.Contains(string(content), "framework: jest"),
-		Expected: true,
-	})
-
-	// Jest-specific recommendation should be printed.
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "jest framework selected",
-		Should:   "print jest-junit recommendation",
-		Actual:   strings.Contains(stdout, "jest-junit"),
+		Given:    ".quarantine/config.yml written by init",
+		Should:   "contain jest suite name",
+		Actual:   strings.Contains(string(content), "name: jest"),
 		Expected: true,
 	})
 }
@@ -74,13 +107,11 @@ func TestInitJestFirstTime(t *testing.T) {
 // --- Scenario 2: quarantine init with RSpec ---
 
 func TestInitRSpec(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
-
+	dir := setupRSpecRepo(t, "https://github.com/my-org/my-project.git")
 	mockServer := newInitTestServer(t)
 
 	stdout, err := executeInitCmd(t,
-		"rspec\n\n\n", // framework=rspec, retries=default, junitxml=default
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
@@ -89,33 +120,24 @@ func TestInitRSpec(t *testing.T) {
 	)
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "rspec framework selected",
+		Given:    "rspec detected from Gemfile",
 		Should:   "exit without error",
 		Actual:   err == nil,
 		Expected: true,
 	})
 
-	content, _ := os.ReadFile(dir + "/quarantine.yml")
+	content, _ := os.ReadFile(dir + "/.quarantine/config.yml")
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "rspec framework selected",
-		Should:   "write framework: rspec to quarantine.yml",
-		Actual:   strings.Contains(string(content), "framework: rspec"),
+		Given:    "rspec detected from Gemfile",
+		Should:   "write name: rspec to .quarantine/config.yml",
+		Actual:   strings.Contains(string(content), "name: rspec"),
 		Expected: true,
 	})
 
-	// No jest-junit recommendation for rspec.
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "rspec framework selected",
-		Should:   "NOT print jest-junit recommendation",
-		Actual:   !strings.Contains(stdout, "jest-junit"),
-		Expected: true,
-	})
-
-	// Workflow snippet should be rspec-specific.
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "rspec framework selected",
-		Should:   "print rspec workflow snippet",
-		Actual:   strings.Contains(stdout, "RspecJunitFormatter") || strings.Contains(stdout, "rspec"),
+		Given:    "rspec detected from Gemfile",
+		Should:   "print detected rspec framework",
+		Actual:   strings.Contains(stdout, "rspec"),
 		Expected: true,
 	})
 }
@@ -123,13 +145,11 @@ func TestInitRSpec(t *testing.T) {
 // --- Scenario 3: quarantine init with Vitest ---
 
 func TestInitVitest(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
-
+	dir := setupVitestRepo(t, "https://github.com/my-org/my-project.git")
 	mockServer := newInitTestServer(t)
 
 	stdout, err := executeInitCmd(t,
-		"vitest\n\n\n", // framework=vitest, retries=default, junitxml=default
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
@@ -138,24 +158,24 @@ func TestInitVitest(t *testing.T) {
 	)
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "vitest framework selected",
+		Given:    "vitest detected from package.json",
 		Should:   "exit without error",
 		Actual:   err == nil,
 		Expected: true,
 	})
 
-	content, _ := os.ReadFile(dir + "/quarantine.yml")
+	content, _ := os.ReadFile(dir + "/.quarantine/config.yml")
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "vitest framework selected",
-		Should:   "write framework: vitest to quarantine.yml",
-		Actual:   strings.Contains(string(content), "framework: vitest"),
+		Given:    "vitest detected from package.json",
+		Should:   "write name: vitest to .quarantine/config.yml",
+		Actual:   strings.Contains(string(content), "name: vitest"),
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "vitest framework selected",
-		Should:   "print vitest workflow snippet with --reporter=junit",
-		Actual:   strings.Contains(stdout, "--reporter=junit"),
+		Given:    "vitest detected from package.json",
+		Should:   "print detected vitest framework",
+		Actual:   strings.Contains(stdout, "vitest"),
 		Expected: true,
 	})
 }
@@ -163,13 +183,11 @@ func TestInitVitest(t *testing.T) {
 // --- Scenario 5: quarantine/state branch already exists ---
 
 func TestInitBranchAlreadyExists(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
-
+	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 	mockServer := newInitTestServer(t, withExistingBranch())
 
 	stdout, err := executeInitCmd(t,
-		"jest\n\n\n",
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
@@ -186,92 +204,27 @@ func TestInitBranchAlreadyExists(t *testing.T) {
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "quarantine/state branch already exists",
-		Should:   "print message about skipping branch creation",
-		Actual:   strings.Contains(stdout, "already exists") && strings.Contains(stdout, "Skipping"),
-		Expected: true,
-	})
-}
-
-// --- Scenario 10: invalid framework input ---
-
-func TestInitInvalidFrameworkRePrompts(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
-
-	mockServer := newInitTestServer(t)
-	t.Setenv("QUARANTINE_GITHUB_TOKEN", "ghp_test")
-	t.Setenv("QUARANTINE_GITHUB_API_BASE_URL", mockServer.server.URL)
-
-	// Enter invalid framework first, then valid one.
-	stdout, _ := executeInitCmd(t,
-		"pytest\njest\n\n\n",
-		dir,
-		nil,
-	)
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "user enters 'pytest' then 'jest' at the framework prompt",
-		Should:   "print exact invalid framework message for 'pytest'",
-		Actual:   strings.Contains(stdout, "Invalid framework 'pytest'. Supported: rspec, jest, vitest."),
-		Expected: true,
-	})
-}
-
-// --- Custom junitxml path ---
-// Kills mutation on line 65: `junitInput != ""` → `junitInput == ""`.
-
-func TestInitCustomJUnitXMLPath(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
-
-	mockServer := newInitTestServer(t)
-
-	stdout, err := executeInitCmd(t,
-		"jest\n3\nmy-custom-results.xml\n", // framework=jest, retries=3, junitxml=my-custom-results.xml
-		dir,
-		map[string]string{
-			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-			"QUARANTINE_GITHUB_API_BASE_URL": mockServer.server.URL,
-		},
-	)
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "user provides a custom junitxml path",
-		Should:   "exit without error",
-		Actual:   err == nil,
-		Expected: true,
-	})
-
-	// The custom junitxml differs from the jest default (junit.xml), so it must
-	// appear in quarantine.yml.
-	content, _ := os.ReadFile(dir + "/quarantine.yml")
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "user provides 'my-custom-results.xml' as junitxml",
-		Should:   "write junitxml: my-custom-results.xml to quarantine.yml",
-		Actual:   strings.Contains(string(content), "my-custom-results.xml"),
+		Should:   "print 'already exists' in output",
+		Actual:   strings.Contains(stdout, "already exists"),
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "user provides a custom junitxml",
-		Should:   "print the custom path in the init summary",
-		Actual:   strings.Contains(stdout, "my-custom-results.xml"),
+		Given:    "quarantine/state branch already exists",
+		Should:   "print 'Skipping' in output",
+		Actual:   strings.Contains(stdout, "Skipping"),
 		Expected: true,
 	})
 }
 
 // --- Empty defaultBranch fallback ---
-// Kills mutation on line 133: `defaultBranch == ""` → `defaultBranch != ""`.
 
 func TestInitEmptyDefaultBranchFallsBackToMain(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
-
-	// Mock server returns empty default_branch; code should fall back to "main".
+	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 	mockServer := newInitTestServer(t, withEmptyDefaultBranch())
 
 	_, err := executeInitCmd(t,
-		"jest\n\n\n",
+		"",
 		dir,
 		map[string]string{
 			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
@@ -279,61 +232,10 @@ func TestInitEmptyDefaultBranchFallsBackToMain(t *testing.T) {
 		},
 	)
 
-	// If defaultBranch fallback is broken (mutation: != "" instead of == ""),
-	// the code would try to fetch a ref for an empty branch name and fail.
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "GitHub API returns empty default_branch field",
 		Should:   "fall back to 'main' and initialize successfully",
 		Actual:   err == nil,
-		Expected: true,
-	})
-}
-
-// --- Jest recommendation is printed in init output ---
-// Kills mutation on line 166: `rec != ""` → `rec == ""`.
-
-func TestInitJestRecommendationAppearsInOutput(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
-
-	mockServer := newInitTestServer(t)
-
-	stdout, err := executeInitCmd(t,
-		"jest\n\n\n",
-		dir,
-		map[string]string{
-			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-			"QUARANTINE_GITHUB_API_BASE_URL": mockServer.server.URL,
-		},
-	)
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "jest framework selected during init",
-		Should:   "print the jest-junit recommendation block",
-		Actual:   err == nil && strings.Contains(stdout, "classNameTemplate"),
-		Expected: true,
-	})
-}
-
-func TestInitRSpecNoJestRecommendation(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
-
-	mockServer := newInitTestServer(t)
-
-	stdout, err := executeInitCmd(t,
-		"rspec\n\n\n",
-		dir,
-		map[string]string{
-			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-			"QUARANTINE_GITHUB_API_BASE_URL": mockServer.server.URL,
-		},
-	)
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "rspec framework selected during init",
-		Should:   "NOT print the jest-junit recommendation block",
-		Actual:   err == nil && !strings.Contains(stdout, "classNameTemplate"),
 		Expected: true,
 	})
 }

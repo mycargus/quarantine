@@ -1,78 +1,40 @@
 package main
 
 import (
-	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 
-	"github.com/mycargus/quarantine/cli/internal/config"
 	"github.com/mycargus/quarantine/cli/internal/git"
 	ghclient "github.com/mycargus/quarantine/cli/internal/github"
-	"github.com/mycargus/quarantine/cli/internal/quarantine"
 )
 
 // runInit implements the `quarantine init` command.
+// It auto-detects test frameworks from package.json and Gemfile,
+// creates .quarantine/config.yml with per-suite entries, creates
+// .quarantine/.gitignore, and sets up the quarantine/state branch.
 func runInit(cmd *cobra.Command, args []string) error {
-	// Route init output to stdout. Cobra v1.8+ defaults cmd.Printf to stderr
-	// (via OutOrStderr), which is correct for `quarantine run` where stdout is
-	// reserved for the test runner. `init` is interactive setup — no test
-	// runner — so stdout is safe and expected.
 	cmd.SetOut(cmd.OutOrStdout())
-	in := bufio.NewReader(cmd.InOrStdin())
 
-	// Step 1: Check for existing quarantine.yml.
-	configPath := "quarantine.yml"
-	if _, err := os.Stat(configPath); err == nil {
-		cmd.Printf("quarantine.yml already exists. Overwrite? [y/N] ")
-		answer, _ := in.ReadString('\n')
-		answer = strings.TrimSpace(strings.ToLower(answer))
-		if answer != "y" && answer != "yes" {
-			cmd.Printf("Aborted. Existing quarantine.yml preserved.\n")
-			return nil
-		}
+	// Step 1: Detect frameworks from project files.
+	pkgJSON, _ := os.ReadFile("package.json")
+	gemfile, _ := os.ReadFile("Gemfile")
+	frameworks := detectFrameworks(string(pkgJSON), string(gemfile))
+
+	if len(frameworks) == 0 {
+		cmd.Printf("No supported test frameworks detected.\n")
+		cmd.Printf("Supported frameworks: jest, vitest, rspec.\n")
+		cmd.Printf("Add jest or vitest to package.json devDependencies, or add gem 'rspec' to your Gemfile.\n")
+		return fmt.Errorf("no frameworks detected")
 	}
 
-	// Step 2: Prompt for framework.
-	framework := ""
-	for {
-		cmd.Printf("Which test framework? [rspec/jest/vitest] ")
-		input, _ := in.ReadString('\n')
-		input = strings.TrimSpace(input)
-		if config.IsValidFramework(input) {
-			framework = input
-			break
-		}
-		cmd.Printf("Invalid framework '%s'. Supported: rspec, jest, vitest.\n", input)
-	}
+	cmd.Printf("Detected test frameworks: %s\n", strings.Join(frameworks, ", "))
 
-	// Step 3: Prompt for retries.
-	cmd.Printf("How many retries for failing tests? [3] ")
-	retriesInput, _ := in.ReadString('\n')
-	retries := parseRetriesInput(retriesInput, 3)
-
-	// Step 4: Prompt for junitxml path.
-	defaultJUnit := config.FrameworkDefaultJUnit(framework)
-	cmd.Printf("Path/glob for JUnit XML output? [%s] ", defaultJUnit)
-	junitInput, _ := in.ReadString('\n')
-	junitInput = strings.TrimSpace(junitInput)
-	junitxml := defaultJUnit
-	if junitInput != "" {
-		junitxml = junitInput
-	}
-
-	// Step 5: Write quarantine.yml (BEFORE GitHub operations).
-	if err := writeConfig(configPath, framework, retries, junitxml, defaultJUnit); err != nil {
-		cmd.Printf("Error: failed to write quarantine.yml: %v\n", err)
-		return fmt.Errorf("write config: %w", err)
-	}
-
-	// Step 6: Validate GitHub token.
+	// Step 2: Validate GitHub token.
 	token := ghclient.ResolveToken()
 	if token == "" {
 		cmd.Printf(`
@@ -85,7 +47,7 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 		return fmt.Errorf("no GitHub token")
 	}
 
-	// Step 7: Detect owner/repo from git remote.
+	// Step 3: Detect owner/repo from git remote.
 	cwd, err := os.Getwd()
 	if err != nil {
 		cmd.Printf("Error: could not determine current directory: %v\n", err)
@@ -98,7 +60,7 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 		return fmt.Errorf("git remote: %w", err)
 	}
 
-	// Step 8: Create GitHub client and run API calls in required order.
+	// Step 4: Create GitHub client and validate token.
 	client, err := ghclient.NewClient(owner, repo)
 	if err != nil {
 		cmd.Printf("Error: %v\n", err)
@@ -108,17 +70,33 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 	ctx := context.Background()
 
 	// Call 1: GET /repos/{owner}/{repo} — validate token and permissions.
-	cmd.Printf("\nValidating GitHub token... ")
 	repoInfo, err := client.GetRepo(ctx)
 	if err != nil {
-		cmd.Printf("FAILED\n")
 		cmd.Printf("%s\n", classifyGitHubError(err, owner, repo))
 		return fmt.Errorf("get repo: %w", err)
 	}
-	cmd.Printf("OK\n")
-	cmd.Printf("Testing repository access (%s/%s)... OK\n", owner, repo)
 
-	// Call 2: GET /repos/{owner}/{repo}/git/ref/heads/quarantine/state — check if branch exists.
+	// Step 5: Write .quarantine/config.yml and .quarantine/.gitignore.
+	if err := os.MkdirAll(".quarantine", 0755); err != nil {
+		cmd.Printf("Error: failed to create .quarantine directory: %v\n", err)
+		return fmt.Errorf("mkdir .quarantine: %w", err)
+	}
+
+	configContent := formatInitConfig(owner, repo, frameworks)
+	if err := os.WriteFile(".quarantine/config.yml", []byte(configContent), 0644); err != nil {
+		cmd.Printf("Error: failed to write .quarantine/config.yml: %v\n", err)
+		return fmt.Errorf("write config: %w", err)
+	}
+
+	gitignoreContent := formatQuarantineGitignore()
+	if err := os.WriteFile(".quarantine/.gitignore", []byte(gitignoreContent), 0644); err != nil {
+		cmd.Printf("Error: failed to write .quarantine/.gitignore: %v\n", err)
+		return fmt.Errorf("write gitignore: %w", err)
+	}
+
+	cmd.Printf("Pre-filled %d suite entries in .quarantine/config.yml\n", len(frameworks))
+
+	// Step 6: Check and create the quarantine/state branch.
 	_, branchExists, err := client.GetRef(ctx, "quarantine/state")
 	if err != nil {
 		cmd.Printf("Error: failed to check branch status: %v\n", err)
@@ -128,7 +106,6 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 	if branchExists {
 		cmd.Printf("Branch 'quarantine/state' already exists. Skipping branch creation.\n")
 	} else {
-		// Call 3: GET /repos/{owner}/{repo}/git/ref/heads/{default_branch} — get HEAD SHA.
 		defaultBranch := repoInfo.DefaultBranch
 		if defaultBranch == "" {
 			defaultBranch = "main"
@@ -139,79 +116,194 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 			return fmt.Errorf("get ref: %w", err)
 		}
 
-		// Call 4: POST /repos/{owner}/{repo}/git/refs — create branch.
-		cmd.Printf("Creating quarantine/state branch... ")
 		if err := client.CreateRef(ctx, "quarantine/state", baseSHA); err != nil {
-			cmd.Printf("FAILED\n")
 			cmd.Printf("Error: failed to create branch: %v\n", err)
 			return fmt.Errorf("create ref: %w", err)
 		}
-		cmd.Printf("OK\n")
 
-		// Call 5: PUT /repos/{owner}/{repo}/contents/quarantine.json — write empty state.
-		emptyState := quarantine.NewEmptyState()
-		stateJSON, err := emptyState.Marshal()
-		if err != nil {
-			cmd.Printf("Error: failed to marshal quarantine.json: %v\n", err)
-			return fmt.Errorf("marshal state: %w", err)
-		}
+		readmeContent := []byte(`# quarantine/state
 
-		if err := client.PutContents(ctx, "quarantine.json", "quarantine: initialize empty state", stateJSON, ""); err != nil {
-			cmd.Printf("Error: failed to write quarantine.json: %v\n", err)
+This branch stores quarantine state managed by the quarantine CLI.
+Do not edit files on this branch manually.
+`)
+		if err := client.PutContents(ctx, "README.md", "quarantine: initialize state branch", readmeContent, ""); err != nil {
+			cmd.Printf("Error: failed to write README.md: %v\n", err)
 			return fmt.Errorf("put contents: %w", err)
 		}
 	}
 
-	// Jest-specific recommendation.
-	if rec := jestRecommendation(framework); rec != "" {
-		cmd.Printf("%s", rec)
-	}
-
-	cmd.Printf("%s", formatInitSummary(framework, retries, junitxml, branchExists))
+	cmd.Printf("%s", formatInitSummary(owner, repo, frameworks, branchExists))
 
 	return nil
 }
 
-// parseRetriesInput parses a retries string, returning defaultVal for empty or invalid input.
+// detectFrameworks inspects package.json and Gemfile content and returns
+// the list of detected framework names (jest, vitest, rspec).
 // This is a pure function — no I/O.
-func parseRetriesInput(input string, defaultVal int) int {
-	input = strings.TrimSpace(input)
-	if input == "" {
-		return defaultVal
+func detectFrameworks(pkgJSON, gemfile string) []string {
+	var frameworks []string
+
+	if pkgJSON != "" {
+		// Parse package.json to detect jest and vitest keys.
+		var pkg map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(pkgJSON), &pkg); err == nil {
+			if hasPackageKey(pkg, "jest") {
+				frameworks = append(frameworks, "jest")
+			}
+			if hasPackageKey(pkg, "vitest") {
+				frameworks = append(frameworks, "vitest")
+			}
+		}
 	}
-	if n, err := strconv.Atoi(input); err == nil {
-		return n
+
+	if gemfile != "" {
+		if gemfileContainsRSpec(gemfile) {
+			frameworks = append(frameworks, "rspec")
+		}
 	}
-	return defaultVal
+
+	return frameworks
 }
 
-// writeConfig writes quarantine.yml with the given settings.
-// Fields that match defaults are omitted except version and framework.
-func writeConfig(path, framework string, retries int, junitxml, defaultJUnit string) error {
-	// Build minimal config map — always include version and framework.
-	// Omit fields that match defaults.
-	cfg := map[string]interface{}{
-		"version":   1,
-		"framework": framework,
+// hasPackageKey returns true if the parsed package.json map contains the given
+// key in "dependencies" or "devDependencies".
+// This is a pure function — no I/O.
+func hasPackageKey(pkg map[string]json.RawMessage, key string) bool {
+	for _, section := range []string{"dependencies", "devDependencies"} {
+		raw, ok := pkg[section]
+		if !ok {
+			continue
+		}
+		var deps map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &deps); err != nil {
+			continue
+		}
+		if _, found := deps[key]; found {
+			return true
+		}
+	}
+	return false
+}
+
+// gemfileContainsRSpec returns true if the Gemfile content declares rspec.
+// Detects both gem 'rspec' and gem "rspec" patterns.
+// This is a pure function — no I/O.
+func gemfileContainsRSpec(gemfile string) bool {
+	return strings.Contains(gemfile, "gem 'rspec'") ||
+		strings.Contains(gemfile, `gem "rspec"`)
+}
+
+// buildSuiteEntry returns the default SuiteEntry for a given framework name.
+// This is a pure function — no I/O.
+func buildSuiteEntry(framework string) map[string]interface{} {
+	switch framework {
+	case "jest":
+		return map[string]interface{}{
+			"name":           "jest",
+			"command":        []string{"npx", "jest", "--ci"},
+			"junitxml":       "junit.xml",
+			"rerun_command":  []string{"npx", "jest", "--testNamePattern", "{name}"},
+			"retries":        3,
+		}
+	case "rspec":
+		return map[string]interface{}{
+			"name":           "rspec",
+			"command":        []string{"bundle", "exec", "rspec"},
+			"junitxml":       "rspec.xml",
+			"rerun_command":  []string{"bundle", "exec", "rspec", "-e", "{name}"},
+			"retries":        3,
+		}
+	case "vitest":
+		return map[string]interface{}{
+			"name":          "vitest",
+			"command":       []string{"npx", "vitest", "run"},
+			"junitxml":      "junit-report.xml",
+			"rerun_command": []string{"npx", "vitest", "run", "--reporter=junit", "{file}", "-t", "{name}"},
+			"retries":       3,
+		}
+	}
+	return map[string]interface{}{
+		"name":          framework,
+		"command":       []string{},
+		"junitxml":      "junit.xml",
+		"rerun_command": []string{},
+		"retries":       3,
+	}
+}
+
+// formatInitConfig generates the content of .quarantine/config.yml.
+// This is a pure function — no I/O.
+func formatInitConfig(owner, repo string, frameworks []string) string {
+	var suites strings.Builder
+	for _, fw := range frameworks {
+		entry := buildSuiteEntry(fw)
+		cmd := entry["command"].([]string)
+		rerun := entry["rerun_command"].([]string)
+		fmt.Fprintf(&suites, "  - name: %s\n", entry["name"])
+		fmt.Fprintf(&suites, "    command: [%s]\n", joinQuoted(cmd))
+		fmt.Fprintf(&suites, "    junitxml: %q\n", entry["junitxml"])
+		fmt.Fprintf(&suites, "    rerun_command: [%s]\n", joinQuoted(rerun))
+		fmt.Fprintf(&suites, "    retries: %d\n", entry["retries"])
 	}
 
-	if retries != 3 {
-		cfg["retries"] = retries
-	}
+	return fmt.Sprintf(`version: 1
 
-	if junitxml != defaultJUnit {
-		cfg["junitxml"] = junitxml
-	}
+github:
+  owner: %s
+  repo: %s
 
-	data, err := yaml.Marshal(cfg)
-	if err != nil {
-		return fmt.Errorf("marshal yaml: %w", err)
-	}
+issue_tracker: github
+labels:
+  - quarantine
+notifications:
+  github_pr_comment: true
+storage:
+  branch: quarantine/state
 
-	return os.WriteFile(path, data, 0644)
+test_suites:
+%s`, owner, repo, suites.String())
+}
+
+// joinQuoted returns a comma-separated, double-quoted list of strings for
+// embedding inside a YAML flow sequence: ["npx", "jest", "--ci"].
+// This is a pure function — no I/O.
+func joinQuoted(items []string) string {
+	quoted := make([]string, len(items))
+	for i, s := range items {
+		quoted[i] = fmt.Sprintf("%q", s)
+	}
+	return strings.Join(quoted, ", ")
+}
+
+// formatQuarantineGitignore returns the content for .quarantine/.gitignore.
+// This is a pure function — no I/O.
+func formatQuarantineGitignore() string {
+	return `# Ignore all runtime files. Only config.yml is source-controlled.
+*
+!.gitignore
+!config.yml
+`
+}
+
+// formatInitSummary returns the success output for quarantine init.
+// This is a pure function — no I/O.
+func formatInitSummary(owner, repo string, frameworks []string, branchExists bool) string {
+	branchStatus := "created"
+	if branchExists {
+		branchStatus = "already exists"
+	}
+	return fmt.Sprintf(`
+Quarantine initialized.
+  Config:   .quarantine/config.yml (created)
+  Branch:   quarantine/state (%s)
+
+Next step: review .quarantine/config.yml, adjust suite names and commands,
+then run `+"`quarantine doctor`"+` to validate.
+`, branchStatus)
 }
 
 // classifyGitHubError returns a user-facing error message for a GitHub API failure.
+// This is a pure function — no I/O.
 func classifyGitHubError(err error, owner, repo string) string {
 	errStr := err.Error()
 	if strings.Contains(errStr, "403") || strings.Contains(errStr, "lacks permission") {
@@ -224,33 +316,14 @@ func classifyGitHubError(err error, owner, repo string) string {
 	return fmt.Sprintf("Error: GitHub API error: %v", err)
 }
 
-// jestRecommendation returns the jest-junit configuration recommendation if framework is "jest",
-// or an empty string otherwise.
-func jestRecommendation(framework string) string {
-	if framework != "jest" {
-		return ""
-	}
-	return `
-Recommended jest-junit configuration (in jest.config.js or package.json):
-
-  "jest-junit": {
-    "classNameTemplate": "{classname}",
-    "titleTemplate": "{title}",
-    "ancestorSeparator": " > ",
-    "addFileAttribute": "true"
-  }
-
-This produces well-structured JUnit XML for quarantine's test identification.
-`
-}
-
 // classifyGitRemoteError returns a user-facing error message for a git remote parsing failure.
+// This is a pure function — no I/O.
 func classifyGitRemoteError(err error) string {
 	errMsg := err.Error()
 	if strings.Contains(errMsg, "not a git repository") {
 		return "Error: Not a git repository. Run 'quarantine init' from the root of a git repository."
 	} else if strings.Contains(errMsg, "not a GitHub URL") {
-		return fmt.Sprintf("Error: Remote 'origin' is not a GitHub URL: %s\nQuarantine v1 supports GitHub repositories only. Set github.owner and github.repo\nin quarantine.yml manually if using a non-standard remote.", extractURLFromError(errMsg))
+		return fmt.Sprintf("Error: Remote 'origin' is not a GitHub URL: %s\nQuarantine v1 supports GitHub repositories only. Set github.owner and github.repo\nin .quarantine/config.yml manually if using a non-standard remote.", extractURLFromError(errMsg))
 	}
 	return fmt.Sprintf("Error: %v", err)
 }
@@ -263,53 +336,4 @@ func extractURLFromError(errMsg string) string {
 		return errMsg
 	}
 	return errMsg[idx+len(prefix):]
-}
-
-// formatInitSummary returns the formatted success summary for quarantine init.
-func formatInitSummary(framework string, retries int, junitxml string, branchExists bool) string {
-	branchStatus := "created"
-	if branchExists {
-		branchStatus = "already exists"
-	}
-	workflowSnippet := frameworkWorkflowSnippet(framework, junitxml)
-	return fmt.Sprintf(`
-Quarantine initialized successfully.
-
-  Config:     quarantine.yml (created)
-  Framework:  %s
-  Retries:    %d
-  JUnit XML:  %s
-  Branch:     quarantine/state (%s)
-
-Next steps:
-  1. Add quarantine to your CI workflow:
-
-     - name: Run tests
-       run: %s
-       env:
-         QUARANTINE_GITHUB_TOKEN: ${{ secrets.QUARANTINE_GITHUB_TOKEN }}
-
-     - name: Upload quarantine results
-       if: always()
-       uses: actions/upload-artifact@v4
-       with:
-         name: quarantine-results-${{ github.run_id }}
-         path: .quarantine/results.json
-
-  2. Run `+"`quarantine doctor`"+` to verify your configuration.
-`, framework, retries, junitxml, branchStatus, workflowSnippet)
-}
-
-// frameworkWorkflowSnippet returns the recommended CI workflow run snippet for a framework.
-func frameworkWorkflowSnippet(framework, junitxml string) string {
-	switch framework {
-	case "jest":
-		return "quarantine run -- jest --ci --reporters=default --reporters=jest-junit"
-	case "rspec":
-		return fmt.Sprintf("quarantine run -- rspec --format RspecJunitFormatter --out %s", junitxml)
-	case "vitest":
-		return "quarantine run -- vitest run --reporter=junit"
-	default:
-		return "quarantine run -- <your test command>"
-	}
 }

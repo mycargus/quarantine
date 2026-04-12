@@ -83,7 +83,7 @@ func TestResultSchemaConformance(t *testing.T) {
 		Branch:     "main",
 		CommitSHA:  "abc123def456abc123def456abc123def456abc1",
 		CLIVersion: "0.1.0",
-		Framework:  "jest",
+		SuiteName:  "jest",
 		RetryCount: 3,
 	}
 
@@ -149,7 +149,7 @@ func TestResultSchemaConformance_FlakyTest(t *testing.T) {
 		Branch:     "main",
 		CommitSHA:  "abc123def456abc123def456abc123def456abc1",
 		CLIVersion: "0.1.0",
-		Framework:  "jest",
+		SuiteName:  "jest",
 		RetryCount: 3,
 	}
 
@@ -190,7 +190,7 @@ func TestResultSchemaConformance_ErrorElementMappedToFailed(t *testing.T) {
 		Branch:     "main",
 		CommitSHA:  "abc123def456abc123def456abc123def456abc1",
 		CLIVersion: "0.1.0",
-		Framework:  "jest",
+		SuiteName:  "jest",
 		RetryCount: 3,
 	}
 
@@ -231,7 +231,7 @@ func TestResultSchemaConformance_RejectsInvalidData(t *testing.T) {
 		Branch:     "main",
 		CommitSHA:  "abc123def456abc123def456abc123def456abc1",
 		CLIVersion: "0.1.0",
-		Framework:  "jest",
+		SuiteName:  "jest",
 		RetryCount: 3,
 	}
 
@@ -294,7 +294,7 @@ func TestResultSchemaConformance_AllRetriesFail(t *testing.T) {
 		Branch:     "main",
 		CommitSHA:  "abc123def456abc123def456abc123def456abc1",
 		CLIVersion: "0.1.0",
-		Framework:  "jest",
+		SuiteName:  "jest",
 		RetryCount: 2,
 	}
 
@@ -335,7 +335,7 @@ func TestResultSchemaConformance_QuarantinedTest(t *testing.T) {
 		Branch:     "main",
 		CommitSHA:  "abc123def456abc123def456abc123def456abc1",
 		CLIVersion: "0.1.0",
-		Framework:  "jest",
+		SuiteName:  "jest",
 		RetryCount: 3,
 	}
 

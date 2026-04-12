@@ -17,7 +17,7 @@ type Result struct {
 	PRNumber   *int       `json:"pr_number"`
 	Timestamp  string     `json:"timestamp"`
 	CLIVersion string     `json:"cli_version"`
-	Framework  string     `json:"framework"`
+	SuiteName  string     `json:"suite_name"`
 	Config     ConfigInfo `json:"config"`
 	Summary    Summary    `json:"summary"`
 	Tests      []TestEntry `json:"tests"`
@@ -68,7 +68,7 @@ type Metadata struct {
 	CommitSHA  string
 	PRNumber   *int
 	CLIVersion string
-	Framework  string
+	SuiteName  string
 	RetryCount int
 }
 
@@ -101,7 +101,7 @@ func BuildAt(tests []parser.TestResult, meta Metadata, timestamp string) Result 
 		PRNumber:   meta.PRNumber,
 		Timestamp:  timestamp,
 		CLIVersion: meta.CLIVersion,
-		Framework:  meta.Framework,
+		SuiteName:  meta.SuiteName,
 		Config: ConfigInfo{
 			RetryCount: meta.RetryCount,
 		},
@@ -185,7 +185,7 @@ func BuildAtWithRetries(tests []parser.TestResult, retries map[string]RetryOutco
 		PRNumber:   meta.PRNumber,
 		Timestamp:  timestamp,
 		CLIVersion: meta.CLIVersion,
-		Framework:  meta.Framework,
+		SuiteName:  meta.SuiteName,
 		Config: ConfigInfo{
 			RetryCount: meta.RetryCount,
 		},

@@ -107,8 +107,8 @@ func newInitTestServer(t *testing.T, opts ...func(*initTestServer)) *initTestSer
 		})
 	})
 
-	// PUT /repos/{owner}/{repo}/contents/quarantine.json
-	mux.HandleFunc("/repos/my-org/my-project/contents/quarantine.json", func(w http.ResponseWriter, r *http.Request) {
+	// PUT /repos/{owner}/{repo}/contents/README.md — initial state branch commit
+	mux.HandleFunc("/repos/my-org/my-project/contents/README.md", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut {
 			http.NotFound(w, r)
 			return
@@ -116,7 +116,7 @@ func newInitTestServer(t *testing.T, opts ...func(*initTestServer)) *initTestSer
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"content": map[string]interface{}{
-				"name": "quarantine.json",
+				"name": "README.md",
 				"sha":  "newsha456",
 			},
 		})
