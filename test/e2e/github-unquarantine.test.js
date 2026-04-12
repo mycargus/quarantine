@@ -27,7 +27,7 @@ import { assert } from "riteway/vitest"
 import { afterEach, beforeAll, beforeEach, describe, onTestFailed, test } from "vitest"
 
 const BRANCH = "quarantine/state"
-const STATE_FILE = "quarantine.json"
+const STATE_FILE = ".quarantine/unit/state.json"
 
 const token = process.env.QUARANTINE_GITHUB_TOKEN
 const owner = process.env.QUARANTINE_TEST_OWNER
@@ -173,6 +173,7 @@ async function createBranchWithEmptyState() {
     throw new Error(`createBranchWithEmptyState: create ref failed ${createRes.status}: ${text}`)
   }
 
+  // Write an empty state file to the new branch at the per-suite path.
   const emptyState = JSON.stringify(
     { version: 1, updated_at: new Date().toISOString(), tests: {} },
     null,
@@ -249,8 +250,10 @@ function createWorkDir() {
   return dir
 }
 
-function writeConfig(dir, content) {
-  writeFileSync(join(dir, "quarantine.yml"), content, "utf8")
+function writeConfig(dir, { command, junitxml, rerunCommand }) {
+  mkdirSync(join(dir, ".quarantine"), { recursive: true })
+  const config = `version: 1\ntest_suites:\n  - name: unit\n    command: [${JSON.stringify(command)}]\n    junitxml: ${JSON.stringify(junitxml)}\n    rerun_command: [${rerunCommand.map(JSON.stringify).join(", ")}]\n`
+  writeFileSync(join(dir, ".quarantine", "config.yml"), config, "utf8")
 }
 
 function makeScript(dir, name, body) {
@@ -414,9 +417,13 @@ describe("quarantine run — Scenario 25: unquarantine via closed issue", () => 
       makeScript(binDir, "jest", "exit 0")
 
       const scriptPath = makeScript(dir, "fake-jest", "exit 0")
-      writeConfig(dir, "version: 1\nframework: jest\n")
+      writeConfig(dir, {
+        command: scriptPath,
+        junitxml: xmlPath,
+        rerunCommand: ["echo", "no-rerun"],
+      })
 
-      const result = runCLI(dir, ["run", "--junitxml", xmlPath, "--", scriptPath], {
+      const result = runCLI(dir, ["run", "unit"], {
         PATH: `${binDir}:${process.env.PATH}`,
       })
 

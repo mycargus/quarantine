@@ -93,10 +93,9 @@ describe("quarantine init — E2E against real GitHub", () => {
       stdio: "pipe",
     })
 
-    // Run `quarantine init` with framework=jest and defaults for everything else.
+    // Run `quarantine init` — non-interactive, detects framework automatically.
     result = spawnSync(binPath, ["init"], {
       cwd: dir,
-      input: "jest\n\n\n",
       encoding: "utf8",
       env: { ...process.env, QUARANTINE_GITHUB_TOKEN: token },
       timeout: 60_000,
@@ -125,18 +124,24 @@ describe("quarantine init — E2E against real GitHub", () => {
     assert({
       given: "successful init",
       should: "print success message",
-      actual: result.stdout.includes("Quarantine initialized successfully"),
+      actual: result.stdout.includes("Quarantine initialized."),
       expected: true,
     })
   })
 
-  test("creates quarantine.yml locally", () => {
-    const path = join(dir, "quarantine.yml")
+  test("creates .quarantine/config.yml locally", () => {
+    const path = join(dir, ".quarantine", "config.yml")
     const content = existsSync(path) ? readFileSync(path, "utf8") : ""
     assert({
       given: "successful init",
-      should: "create quarantine.yml with version: 1",
+      should: "create .quarantine/config.yml with version: 1",
       actual: content.includes("version: 1"),
+      expected: true,
+    })
+    assert({
+      given: "successful init",
+      should: "create .quarantine/config.yml with test_suites:",
+      actual: content.includes("test_suites:"),
       expected: true,
     })
   })
@@ -150,25 +155,13 @@ describe("quarantine init — E2E against real GitHub", () => {
     })
   })
 
-  test("writes quarantine.json with version: 1 to the branch", async () => {
-    const raw = await getFileOnBranch("quarantine.json")
-    const state = JSON.parse(raw)
+  test("writes README.md to the state branch", async () => {
+    const content = await getFileOnBranch("README.md")
     assert({
-      given: "quarantine.json on quarantine/state branch",
-      should: "have version: 1",
-      actual: state.version,
-      expected: 1,
-    })
-  })
-
-  test("quarantine.json contains a tests object", async () => {
-    const raw = await getFileOnBranch("quarantine.json")
-    const state = JSON.parse(raw)
-    assert({
-      given: "quarantine.json on quarantine/state branch",
-      should: "contain a tests object",
-      actual: typeof state.tests,
-      expected: "object",
+      given: "quarantine/state branch after init",
+      should: "have a README.md file",
+      actual: content.length > 0,
+      expected: true,
     })
   })
 

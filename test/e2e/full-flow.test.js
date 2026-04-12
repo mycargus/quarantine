@@ -21,7 +21,7 @@ import { assert } from "riteway/vitest"
 import { afterEach, beforeAll, beforeEach, describe, onTestFailed, test } from "vitest"
 
 const BRANCH = "quarantine/state"
-const STATE_FILE = "quarantine.json"
+const STATE_FILE = ".quarantine/unit/state.json"
 
 const token = process.env.QUARANTINE_GITHUB_TOKEN
 const owner = process.env.QUARANTINE_TEST_OWNER
@@ -139,6 +139,7 @@ async function createBranchWithEmptyState() {
     throw new Error(`createBranchWithEmptyState: create ref failed ${createRes.status}: ${text}`)
   }
 
+  // Write an empty state file to the new branch at the per-suite path.
   const emptyState = JSON.stringify(
     { version: 1, updated_at: new Date().toISOString(), tests: {} },
     null,
@@ -231,7 +232,7 @@ async function findQuarantineBotComment(issueNumber) {
       throw new Error(`findQuarantineBotComment: unexpected ${res.status}: ${text}`)
     }
     const comments = await res.json()
-    const found = comments.find((c) => c.body.startsWith("<!-- quarantine-bot -->"))
+    const found = comments.find((c) => c.body.startsWith("<!-- quarantine:unit -->"))
     if (found) return found
   }
   return null
@@ -251,8 +252,11 @@ function createWorkDir() {
   return dir
 }
 
-function writeConfig(dir, content) {
-  writeFileSync(join(dir, "quarantine.yml"), content, "utf8")
+function writeConfig(dir, { command, junitxml, rerunCommand, retries }) {
+  mkdirSync(join(dir, ".quarantine"), { recursive: true })
+  const retriesLine = retries != null ? `\n    retries: ${retries}` : ""
+  const config = `version: 1\ntest_suites:\n  - name: unit\n    command: [${JSON.stringify(command)}]\n    junitxml: ${JSON.stringify(junitxml)}\n    rerun_command: [${rerunCommand.map(JSON.stringify).join(", ")}]${retriesLine}\n`
+  writeFileSync(join(dir, ".quarantine", "config.yml"), config, "utf8")
 }
 
 function makeScript(dir, name, body) {
@@ -286,7 +290,7 @@ function runCLI(dir, args, extraEnv = {}) {
 // Read quarantine issue numbers from the CLI's results.json output.
 // This is a local file read — no API call, no propagation delay.
 function readResultsIssueNumbers(dir) {
-  const resultsPath = join(dir, ".quarantine", "results.json")
+  const resultsPath = join(dir, ".quarantine", "unit", "results.json")
   if (!existsSync(resultsPath)) return []
   try {
     const data = JSON.parse(readFileSync(resultsPath, "utf8"))
@@ -408,26 +412,18 @@ exit 1`,
       mkdirSync(binDir)
       makeScript(binDir, "jest", "exit 0")
 
-      writeConfig(
-        dir,
-        `version: 1\nframework: jest\nrerun_command: "${join(binDir, "jest")} --testNamePattern '{name}'"\n`,
-      )
-
       const mainScriptPath = join(dir, "fake-jest-main")
+
+      writeConfig(dir, {
+        command: mainScriptPath,
+        junitxml: xmlPath,
+        rerunCommand: [join(binDir, "jest"), "--testNamePattern", "{name}"],
+        retries: 3,
+      })
 
       const result = runCLI(
         dir,
-        [
-          "run",
-          "--retries",
-          "3",
-          "--junitxml",
-          xmlPath,
-          "--pr",
-          String(proxyIssueNumber),
-          "--",
-          mainScriptPath,
-        ],
+        ["run", "unit", "--pr", String(proxyIssueNumber)],
         {
           PATH: `${binDir}:${process.env.PATH}`,
         },
@@ -459,7 +455,7 @@ exit 1`,
 
       assert({
         given: "a newly detected flaky test with --pr flag set",
-        should: "post a PR comment with the <!-- quarantine-bot --> marker",
+        should: "post a PR comment with the <!-- quarantine:unit --> marker",
         actual: quarantineBotComment !== null,
         expected: true,
       })
@@ -539,27 +535,20 @@ exit 1`,
       mkdirSync(binDir)
       makeScript(binDir, "jest", "exit 0")
 
-      writeConfig(
-        dir,
-        `version: 1\nframework: jest\nrerun_command: "${join(binDir, "jest")} --testNamePattern '{name}'"\n`,
-      )
       const mainScriptPath = join(dir, "fake-jest-main")
+
+      writeConfig(dir, {
+        command: mainScriptPath,
+        junitxml: xmlPath,
+        rerunCommand: [join(binDir, "jest"), "--testNamePattern", "{name}"],
+        retries: 3,
+      })
       const pathEnv = { PATH: `${binDir}:${process.env.PATH}` }
 
       // --- First run: creates the issue ---
       const run1 = runCLI(
         dir,
-        [
-          "run",
-          "--retries",
-          "3",
-          "--junitxml",
-          xmlPath,
-          "--pr",
-          String(proxyIssueNumber),
-          "--",
-          mainScriptPath,
-        ],
+        ["run", "unit", "--pr", String(proxyIssueNumber)],
         pathEnv,
       )
 
@@ -612,24 +601,16 @@ exit 1`,
       const binDir2 = join(dir2, "bin")
       mkdirSync(binDir2)
       makeScript(binDir2, "jest", "exit 0")
-      writeConfig(
-        dir2,
-        `version: 1\nframework: jest\nrerun_command: "${join(binDir2, "jest")} --testNamePattern '{name}'"\n`,
-      )
+      writeConfig(dir2, {
+        command: join(dir2, "fake-jest-main"),
+        junitxml: xmlPath2,
+        rerunCommand: [join(binDir2, "jest"), "--testNamePattern", "{name}"],
+        retries: 3,
+      })
 
       const run2 = runCLI(
         dir2,
-        [
-          "run",
-          "--retries",
-          "3",
-          "--junitxml",
-          xmlPath2,
-          "--pr",
-          String(proxyIssueNumber),
-          "--",
-          join(dir2, "fake-jest-main"),
-        ],
+        ["run", "unit", "--pr", String(proxyIssueNumber)],
         { PATH: `${binDir2}:${process.env.PATH}` },
       )
 
@@ -721,27 +702,20 @@ exit 1`,
       mkdirSync(binDir)
       makeScript(binDir, "jest", "exit 0")
 
-      writeConfig(
-        dir,
-        `version: 1\nframework: jest\nrerun_command: "${join(binDir, "jest")} --testNamePattern '{name}'"\n`,
-      )
       const mainScriptPath = join(dir, "fake-jest-main")
+
+      writeConfig(dir, {
+        command: mainScriptPath,
+        junitxml: xmlPath,
+        rerunCommand: [join(binDir, "jest"), "--testNamePattern", "{name}"],
+        retries: 3,
+      })
       const pathEnv = { PATH: `${binDir}:${process.env.PATH}` }
 
       // --- First run: creates the PR comment ---
       const run1 = runCLI(
         dir,
-        [
-          "run",
-          "--retries",
-          "3",
-          "--junitxml",
-          xmlPath,
-          "--pr",
-          String(proxyIssueNumber),
-          "--",
-          mainScriptPath,
-        ],
+        ["run", "unit", "--pr", String(proxyIssueNumber)],
         pathEnv,
       )
 
@@ -790,24 +764,16 @@ exit 1`,
       const binDir2 = join(dir2, "bin")
       mkdirSync(binDir2)
       makeScript(binDir2, "jest", "exit 0")
-      writeConfig(
-        dir2,
-        `version: 1\nframework: jest\nrerun_command: "${join(binDir2, "jest")} --testNamePattern '{name}'"\n`,
-      )
+      writeConfig(dir2, {
+        command: join(dir2, "fake-jest-main"),
+        junitxml: xmlPath2,
+        rerunCommand: [join(binDir2, "jest"), "--testNamePattern", "{name}"],
+        retries: 3,
+      })
 
       const run2 = runCLI(
         dir2,
-        [
-          "run",
-          "--retries",
-          "3",
-          "--junitxml",
-          xmlPath2,
-          "--pr",
-          String(proxyIssueNumber),
-          "--",
-          join(dir2, "fake-jest-main"),
-        ],
+        ["run", "unit", "--pr", String(proxyIssueNumber)],
         { PATH: `${binDir2}:${process.env.PATH}` },
       )
 
@@ -839,7 +805,7 @@ exit 1`,
       // Count all quarantine-bot comments — should be exactly 1.
       const allCommentsRes = await ghRequest("GET", `/issues/${proxyIssueNumber}/comments`)
       const allComments = await allCommentsRes.json()
-      const botComments = allComments.filter((c) => c.body.startsWith("<!-- quarantine-bot -->"))
+      const botComments = allComments.filter((c) => c.body.startsWith("<!-- quarantine:unit -->"))
 
       assert({
         given: "two consecutive runs on the same PR",

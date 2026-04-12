@@ -21,7 +21,7 @@ import { assert } from "riteway/vitest"
 import { afterEach, beforeAll, beforeEach, describe, onTestFailed, test } from "vitest"
 
 const BRANCH = "quarantine/state"
-const STATE_FILE = "quarantine.json"
+const STATE_FILE = ".quarantine/unit/state.json"
 
 const token = process.env.QUARANTINE_GITHUB_TOKEN
 const owner = process.env.QUARANTINE_TEST_OWNER
@@ -159,7 +159,7 @@ async function createBranchWithEmptyState() {
     throw new Error(`createBranchWithEmptyState: create ref failed ${createRes.status}: ${text}`)
   }
 
-  // Write an empty quarantine.json to the new branch.
+  // Write an empty state file to the new branch at the per-suite path.
   const emptyState = JSON.stringify(
     { version: 1, updated_at: new Date().toISOString(), tests: {} },
     null,
@@ -184,8 +184,11 @@ function createWorkDir() {
   return dir
 }
 
-function writeConfig(dir, content) {
-  writeFileSync(join(dir, "quarantine.yml"), content, "utf8")
+function writeConfig(dir, { command, junitxml, rerunCommand, retries }) {
+  mkdirSync(join(dir, ".quarantine"), { recursive: true })
+  const retriesLine = retries != null ? `\n    retries: ${retries}` : ""
+  const config = `version: 1\ntest_suites:\n  - name: unit\n    command: [${JSON.stringify(command)}]\n    junitxml: ${JSON.stringify(junitxml)}\n    rerun_command: [${rerunCommand.map(JSON.stringify).join(", ")}]${retriesLine}\n`
+  writeFileSync(join(dir, ".quarantine", "config.yml"), config, "utf8")
 }
 
 function makeScript(dir, name, body) {
@@ -251,7 +254,7 @@ async function closeIssue(issueNumber) {
 // --- Results helpers ---
 
 function readResultsIssueNumbers(dir) {
-  const resultsPath = join(dir, ".quarantine", "results.json")
+  const resultsPath = join(dir, ".quarantine", "unit", "results.json")
   if (!existsSync(resultsPath)) return []
   try {
     const data = JSON.parse(readFileSync(resultsPath, "utf8"))
@@ -344,19 +347,15 @@ describe("quarantine run — E2E against real GitHub", () => {
       )
 
       const scriptPath = makeScript(dir, "fake-jest", "exit 0")
-      const resultsPath = join(dir, "results.json")
+      const resultsPath = join(dir, ".quarantine", "unit", "results.json")
 
-      writeConfig(dir, "version: 1\nframework: jest\n")
+      writeConfig(dir, {
+        command: scriptPath,
+        junitxml: xmlPath,
+        rerunCommand: ["echo", "no-rerun"],
+      })
 
-      const result = runCLI(dir, [
-        "run",
-        "--junitxml",
-        xmlPath,
-        "--output",
-        resultsPath,
-        "--",
-        scriptPath,
-      ])
+      const result = runCLI(dir, ["run", "unit"])
 
       assert({
         given: "quarantine run with empty state and all passing tests",
@@ -426,27 +425,18 @@ exit 1`,
       mkdirSync(binDir)
       makeScript(binDir, "jest", "exit 0")
 
-      writeConfig(
-        dir,
-        `version: 1\nframework: jest\nrerun_command: "${join(binDir, "jest")} --testNamePattern '{name}'"\n`,
-      )
-
-      const resultsPath = join(dir, "results.json")
       const mainScriptPath = join(dir, "fake-jest-main")
+
+      writeConfig(dir, {
+        command: mainScriptPath,
+        junitxml: xmlPath,
+        rerunCommand: [join(binDir, "jest"), "--testNamePattern", "{name}"],
+        retries: 3,
+      })
 
       const result = runCLI(
         dir,
-        [
-          "run",
-          "--retries",
-          "3",
-          "--junitxml",
-          xmlPath,
-          "--output",
-          resultsPath,
-          "--",
-          mainScriptPath,
-        ],
+        ["run", "unit"],
         {
           PATH: `${binDir}:${process.env.PATH}`,
         },
@@ -545,19 +535,15 @@ exit 1`,
       )
 
       const scriptPath = makeScript(dir, "fake-jest", "exit 0")
-      const resultsPath = join(dir, "results.json")
+      const resultsPath = join(dir, ".quarantine", "unit", "results.json")
 
-      writeConfig(dir, "version: 1\nframework: jest\n")
+      writeConfig(dir, {
+        command: scriptPath,
+        junitxml: xmlPath,
+        rerunCommand: ["echo", "no-rerun"],
+      })
 
-      const result = runCLI(dir, [
-        "run",
-        "--junitxml",
-        xmlPath,
-        "--output",
-        resultsPath,
-        "--",
-        scriptPath,
-      ])
+      const result = runCLI(dir, ["run", "unit"])
 
       assert({
         given: "quarantine run with one quarantined test (issue open)",
