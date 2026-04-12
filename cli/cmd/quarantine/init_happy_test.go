@@ -393,6 +393,76 @@ func TestInitIdempotentSkipsExistingArtifacts(t *testing.T) {
 	})
 }
 
+// --- Scenario 113: recovery when branch is missing but config and gitignore exist ---
+
+func TestInitRecreatesMissingStateBranch(t *testing.T) {
+	dir := t.TempDir()
+	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+
+	// Pre-create .quarantine/config.yml and .quarantine/.gitignore.
+	if err := os.MkdirAll(dir+"/.quarantine", 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	customConfig := "version: 1\n# my-custom-suite\n"
+	if err := os.WriteFile(dir+"/.quarantine/config.yml", []byte(customConfig), 0644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	if err := os.WriteFile(dir+"/.quarantine/.gitignore", []byte("*\n!.gitignore\n!config.yml\n"), 0644); err != nil {
+		t.Fatalf("write gitignore: %v", err)
+	}
+
+	// newInitTestServer without withExistingBranch() — branch check returns 404.
+	mockServer := newInitTestServer(t)
+
+	stdout, err := executeInitCmd(t,
+		"",
+		dir,
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": mockServer.server.URL,
+		},
+	)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config and gitignore exist but quarantine/state branch is missing",
+		Should:   "exit with code 0",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	// Config must be unchanged.
+	content, configReadErr := os.ReadFile(dir + "/.quarantine/config.yml")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config exists before re-running init",
+		Should:   "read config without error",
+		Actual:   configReadErr == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config exists before re-running init",
+		Should:   "leave config content unchanged",
+		Actual:   strings.Contains(string(content), "my-custom-suite"),
+		Expected: true,
+	})
+
+	// Recovery summary must appear in output.
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "state branch was missing and has been recreated",
+		Should:   "print 'recovered' in output",
+		Actual:   strings.Contains(stdout, "recovered"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "state branch was deleted (previous state lost)",
+		Should:   "print 'not recoverable' data-loss warning in output",
+		Actual:   strings.Contains(stdout, "not recoverable"),
+		Expected: true,
+	})
+}
+
 // --- Empty defaultBranch fallback ---
 
 func TestInitEmptyDefaultBranchFallsBackToMain(t *testing.T) {

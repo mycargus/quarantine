@@ -6,6 +6,44 @@ import (
 	riteway "github.com/mycargus/riteway-golang"
 )
 
+// --- isRecoveryMode unit tests ---
+
+func TestIsRecoveryModeAllConditionsMet(t *testing.T) {
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config skipped, gitignore skipped, branch does not exist",
+		Should:   "return true (recovery mode)",
+		Actual:   isRecoveryMode(true, true, false),
+		Expected: true,
+	})
+}
+
+func TestIsRecoveryModeConfigNotSkipped(t *testing.T) {
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config was NOT skipped (new install), gitignore skipped, branch missing",
+		Should:   "return false (not recovery mode — config was just created)",
+		Actual:   isRecoveryMode(false, true, false),
+		Expected: false,
+	})
+}
+
+func TestIsRecoveryModeGitignoreNotSkipped(t *testing.T) {
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config skipped, gitignore was NOT skipped, branch missing",
+		Should:   "return false (not recovery mode — gitignore was just created)",
+		Actual:   isRecoveryMode(true, false, false),
+		Expected: false,
+	})
+}
+
+func TestIsRecoveryModeBranchExists(t *testing.T) {
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "config skipped, gitignore skipped, but branch already exists",
+		Should:   "return false (not recovery mode — already initialized)",
+		Actual:   isRecoveryMode(true, true, true),
+		Expected: false,
+	})
+}
+
 // --- hasPackageKey unit tests (exercised via detectFrameworks) ---
 
 func TestHasPackageKeyMalformedSection(t *testing.T) {

@@ -124,9 +124,14 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 		return fmt.Errorf("check branch: %w", err)
 	}
 
+	recoveryMode := isRecoveryMode(configSkipped, gitignoreSkipped, branchExists)
+
 	if branchExists {
 		cmd.Printf("quarantine/state branch already exists — skipping.\n")
 	} else {
+		if recoveryMode {
+			cmd.Printf("quarantine/state branch not found — creating.\n")
+		}
 		defaultBranch := repoInfo.DefaultBranch
 		if defaultBranch == "" {
 			defaultBranch = "main"
@@ -157,6 +162,8 @@ Do not edit files on this branch manually.
 
 	if configSkipped && gitignoreSkipped && branchExists {
 		cmd.Printf("\n%s", formatAlreadyInitializedSummary())
+	} else if recoveryMode {
+		cmd.Printf("\n%s", formatRecoverySummary())
 	} else {
 		cmd.Printf("%s", formatInitSummary(owner, repo, frameworks, branchExists))
 	}
@@ -346,6 +353,22 @@ func formatQuarantineGitignore() string {
 // This is a pure function — no I/O.
 func formatAlreadyInitializedSummary() string {
 	return "Quarantine is already initialized. Edit .quarantine/config.yml to add test suites.\n"
+}
+
+// isRecoveryMode returns true when config and .gitignore were already present
+// but the quarantine/state branch did not exist — indicating a recovery scenario.
+// This is a pure function — no I/O.
+func isRecoveryMode(configSkipped, gitignoreSkipped, branchExists bool) bool {
+	return configSkipped && gitignoreSkipped && !branchExists
+}
+
+// formatRecoverySummary returns the output when the quarantine/state branch was
+// recreated because it was missing while config and .gitignore already existed.
+// This is a pure function — no I/O.
+func formatRecoverySummary() string {
+	return `Quarantine recovered. The state branch has been recreated.
+Previous quarantine state was on the deleted branch and is not recoverable.
+`
 }
 
 // formatInitSummary returns the success output for quarantine init.
