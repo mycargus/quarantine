@@ -9,7 +9,8 @@ import (
 	riteway "github.com/mycargus/riteway-golang"
 )
 
-// writeTempSuiteConfig writes a .quarantine/config.yml to a temp dir and returns the path.
+// writeTempSuiteConfig writes a .quarantine/config.yml to a temp dir, changes to
+// that dir, and returns the dir path.
 func writeTempSuiteConfig(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -21,13 +22,14 @@ func writeTempSuiteConfig(t *testing.T, content string) string {
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatalf("writeTempSuiteConfig write: %v", err)
 	}
-	return path
+	chdirTest(t, dir)
+	return dir
 }
 
 // --- Scenario 114: quarantine doctor validates test_suites array and rejects invalid configs ---
 
 func TestDoctorRejectsInvalidSuiteConfig(t *testing.T) {
-	path := writeTempSuiteConfig(t, `
+	writeTempSuiteConfig(t, `
 version: 1
 test_suites:
   - name: "My Backend!"
@@ -35,7 +37,7 @@ test_suites:
     rerun_command: ["bundle", "exec", "rspec", "-e", "{name}"]
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, nil)
+	stdout, err := executeDoctorCmd(t, nil, nil)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a .quarantine/config.yml with an invalid suite entry",
@@ -76,18 +78,16 @@ test_suites:
 // --- Scenario 115: quarantine doctor warns on detected jest retryTimes but does not error ---
 
 func TestDoctorWarnsOnJestRetryTimes(t *testing.T) {
-	path := writeTempSuiteConfig(t, `
+	dir := writeTempSuiteConfig(t, `
 version: 1
-framework: jest
 `)
-	// Write jest.config.js with retryTimes: 2 in the repo root (parent of .quarantine dir).
-	repoRoot := filepath.Dir(filepath.Dir(path))
-	jestConfigPath := filepath.Join(repoRoot, "jest.config.js")
+	// Write jest.config.js with retryTimes: 2 in the repo root.
+	jestConfigPath := filepath.Join(dir, "jest.config.js")
 	if err := os.WriteFile(jestConfigPath, []byte("module.exports = {\n  retryTimes: 2,\n};\n"), 0644); err != nil {
 		t.Fatalf("write jest.config.js: %v", err)
 	}
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
@@ -116,18 +116,16 @@ framework: jest
 // --- Scenario 116: quarantine doctor does not warn when retryTimes is set to 0 ---
 
 func TestDoctorNoWarnOnRetryTimesZero(t *testing.T) {
-	path := writeTempSuiteConfig(t, `
+	dir := writeTempSuiteConfig(t, `
 version: 1
-framework: jest
 `)
 	// Write a test file with jest.retryTimes(0) — explicit no-op that disables retries.
-	repoRoot := filepath.Dir(filepath.Dir(path))
-	testFilePath := filepath.Join(repoRoot, "example.test.js")
+	testFilePath := filepath.Join(dir, "example.test.js")
 	if err := os.WriteFile(testFilePath, []byte("jest.retryTimes(0);\n"), 0644); err != nil {
 		t.Fatalf("write example.test.js: %v", err)
 	}
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 

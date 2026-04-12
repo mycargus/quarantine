@@ -30,23 +30,29 @@ func executeDoctorCmd(t *testing.T, args []string, env map[string]string) (stdou
 	return buf.String(), exitErr
 }
 
-// writeTempConfig writes a quarantine.yml to a temp dir and returns the path.
+// writeTempConfig writes a .quarantine/config.yml to a temp dir, changes to that
+// dir, and returns the dir path. The doctor command reads from .quarantine/config.yml
+// relative to the working directory.
 func writeTempConfig(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
-	path := dir + "/quarantine.yml"
+	suiteDir := dir + "/.quarantine"
+	if err := os.MkdirAll(suiteDir, 0755); err != nil {
+		t.Fatalf("writeTempConfig mkdir: %v", err)
+	}
+	path := suiteDir + "/config.yml"
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatalf("writeTempConfig: %v", err)
 	}
-	return path
+	chdirTest(t, dir)
+	return dir
 }
 
 // --- Scenario 12: quarantine doctor — valid configuration ---
 
 func TestDoctorValidConfig(t *testing.T) {
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 retries: 3
 issue_tracker: github
 labels:
@@ -55,7 +61,7 @@ notifications:
   github_pr_comment: true
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
@@ -74,9 +80,9 @@ notifications:
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a valid quarantine.yml with jest",
-		Should:   "print resolved configuration with framework jest",
-		Actual:   strings.Contains(stdout, "framework:") && strings.Contains(stdout, "jest"),
+		Given:    "a valid quarantine.yml",
+		Should:   "print resolved configuration with version",
+		Actual:   strings.Contains(stdout, "version:"),
 		Expected: true,
 	})
 }
@@ -84,7 +90,9 @@ notifications:
 // --- Scenario 13: quarantine doctor — missing config file ---
 
 func TestDoctorMissingConfig(t *testing.T) {
-	stdout, err := executeDoctorCmd(t, []string{"--config", "/nonexistent/quarantine.yml"}, nil)
+	dir := t.TempDir()
+	chdirTest(t, dir)
+	stdout, err := executeDoctorCmd(t, nil, nil)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "no quarantine.yml in current directory",
@@ -104,13 +112,12 @@ func TestDoctorMissingConfig(t *testing.T) {
 // --- Scenario 14: quarantine doctor — invalid field values ---
 
 func TestDoctorInvalidRetries(t *testing.T) {
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 retries: -1
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, nil)
+	stdout, err := executeDoctorCmd(t, nil, nil)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a quarantine.yml with retries: -1",
@@ -130,13 +137,12 @@ retries: -1
 // --- Scenario 15: quarantine doctor — forward-compatible config value ---
 
 func TestDoctorForwardCompatibleIssueTracker(t *testing.T) {
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 issue_tracker: jira
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, nil)
+	stdout, err := executeDoctorCmd(t, nil, nil)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a quarantine.yml with issue_tracker: jira",
@@ -156,16 +162,15 @@ issue_tracker: jira
 // --- Scenario 16: quarantine doctor — unknown fields ---
 
 func TestDoctorUnknownFields(t *testing.T) {
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 custom_field: something
 notifications:
   github_pr_comment: true
   slack: true
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, nil)
+	stdout, err := executeDoctorCmd(t, nil, nil)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a quarantine.yml with custom_field and notifications.slack",
@@ -192,31 +197,23 @@ notifications:
 // --- Scenario 17: quarantine doctor — custom config path ---
 
 func TestDoctorCustomConfigPath(t *testing.T) {
-	dir := t.TempDir()
-	customPath := dir + "/config/quarantine.yml"
-	if err := os.MkdirAll(dir+"/config", 0755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	if err := os.WriteFile(customPath, []byte(`
+	writeTempConfig(t, `
 version: 1
-framework: jest
-`), 0644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+`)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", customPath}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a valid config at a custom path",
+		Given:    "a valid config at .quarantine/config.yml",
 		Should:   "exit without error",
 		Actual:   err == nil,
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a valid config at a custom path",
+		Given:    "a valid config at .quarantine/config.yml",
 		Should:   "print 'quarantine.yml is valid.'",
 		Actual:   strings.Contains(stdout, "quarantine.yml is valid."),
 		Expected: true,
@@ -226,12 +223,11 @@ framework: jest
 // --- Scenario 18: Minimal valid config ---
 
 func TestDoctorMinimalValidConfig(t *testing.T) {
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
@@ -249,12 +245,6 @@ framework: jest
 		Expected: true,
 	})
 
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a minimal quarantine.yml with jest",
-		Should:   "print default junitxml (junit.xml for jest)",
-		Actual:   strings.Contains(stdout, "junit.xml"),
-		Expected: true,
-	})
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a minimal quarantine.yml",
@@ -267,12 +257,11 @@ framework: jest
 // --- Scenario 19: Unsupported config version ---
 
 func TestDoctorUnsupportedVersion(t *testing.T) {
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 2
-framework: jest
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, nil)
+	stdout, err := executeDoctorCmd(t, nil, nil)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a quarantine.yml with version: 2",
@@ -301,14 +290,13 @@ func TestDoctorPRCommentExplicitFalseIsReflected(t *testing.T) {
 	// `prComment := true` the if-branch on line 75–77 still overwrites with
 	// the pointer value (false), so the output is still correct. This test
 	// confirms the value flows through the non-nil branch unchanged.
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 notifications:
   github_pr_comment: false
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
@@ -333,14 +321,13 @@ func TestDoctorPRCommentNonNilEnabledValueIsUsed(t *testing.T) {
 	// `== nil`, the condition is false for a non-nil pointer, so prComment
 	// stays at the line-74 initial value (false) instead of true — killing
 	// the mutation.
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 notifications:
   github_pr_comment: true
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
@@ -362,7 +349,9 @@ notifications:
 // --- Exact error message when quarantine.yml is not found (line 20) ---
 
 func TestDoctorMissingConfigExactMessage(t *testing.T) {
-	stdout, _ := executeDoctorCmd(t, []string{"--config", "/nonexistent/quarantine.yml"}, nil)
+	dir := t.TempDir()
+	chdirTest(t, dir)
+	stdout, _ := executeDoctorCmd(t, nil, nil)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "no quarantine.yml at the given path",
@@ -375,13 +364,12 @@ func TestDoctorMissingConfigExactMessage(t *testing.T) {
 // --- Exact error message when config has validation errors (line 44) ---
 
 func TestDoctorValidationErrorExactMessage(t *testing.T) {
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 retries: -1
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
@@ -410,12 +398,11 @@ retries: -1
 func TestDoctorLabelsSingleDefaultInOutput(t *testing.T) {
 	// Confirms the labels field is rendered as [quarantine] in the resolved
 	// configuration output (exercises the surrounding format string).
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
@@ -441,12 +428,11 @@ framework: jest
 func TestDoctorGitRemoteDetectionFailure(t *testing.T) {
 	// Write a valid config to a temp dir that is NOT a git repository.
 	// doctor should still succeed but show empty owner/repo fields.
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
@@ -466,13 +452,12 @@ framework: jest
 }
 
 func TestDoctorNoTokenWarning(t *testing.T) {
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 `)
 
 	// Unset any token env vars.
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "",
 		"GITHUB_TOKEN":            "",
 	})

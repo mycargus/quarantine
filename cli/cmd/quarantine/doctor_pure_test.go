@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -115,71 +116,15 @@ func TestResolveDisplayOwnerRepo(t *testing.T) {
 	}
 }
 
-// --- junitxml "(default)" annotation (lines 55–56) ---
-
-func TestDoctorJUnitXMLDefaultAnnotation(t *testing.T) {
-	// jest default junitxml is "junit.xml"; omitting junitxml in config triggers the default.
-	path := writeTempConfig(t, `
-version: 1
-framework: jest
-`)
-
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
-		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a jest config with default junitxml (junit.xml)",
-		Should:   "exit without error",
-		Actual:   err == nil,
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a jest config using the default junitxml",
-		Should:   "print '(default)' annotation next to junitxml",
-		Actual:   strings.Contains(stdout, "junit.xml (default)"),
-		Expected: true,
-	})
-}
-
-func TestDoctorJUnitXMLNonDefaultNoAnnotation(t *testing.T) {
-	// Custom junitxml must NOT show "(default)".
-	path := writeTempConfig(t, `
-version: 1
-framework: jest
-junitxml: my-results.xml
-`)
-
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
-		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a jest config with custom junitxml",
-		Should:   "exit without error",
-		Actual:   err == nil,
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a jest config with custom junitxml",
-		Should:   "not print '(default)' annotation next to custom junitxml",
-		Actual:   !strings.Contains(stdout, "my-results.xml (default)"),
-		Expected: true,
-	})
-}
-
 // --- storage.branch "(default)" annotation (lines 81–82) ---
 
 func TestDoctorStorageBranchDefaultAnnotation(t *testing.T) {
 	// Omitting storage.branch triggers the default "quarantine/state".
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
@@ -200,14 +145,13 @@ framework: jest
 
 func TestDoctorStorageBranchNonDefaultNoAnnotation(t *testing.T) {
 	// Custom branch must NOT show "(default)".
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 storage:
   branch: my-custom-branch
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
@@ -229,12 +173,11 @@ storage:
 // --- No spurious "Warnings:" in valid config with token (line 86) ---
 
 func TestDoctorValidConfigNoSpuriousWarnings(t *testing.T) {
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
@@ -258,13 +201,12 @@ framework: jest
 func TestDoctorErrorBlockNoSpuriousWarnings(t *testing.T) {
 	// retries: -1 triggers a validation error. With a token present no warnings
 	// are generated, so "Warnings:" must not appear in the output.
-	path := writeTempConfig(t, `
+	writeTempConfig(t, `
 version: 1
-framework: jest
 retries: -1
 `)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
@@ -372,14 +314,23 @@ func TestDoctorGitDetectionWithOnlyOwnerSet(t *testing.T) {
 	// detection should still fire so the missing repo can be auto-detected.
 	// We verify the owner appears without an "(auto-detected)" note, proving the
 	// config value was used rather than the detected one.
-	path := writeTempConfig(t, `
+	dir := t.TempDir()
+	// Create a fake git repo with a remote so doctor can auto-detect repo.
+	gitInit(t, dir, "git@github.com:myorg/detected-repo.git")
+	suiteDir := dir + "/.quarantine"
+	if err := os.MkdirAll(suiteDir, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(suiteDir+"/config.yml", []byte(`
 version: 1
-framework: jest
 github:
   owner: myorg
-`)
+`), 0644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	chdirTest(t, dir)
 
-	stdout, err := executeDoctorCmd(t, []string{"--config", path}, map[string]string{
+	stdout, err := executeDoctorCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
