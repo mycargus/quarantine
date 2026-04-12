@@ -28,63 +28,21 @@ func TestRunStartFails(t *testing.T) {
 }
 
 func TestRerunCommand(t *testing.T) {
-	cmd, args := runner.RerunCommand(runner.Jest, "my test", "MyClass", "src/foo.test.js", "")
+	cmd, args := runner.RerunCommand("my test", "MyClass", "src/foo.test.js", "")
 	riteway.Assert(t, riteway.Case[string]{
-		Given:    "Jest framework, no custom rerun_command",
-		Should:   "use npx as command",
-		Actual:   cmd,
-		Expected: "npx",
-	})
-	riteway.Assert(t, riteway.Case[[]string]{
-		Given:    "Jest framework, no custom rerun_command",
-		Should:   "pass jest --testNamePattern <name> as args",
-		Actual:   args,
-		Expected: []string{"jest", "--testNamePattern", "my test"},
-	})
-
-	cmd, args = runner.RerunCommand(runner.RSpec, "my test", "MyClass", "spec/foo_spec.rb", "")
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "RSpec framework, no custom rerun_command",
-		Should:   "use bundle as command",
-		Actual:   cmd,
-		Expected: "bundle",
-	})
-	riteway.Assert(t, riteway.Case[[]string]{
-		Given:    "RSpec framework, no custom rerun_command",
-		Should:   "pass exec rspec -e <name> as args",
-		Actual:   args,
-		Expected: []string{"exec", "rspec", "-e", "my test"},
-	})
-
-	cmd, args = runner.RerunCommand(runner.Vitest, "my test", "MyClass", "src/foo.test.ts", "")
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "Vitest framework, no custom rerun_command",
-		Should:   "use npx as command",
-		Actual:   cmd,
-		Expected: "npx",
-	})
-	riteway.Assert(t, riteway.Case[[]string]{
-		Given:    "Vitest framework, no custom rerun_command",
-		Should:   "pass vitest run --reporter=junit <file> -t <name> as args",
-		Actual:   args,
-		Expected: []string{"vitest", "run", "--reporter=junit", "src/foo.test.ts", "-t", "my test"},
-	})
-
-	cmd, args = runner.RerunCommand("unknown", "my test", "MyClass", "src/foo.test.js", "")
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "unknown framework",
+		Given:    "no custom rerun_command",
 		Should:   "return empty command",
 		Actual:   cmd,
 		Expected: "",
 	})
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "unknown framework",
+		Given:    "no custom rerun_command",
 		Should:   "return nil args",
 		Actual:   args == nil,
 		Expected: true,
 	})
 
-	cmd, args = runner.RerunCommand(runner.Jest, "my test", "MyClass", "src/foo.test.js", "custom-runner --test {name}")
+	cmd, args = runner.RerunCommand("my test", "MyClass", "src/foo.test.js", "custom-runner --test {name}")
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "a custom template with {name} placeholder",
 		Should:   "use the first token as the command",
@@ -100,7 +58,7 @@ func TestRerunCommand(t *testing.T) {
 }
 
 func TestRerunCommandPlaceholderSubstitution(t *testing.T) {
-	cmd, args := runner.RerunCommand(runner.Jest, "my test", "MyClass", "src/foo.test.js", "run {name}")
+	cmd, args := runner.RerunCommand("my test", "MyClass", "src/foo.test.js", "run {name}")
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "custom template 'run {name}'",
 		Should:   "use 'run' as the command",
@@ -114,7 +72,7 @@ func TestRerunCommandPlaceholderSubstitution(t *testing.T) {
 		Expected: []string{"my test"},
 	})
 
-	cmd, args = runner.RerunCommand(runner.RSpec, "my test", "MyClass", "spec/foo_spec.rb", "run {classname}")
+	cmd, args = runner.RerunCommand("my test", "MyClass", "spec/foo_spec.rb", "run {classname}")
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "custom template 'run {classname}'",
 		Should:   "use 'run' as the command",
@@ -128,7 +86,7 @@ func TestRerunCommandPlaceholderSubstitution(t *testing.T) {
 		Expected: []string{"MyClass"},
 	})
 
-	cmd, args = runner.RerunCommand(runner.Vitest, "my test", "MyClass", "src/foo.test.ts", "run {file}")
+	cmd, args = runner.RerunCommand("my test", "MyClass", "src/foo.test.ts", "run {file}")
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "custom template 'run {file}'",
 		Should:   "use 'run' as the command",
@@ -142,7 +100,7 @@ func TestRerunCommandPlaceholderSubstitution(t *testing.T) {
 		Expected: []string{"src/foo.test.ts"},
 	})
 
-	cmd, args = runner.RerunCommand(runner.Jest, "my test", "MyClass", "src/foo.test.js", "npx jest --testNamePattern '{name}' --config jest.ci.config.js")
+	cmd, args = runner.RerunCommand("my test", "MyClass", "src/foo.test.js", "npx jest --testNamePattern '{name}' --config jest.ci.config.js")
 	riteway.Assert(t, riteway.Case[string]{
 		Given:    "realistic custom template with quoted {name}",
 		Should:   "use 'npx' as the command",
@@ -198,36 +156,6 @@ func TestSplitShellArgs(t *testing.T) {
 		Should:   "return one-element slice",
 		Actual:   runner.SplitShellArgs("cmd"),
 		Expected: []string{"cmd"},
-	})
-}
-
-func TestEscapeJestPattern(t *testing.T) {
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "test name with a dot",
-		Should:   "escape dot to \\.",
-		Actual:   runner.EscapeJestPattern("foo.bar"),
-		Expected: `foo\.bar`,
-	})
-
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "test name with parentheses",
-		Should:   "escape ( and ) to \\( and \\)",
-		Actual:   runner.EscapeJestPattern("test (case)"),
-		Expected: `test \(case\)`,
-	})
-
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "test name with square brackets",
-		Should:   "escape [ and ] to \\[ and \\]",
-		Actual:   runner.EscapeJestPattern("arr[0]"),
-		Expected: `arr\[0\]`,
-	})
-
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "plain test name with no special chars",
-		Should:   "return name unchanged",
-		Actual:   runner.EscapeJestPattern("should do something"),
-		Expected: "should do something",
 	})
 }
 

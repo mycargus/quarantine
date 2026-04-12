@@ -1,5 +1,4 @@
-// Package runner handles test command execution and framework-specific
-// rerun command construction.
+// Package runner handles test command execution and rerun command construction.
 package runner
 
 import (
@@ -11,15 +10,6 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
-)
-
-// Framework identifies a test framework supported by the CLI.
-type Framework string
-
-const (
-	Jest   Framework = "jest"
-	RSpec  Framework = "rspec"
-	Vitest Framework = "vitest"
 )
 
 // RunResult holds the outcome of executing a test command.
@@ -64,51 +54,27 @@ func Run(ctx context.Context, command string, args []string, stdout, stderr io.W
 	return 0, nil
 }
 
-// jestRegexSpecialChars lists the regex special characters that must be
-// escaped in Jest --testNamePattern values. Backslash is listed first so
-// that added escape characters are not re-escaped.
-var jestRegexSpecialChars = []string{"\\", ".", "(", ")", "[", "]"}
-
-// EscapeJestPattern escapes regex special characters in a Jest test name so it
-// can be passed safely to --testNamePattern.
-// This is a pure function — no I/O.
-func EscapeJestPattern(name string) string {
-	for _, ch := range jestRegexSpecialChars {
-		name = strings.ReplaceAll(name, ch, `\`+ch)
-	}
-	return name
-}
-
-// RerunCommand returns the framework-specific command and arguments for
-// rerunning a single failed test.
-func RerunCommand(fw Framework, name, classname, file, customTemplate string) (string, []string) {
-	if customTemplate != "" {
-		// Split the template into tokens BEFORE substituting placeholders.
-		// This ensures that placeholder values containing spaces (e.g. a test
-		// name like "should handle timeout") stay as a single argument.
-		parts := SplitShellArgs(customTemplate)
-		for i, p := range parts {
-			p = strings.ReplaceAll(p, "{name}", name)
-			p = strings.ReplaceAll(p, "{classname}", classname)
-			p = strings.ReplaceAll(p, "{file}", file)
-			parts[i] = p
-		}
-		if len(parts) == 0 {
-			return "", nil
-		}
-		return parts[0], parts[1:]
-	}
-
-	switch fw {
-	case Jest:
-		return "npx", []string{"jest", "--testNamePattern", EscapeJestPattern(name)}
-	case RSpec:
-		return "bundle", []string{"exec", "rspec", "-e", name}
-	case Vitest:
-		return "npx", []string{"vitest", "run", "--reporter=junit", file, "-t", name}
-	default:
+// RerunCommand returns the command and arguments for rerunning a single failed
+// test using the customTemplate. The template is required; if empty, returns
+// ("", nil). This is a pure function — no I/O.
+func RerunCommand(name, classname, file, customTemplate string) (string, []string) {
+	if customTemplate == "" {
 		return "", nil
 	}
+	// Split the template into tokens BEFORE substituting placeholders.
+	// This ensures that placeholder values containing spaces (e.g. a test
+	// name like "should handle timeout") stay as a single argument.
+	parts := SplitShellArgs(customTemplate)
+	for i, p := range parts {
+		p = strings.ReplaceAll(p, "{name}", name)
+		p = strings.ReplaceAll(p, "{classname}", classname)
+		p = strings.ReplaceAll(p, "{file}", file)
+		parts[i] = p
+	}
+	if len(parts) == 0 {
+		return "", nil
+	}
+	return parts[0], parts[1:]
 }
 
 // SplitShellArgs splits a command string into tokens, respecting single and
