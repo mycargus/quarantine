@@ -13,7 +13,6 @@ import (
 // Config represents the full quarantine.yml configuration.
 type Config struct {
 	Version       int            `yaml:"version"`
-	Framework     string         `yaml:"framework"`
 	Retries       int            `yaml:"retries,omitempty"`
 	JUnitXML      string         `yaml:"junitxml,omitempty"`
 	GitHub        GitHubConfig   `yaml:"github,omitempty"`
@@ -21,8 +20,6 @@ type Config struct {
 	Labels        []string       `yaml:"labels,omitempty"`
 	Notifications Notifications  `yaml:"notifications,omitempty"`
 	Storage       StorageConfig  `yaml:"storage,omitempty"`
-	Exclude       []string       `yaml:"exclude,omitempty"`
-	RerunCommand  string         `yaml:"rerun_command,omitempty"`
 	TestSuites    []TestSuite    `yaml:"test_suites,omitempty"`
 
 	// hasSuitesKey is true when the YAML document explicitly contains the
@@ -96,17 +93,9 @@ type StorageConfig struct {
 	Branch string `yaml:"branch,omitempty"`
 }
 
-// validFrameworks lists the v1-supported frameworks.
-var validFrameworks = map[string]bool{
-	"jest":   true,
-	"rspec":  true,
-	"vitest": true,
-}
-
 // knownTopLevelKeys is the full set of keys defined in the v1 schema.
 var knownTopLevelKeys = map[string]bool{
 	"version":       true,
-	"framework":     true,
 	"retries":       true,
 	"junitxml":      true,
 	"github":        true,
@@ -114,8 +103,6 @@ var knownTopLevelKeys = map[string]bool{
 	"labels":        true,
 	"notifications": true,
 	"storage":       true,
-	"exclude":       true,
-	"rerun_command": true,
 	"test_suites":   true,
 }
 
@@ -127,24 +114,6 @@ var knownNotificationKeys = map[string]bool{
 // knownStorageKeys is the full set of keys under `storage` in the v1 schema.
 var knownStorageKeys = map[string]bool{
 	"branch": true,
-}
-
-// frameworkDefaults maps frameworks to their default junitxml glob patterns.
-var frameworkDefaults = map[string]string{
-	"jest":   "junit.xml",
-	"rspec":  "rspec.xml",
-	"vitest": "junit-report.xml",
-}
-
-// FrameworkDefaultJUnit returns the default junitxml glob pattern for a framework.
-// Returns an empty string for unknown frameworks.
-func FrameworkDefaultJUnit(framework string) string {
-	return frameworkDefaults[framework]
-}
-
-// IsValidFramework reports whether the given framework name is supported.
-func IsValidFramework(framework string) bool {
-	return validFrameworks[framework]
 }
 
 // Load reads and parses a quarantine.yml file from the given path.
@@ -236,11 +205,6 @@ func (c *Config) ApplyDefaults() {
 	if c.Retries == 0 {
 		c.Retries = 3
 	}
-	if c.JUnitXML == "" {
-		if def, ok := frameworkDefaults[c.Framework]; ok {
-			c.JUnitXML = def
-		}
-	}
 	if c.IssueTracker == "" {
 		c.IssueTracker = "github"
 	}
@@ -265,14 +229,6 @@ func (c *Config) Validate() (errs []string, warns []string) {
 	} else if c.Version != 1 {
 		errs = append(errs, fmt.Sprintf(
 			"Unsupported config version: %d. This version of the CLI supports version 1.", c.Version))
-	}
-
-	// framework
-	if c.Framework == "" {
-		errs = append(errs, "Missing required field 'framework' in quarantine.yml.")
-	} else if !validFrameworks[c.Framework] {
-		errs = append(errs, fmt.Sprintf(
-			"Unknown framework '%s'. Supported frameworks: rspec, jest, vitest.", c.Framework))
 	}
 
 	// retries
@@ -367,6 +323,16 @@ func ValidateSuiteJUnitXML(junitxml string) error {
 	return nil
 }
 
+// ValidateSuiteRerunCommand returns a non-nil error when the suite's
+// rerun_command field is absent or empty.
+// This is a pure function — no I/O.
+func ValidateSuiteRerunCommand(rerunCmd []string) error {
+	if len(rerunCmd) == 0 {
+		return fmt.Errorf("rerun_command is required")
+	}
+	return nil
+}
+
 // ValidateSuites collects all validation errors across every suite entry in
 // the config. Each error message is prefixed with the suite name so the caller
 // can display them without further formatting.
@@ -386,6 +352,10 @@ func ValidateSuites(suites []TestSuite) []string {
 		}
 
 		if err := ValidateSuiteJUnitXML(s.JUnitXML); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %s", prefix, err))
+		}
+
+		if err := ValidateSuiteRerunCommand(s.RerunCommand); err != nil {
 			errs = append(errs, fmt.Sprintf("%s: %s", prefix, err))
 		}
 	}

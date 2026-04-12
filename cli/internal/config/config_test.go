@@ -39,7 +39,6 @@ func containsString(slice []string, s string) bool {
 func TestParseValidMinimalConfig(t *testing.T) {
 	yaml := `
 version: 1
-framework: jest
 `
 	cfg, err := config.Parse(strings.NewReader(yaml))
 
@@ -55,13 +54,6 @@ framework: jest
 		Should:   "decode version correctly",
 		Actual:   cfg.Version,
 		Expected: 1,
-	})
-
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "a minimal valid quarantine.yml",
-		Should:   "decode framework correctly",
-		Actual:   cfg.Framework,
-		Expected: "jest",
 	})
 }
 

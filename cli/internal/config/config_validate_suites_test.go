@@ -74,7 +74,6 @@ test_suites: []
 func TestIsSuiteConfigFalseWhenNoTestSuitesKey(t *testing.T) {
 	cfg, err := config.Parse(strings.NewReader(`
 version: 1
-framework: jest
 `))
 
 	riteway.Assert(t, riteway.Case[error]{
@@ -332,6 +331,37 @@ func TestValidateSuiteJUnitXMLEmpty(t *testing.T) {
 	})
 }
 
+// --- ValidateSuiteRerunCommand ---
+
+func TestValidateSuiteRerunCommandValid(t *testing.T) {
+	err := config.ValidateSuiteRerunCommand([]string{"npx", "jest", "--testNamePattern", "{name}"})
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "a non-empty rerun_command",
+		Should:   "return nil",
+		Actual:   err,
+		Expected: nil,
+	})
+}
+
+func TestValidateSuiteRerunCommandEmpty(t *testing.T) {
+	err := config.ValidateSuiteRerunCommand(nil)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a nil rerun_command",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a nil rerun_command",
+		Should:   "error message says rerun_command is required",
+		Actual:   strings.Contains(err.Error(), "required"),
+		Expected: true,
+	})
+}
+
 // --- ValidateSuites ---
 
 func TestValidateSuitesValidSingle(t *testing.T) {
@@ -341,6 +371,7 @@ test_suites:
   - name: backend
     command: ["bundle", "exec", "rspec"]
     junitxml: "rspec.xml"
+    rerun_command: ["bundle", "exec", "rspec", "-e", "{name}"]
 `)
 
 	errs := config.ValidateSuites([]config.TestSuite{suite})

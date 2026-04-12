@@ -10,7 +10,7 @@ import (
 
 func TestValidateMissingVersion(t *testing.T) {
 	cfg := parseYAML(t, `
-framework: jest
+
 `)
 
 	errs, _ := cfg.Validate()
@@ -26,7 +26,7 @@ framework: jest
 func TestValidateUnsupportedVersion(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 2
-framework: jest
+
 `)
 
 	errs, _ := cfg.Validate()
@@ -39,45 +39,12 @@ framework: jest
 	})
 }
 
-// --- Framework validation ---
-
-func TestValidateMissingFramework(t *testing.T) {
-	cfg := parseYAML(t, `
-version: 1
-`)
-
-	errs, _ := cfg.Validate()
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a quarantine.yml with no framework field",
-		Should:   "produce a missing-framework error",
-		Actual:   containsString(errs, "Missing required field 'framework' in quarantine.yml."),
-		Expected: true,
-	})
-}
-
-func TestValidateInvalidFramework(t *testing.T) {
-	cfg := parseYAML(t, `
-version: 1
-framework: pytest
-`)
-
-	errs, _ := cfg.Validate()
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a quarantine.yml with framework: pytest",
-		Should:   "produce an unknown-framework error",
-		Actual:   containsString(errs, "Unknown framework 'pytest'. Supported frameworks: rspec, jest, vitest."),
-		Expected: true,
-	})
-}
-
 // --- Retries validation ---
 
 func TestValidateRetriesNegative(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
+
 retries: -1
 `)
 
@@ -94,7 +61,7 @@ retries: -1
 func TestValidateRetriesAboveMax(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
+
 retries: 11
 `)
 
@@ -111,12 +78,12 @@ retries: 11
 func TestValidateRetriesAtBoundary(t *testing.T) {
 	cfgMin := parseYAML(t, `
 version: 1
-framework: jest
+
 retries: 1
 `)
 	cfgMax := parseYAML(t, `
 version: 1
-framework: jest
+
 retries: 10
 `)
 
@@ -143,7 +110,7 @@ retries: 10
 func TestValidateUnsupportedIssueTracker(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
+
 issue_tracker: jira
 `)
 
@@ -162,7 +129,7 @@ issue_tracker: jira
 func TestValidateSupportedIssueTracker(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
+
 issue_tracker: github
 `)
 
@@ -181,7 +148,7 @@ issue_tracker: github
 func TestValidateCustomLabels(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
+
 labels:
   - flaky
 `)
@@ -199,7 +166,7 @@ labels:
 func TestValidateMultipleLabels(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
+
 labels:
   - quarantine
   - flaky
@@ -218,7 +185,7 @@ labels:
 func TestValidateDefaultLabel(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
+
 labels:
   - quarantine
 `)
@@ -236,7 +203,7 @@ labels:
 func TestValidateNoLabelsFieldProducesNoCustomLabelsError(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
+
 `)
 
 	errs, _ := cfg.Validate()

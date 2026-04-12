@@ -13,7 +13,6 @@ import (
 func TestApplyDefaultsDoesNotOverwriteRetries(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 retries: 5
 `)
 
@@ -27,22 +26,10 @@ retries: 5
 	})
 }
 
-func TestApplyDefaultsUnknownFramework(t *testing.T) {
-	cfg := &config.Config{Framework: "pytest"}
-	cfg.ApplyDefaults()
-
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "a config with unknown framework 'pytest'",
-		Should:   "leave JUnitXML empty (no default for unknown framework)",
-		Actual:   cfg.JUnitXML,
-		Expected: "",
-	})
-}
 
 func TestApplyDefaultsDoesNotOverwriteJUnitXML(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 junitxml: my-custom-junit.xml
 `)
 
@@ -61,7 +48,6 @@ func TestApplyDefaultsDoesNotOverwriteIssueTracker(t *testing.T) {
 	// would visibly overwrite it with "github".
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 issue_tracker: jira
 `)
 
@@ -80,7 +66,6 @@ func TestApplyDefaultsDoesNotOverwriteLabels(t *testing.T) {
 	// would visibly overwrite it with ["quarantine"].
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 labels:
   - flaky
 `)
@@ -105,7 +90,6 @@ labels:
 func TestApplyDefaultsDoesNotOverwriteGitHubPRCommentFalse(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 notifications:
   github_pr_comment: false
 `)
@@ -123,7 +107,6 @@ notifications:
 func TestApplyDefaultsDoesNotOverwriteStorageBranch(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 storage:
   branch: my-custom-branch
 `)
@@ -200,33 +183,3 @@ func TestApplyDefaultsSetsStorageBranchToQuarantineState(t *testing.T) {
 	})
 }
 
-// FrameworkDefaultJUnit is tested here as it directly supports ApplyDefaults.
-
-func TestFrameworkDefaultJUnitKnownFrameworks(t *testing.T) {
-	cases := []struct {
-		framework string
-		expected  string
-	}{
-		{"jest", "junit.xml"},
-		{"rspec", "rspec.xml"},
-		{"vitest", "junit-report.xml"},
-	}
-
-	for _, tc := range cases {
-		riteway.Assert(t, riteway.Case[string]{
-			Given:    "framework " + tc.framework,
-			Should:   "return default junitxml glob " + tc.expected,
-			Actual:   config.FrameworkDefaultJUnit(tc.framework),
-			Expected: tc.expected,
-		})
-	}
-}
-
-func TestFrameworkDefaultJUnitUnknownFramework(t *testing.T) {
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "an unknown framework 'pytest'",
-		Should:   "return empty string",
-		Actual:   config.FrameworkDefaultJUnit("pytest"),
-		Expected: "",
-	})
-}

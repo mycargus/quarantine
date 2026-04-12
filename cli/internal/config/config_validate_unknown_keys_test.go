@@ -12,7 +12,6 @@ import (
 func TestValidateUnknownTopLevelKeyProducesWarning(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 typo_field: oops
 `)
 
@@ -29,7 +28,6 @@ typo_field: oops
 func TestValidateMultipleUnknownTopLevelKeysProduceOneWarningEach(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 alpha: 1
 beta: 2
 `)
@@ -54,7 +52,6 @@ beta: 2
 func TestValidateKnownTopLevelKeysProduceNoUnknownWarning(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 retries: 3
 junitxml: junit.xml
 issue_tracker: github
@@ -64,8 +61,7 @@ notifications:
   github_pr_comment: true
 storage:
   branch: quarantine/state
-exclude: []
-rerun_command: ""
+test_suites: []
 `)
 
 	_, warns := cfg.Validate()
@@ -87,7 +83,6 @@ rerun_command: ""
 func TestValidateUnknownNotificationChannelProducesError(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 notifications:
   slack: true
 `)
@@ -107,7 +102,6 @@ notifications:
 func TestValidateMultipleUnknownNotificationChannelsProduceOneErrorEach(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 notifications:
   slack: true
   email: alerts@example.com
@@ -137,7 +131,6 @@ notifications:
 func TestValidateKnownNotificationKeyProducesNoError(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 notifications:
   github_pr_comment: true
 `)
@@ -161,7 +154,6 @@ notifications:
 func TestValidateUnknownStorageFieldProducesError(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 storage:
   backend: actions-cache
 `)
@@ -179,7 +171,6 @@ storage:
 func TestValidateMultipleUnknownStorageFieldsProduceOneErrorEach(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 storage:
   backend: actions-cache
   region: us-east-1
@@ -205,7 +196,6 @@ storage:
 func TestValidateKnownStorageKeyProducesNoError(t *testing.T) {
 	cfg := parseYAML(t, `
 version: 1
-framework: jest
 storage:
   branch: quarantine/state
 `)
@@ -226,24 +216,23 @@ storage:
 
 // --- Unknown keys do not shadow existing validation errors ---
 
-func TestValidateUnknownTopLevelKeyAlongsideMissingRequired(t *testing.T) {
+func TestValidateUnknownTopLevelKeyAlongsideMissingVersion(t *testing.T) {
 	cfg := parseYAML(t, `
-version: 1
 mystery_key: oops
 `)
-	// framework is missing
+	// version is missing
 
 	errs, warns := cfg.Validate()
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a config missing 'framework' and containing an unknown top-level key",
-		Should:   "still produce the missing-framework error",
-		Actual:   containsString(errs, "Missing required field 'framework' in quarantine.yml."),
+		Given:    "a config missing 'version' and containing an unknown top-level key",
+		Should:   "still produce the missing-version error",
+		Actual:   containsString(errs, "Missing required field 'version' in quarantine.yml."),
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a config missing 'framework' and containing an unknown top-level key",
+		Given:    "a config missing 'version' and containing an unknown top-level key",
 		Should:   "also produce the unknown-field warning",
 		Actual:   containsString(warns, "Unknown field 'mystery_key' in quarantine.yml will be ignored."),
 		Expected: true,
