@@ -130,7 +130,7 @@ test_suites:
 	}
 }
 
-// --- Scenario 117 (variant): missing suite name exits 2 ---
+// --- Scenario 117 (variant): multiple suites + missing suite name argument exits 2 ---
 
 func TestRunSuiteMissingNameExitstwo(t *testing.T) {
 	dir := t.TempDir()
@@ -140,11 +140,15 @@ func TestRunSuiteMissingNameExitstwo(t *testing.T) {
 		t.Fatalf("mkdir .quarantine: %v", err)
 	}
 	configPath := filepath.Join(suiteConfigDir, "config.yml")
+	// Two suites: no suite name arg → ambiguous → exit 2 (Scenario 119).
 	configContent := `version: 1
 test_suites:
   - name: backend
     command: ["bundle", "exec", "rspec"]
     junitxml: "rspec.xml"
+  - name: frontend
+    command: ["jest", "--ci"]
+    junitxml: "jest.xml"
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -157,7 +161,7 @@ test_suites:
 	})
 
 	riteway.Assert(t, riteway.Case[int]{
-		Given:    "a suite config with no suite name argument",
+		Given:    "a suite config with multiple suites and no suite name argument",
 		Should:   "exit with code 2 (usage error)",
 		Actual:   exitCode,
 		Expected: 2,
@@ -297,6 +301,108 @@ func TestFindSuiteReturnsErrorOnEmptyList(t *testing.T) {
 		Should:   "return an error when looking up 'backend'",
 		Actual:   err != nil,
 		Expected: true,
+	})
+}
+
+// --- selectSuite pure function tests ---
+
+func TestSelectSuiteAutoSelectsWhenExactlyOneSuiteAndNoArg(t *testing.T) {
+	suites := []config.TestSuite{
+		{Name: "unit", JUnitXML: "unit.xml"},
+	}
+
+	suite, err := selectSuite(suites, "")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "exactly one suite named 'unit' and no name arg",
+		Should:   "return nil error (auto-selected)",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "exactly one suite named 'unit' and no name arg",
+		Should:   "return the only suite",
+		Actual:   suite.Name,
+		Expected: "unit",
+	})
+}
+
+func TestSelectSuiteErrorsWhenMultipleSuitesAndNoArg(t *testing.T) {
+	suites := []config.TestSuite{
+		{Name: "backend", JUnitXML: "backend.xml"},
+		{Name: "frontend", JUnitXML: "frontend.xml"},
+	}
+
+	_, err := selectSuite(suites, "")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "two suites and no name arg",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "two suites named 'backend' and 'frontend' and no name arg",
+		Should:   "error message contains '[config]' prefix",
+		Actual:   strings.Contains(err.Error(), "[config]"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "two suites named 'backend' and 'frontend' and no name arg",
+		Should:   "error message lists both suite names",
+		Actual:   strings.Contains(err.Error(), "backend") && strings.Contains(err.Error(), "frontend"),
+		Expected: true,
+	})
+}
+
+func TestSelectSuiteErrorsWhenNoSuitesConfigured(t *testing.T) {
+	_, err := selectSuite([]config.TestSuite{}, "")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "empty suite list and no name arg",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "empty suite list and no name arg",
+		Should:   "error message contains '[config]' prefix",
+		Actual:   strings.Contains(err.Error(), "[config]"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "empty suite list and no name arg",
+		Should:   "error message mentions config.yml so user knows where to add suites",
+		Actual:   strings.Contains(err.Error(), "config.yml"),
+		Expected: true,
+	})
+}
+
+func TestSelectSuiteDelegatesToFindSuiteWhenNameArgProvided(t *testing.T) {
+	suites := []config.TestSuite{
+		{Name: "backend", JUnitXML: "backend.xml"},
+		{Name: "frontend", JUnitXML: "frontend.xml"},
+	}
+
+	suite, err := selectSuite(suites, "frontend")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "two suites and name arg 'frontend'",
+		Should:   "return nil error",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "two suites and name arg 'frontend'",
+		Should:   "return the frontend suite",
+		Actual:   suite.Name,
+		Expected: "frontend",
 	})
 }
 

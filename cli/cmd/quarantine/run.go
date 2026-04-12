@@ -32,8 +32,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 	configPath, _ := cmd.Flags().GetString("config")
 	cfg, cfgErr := config.Load(configPath)
 
-	// Suite mode: config has test_suites. The -- separator is not used.
-	if cfgErr == nil && len(cfg.TestSuites) > 0 {
+	// Suite mode: config has test_suites key (even if empty). The -- separator is not used.
+	if cfgErr == nil && cfg.IsSuiteConfig() {
 		if cmd.ArgsLenAtDash() != -1 {
 			cmd.PrintErrln("Error: the -- separator is not used with suite configs. Usage: quarantine run <suite-name>")
 			return exitCodeError(2)
@@ -357,17 +357,18 @@ func runRun(cmd *cobra.Command, args []string) error {
 // It selects the named suite, executes its command unmodified via exec.Command, parses
 // the suite's JUnit XML output, and exits 0 on success.
 func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
-	if len(args) == 0 {
-		cmd.PrintErrln("Error: missing suite name. Usage: quarantine run <suite-name>")
+	nameArg := ""
+	if len(args) > 0 {
+		nameArg = args[0]
+	}
+
+	suite, err := selectSuite(cfg.TestSuites, nameArg)
+	if err != nil {
+		cmd.PrintErrln(err.Error())
 		return exitCodeError(2)
 	}
 
-	suiteName := args[0]
-	suite, err := findSuite(cfg.TestSuites, suiteName)
-	if err != nil {
-		cmd.PrintErrf("Error: %v\n", err)
-		return exitCodeError(2)
-	}
+	suiteName := suite.Name
 
 	suiteCmd := suite.Commands()
 	if len(suiteCmd) == 0 {
@@ -1099,6 +1100,35 @@ func degradedMsg(err error) string {
 func isTimeoutError(err error) bool {
 	var netErr net.Error
 	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+// selectSuite resolves which suite to run based on the suites list and the
+// optional name argument from the CLI. It handles four cases:
+//
+//  1. Zero suites configured → error with guidance.
+//  2. One suite, no nameArg → auto-select (Scenario 118).
+//  3. Multiple suites, no nameArg → error listing available suites (Scenario 119).
+//  4. nameArg provided → delegate to findSuite.
+//
+// This is a pure function — no I/O.
+func selectSuite(suites []config.TestSuite, nameArg string) (config.TestSuite, error) {
+	if nameArg != "" {
+		return findSuite(suites, nameArg)
+	}
+	switch len(suites) {
+	case 0:
+		return config.TestSuite{}, errors.New("Error [config]: No test suites configured. Edit .quarantine/config.yml to add one")
+	case 1:
+		return suites[0], nil
+	default:
+		var sb strings.Builder
+		sb.WriteString("Error [config]: Multiple test suites configured. Specify a suite name:\n")
+		for _, s := range suites {
+			fmt.Fprintf(&sb, "\n  quarantine run %s", s.Name)
+		}
+		sb.WriteString("\n\nRun `quarantine suite list` to see all configured suites.")
+		return config.TestSuite{}, fmt.Errorf("%s", sb.String())
+	}
 }
 
 // findSuite returns the suite with the given name from the suites slice.

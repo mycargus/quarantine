@@ -24,6 +24,74 @@ func parseSuiteYAML(t *testing.T, yamlContent string) config.TestSuite {
 	return cfg.TestSuites[0]
 }
 
+// --- IsSuiteConfig unit tests ---
+
+func TestIsSuiteConfigTrueWhenTestSuitesPresent(t *testing.T) {
+	cfg, err := config.Parse(strings.NewReader(`
+version: 1
+test_suites:
+  - name: backend
+    command: ["bundle", "exec", "rspec"]
+    junitxml: "rspec.xml"
+`))
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "YAML with a populated test_suites key",
+		Should:   "parse without error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "YAML with test_suites key present",
+		Should:   "IsSuiteConfig() return true",
+		Actual:   cfg.IsSuiteConfig(),
+		Expected: true,
+	})
+}
+
+func TestIsSuiteConfigTrueWhenTestSuitesIsEmpty(t *testing.T) {
+	cfg, err := config.Parse(strings.NewReader(`
+version: 1
+test_suites: []
+`))
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "YAML with test_suites: [] (empty array)",
+		Should:   "parse without error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "YAML with test_suites: [] (empty array but key is present)",
+		Should:   "IsSuiteConfig() return true (key is present even if empty)",
+		Actual:   cfg.IsSuiteConfig(),
+		Expected: true,
+	})
+}
+
+func TestIsSuiteConfigFalseWhenNoTestSuitesKey(t *testing.T) {
+	cfg, err := config.Parse(strings.NewReader(`
+version: 1
+framework: jest
+`))
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "legacy YAML without test_suites key",
+		Should:   "parse without error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "legacy YAML without test_suites key",
+		Should:   "IsSuiteConfig() return false",
+		Actual:   cfg.IsSuiteConfig(),
+		Expected: false,
+	})
+}
+
 // --- TestSuite.Commands() unit tests ---
 
 func TestCommandsValidSequence(t *testing.T) {

@@ -25,6 +25,12 @@ type Config struct {
 	RerunCommand  string         `yaml:"rerun_command,omitempty"`
 	TestSuites    []TestSuite    `yaml:"test_suites,omitempty"`
 
+	// hasSuitesKey is true when the YAML document explicitly contains the
+	// test_suites key, even if its value is an empty array. This lets the CLI
+	// distinguish "suite-mode config with no suites yet" from "legacy config".
+	// Populated by Parse.
+	hasSuitesKey bool
+
 	// unknownTopLevel holds any top-level keys not in the known schema.
 	// Populated by Parse; consumed by Validate to emit warnings.
 	unknownTopLevel []string
@@ -36,6 +42,12 @@ type Config struct {
 	// unknownStorage holds any keys under `storage` not in the known schema.
 	// Populated by Parse; consumed by Validate to emit errors.
 	unknownStorage []string
+}
+
+// IsSuiteConfig reports whether this config was authored in suite mode
+// (i.e., the test_suites key was explicitly present, even if empty).
+func (c *Config) IsSuiteConfig() bool {
+	return c.hasSuitesKey
 }
 
 // TestSuite represents a single test suite entry in the test_suites array.
@@ -192,6 +204,8 @@ func Parse(r io.Reader) (*Config, error) {
 
 		// Inspect nested sections for unknown keys.
 		switch key {
+		case "test_suites":
+			cfg.hasSuitesKey = true
 		case "notifications":
 			cfg.unknownNotifications = collectUnknownKeys(valNode, knownNotificationKeys)
 		case "storage":
