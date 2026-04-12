@@ -15,11 +15,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// PRCommentMarker is the HTML comment that marks a quarantine-bot PR comment.
-// It MUST be the first line of every comment body for update-vs-create detection.
-// Changing this value breaks update detection for all existing bot comments.
-const PRCommentMarker = "<!-- quarantine-bot -->"
-
 // IssueTitlePrefix is the prefix prepended to every flaky-test issue title.
 // Changing this breaks dedup label-based search (issues created with the old
 // prefix won't be recognised by the new search query).

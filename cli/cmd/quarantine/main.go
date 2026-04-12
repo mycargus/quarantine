@@ -33,15 +33,6 @@ quarantine state on GitHub.`,
 		SilenceErrors: true,
 	}
 
-	// Override cobra's default flag error handling to print a clean
-	// error message and exit 2 (quarantine error). Exit 1 is reserved
-	// exclusively for test failures, per docs/cli-spec.md.
-	rootCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		cmd.PrintErrln("Error:", err)
-		cmd.PrintErrln(cmd.UsageString())
-		return err
-	})
-
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newRunCmd())
 	rootCmd.AddCommand(newDoctorCmd())
@@ -63,34 +54,19 @@ validates GitHub token/permissions, and creates the quarantine/state branch.`,
 
 func newRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run [flags] -- <test command>",
+		Use:   "run [suite-name]",
 		Short: "Run tests with quarantine detection and enforcement",
-		Long: `Run tests with quarantine detection and enforcement. Wraps your test
-command, parses JUnit XML output, retries failures, and manages quarantine
-state on GitHub.
-
-The -- separator is required. Everything after -- is treated as the test
-command and its arguments.`,
+		Long: `Run tests with quarantine detection and enforcement. Reads the suite
+configuration from .quarantine/config.yml, executes the named suite command,
+parses JUnit XML output, retries failures, and manages quarantine state on GitHub.`,
 		RunE: runRun,
 	}
 
-	// Unknown flags in `run` likely mean the user forgot `--`.
-	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		cmd.PrintErrln(separatorErrorMsg)
-		return fmt.Errorf("missing separator")
-	})
-
-	// Flags will be added in M2-M5 as features are implemented.
-	cmd.Flags().String("config", "quarantine.yml", "Path to configuration file")
-	cmd.Flags().String("junitxml", "", "Glob pattern for JUnit XML output files")
-	cmd.Flags().Int("retries", 0, "Number of retries for failing tests (1-10)")
 	cmd.Flags().Bool("verbose", false, "Detailed output")
 	cmd.Flags().Bool("quiet", false, "Minimal output")
 	cmd.Flags().Bool("strict", false, "Exit 2 on infrastructure errors")
 	cmd.Flags().Bool("dry-run", false, "Show what would happen without making changes")
 	cmd.Flags().Int("pr", 0, "Override PR number for comments")
-	cmd.Flags().StringArray("exclude", nil, "Exclude patterns (repeatable)")
-	cmd.Flags().String("output", ".quarantine/results.json", "Path for results JSON output")
 
 	return cmd
 }
@@ -98,14 +74,12 @@ command and its arguments.`,
 func newDoctorCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "doctor",
-		Short: "Validate quarantine.yml configuration",
-		Long: `Validate quarantine.yml configuration. Reads and validates all fields
-against the schema, prints the resolved configuration, and reports errors
+		Short: "Validate .quarantine/config.yml configuration",
+		Long: `Validate .quarantine/config.yml configuration. Reads and validates all
+fields against the schema, prints the resolved configuration, and reports errors
 and warnings.`,
 		RunE: runDoctor,
 	}
-
-	cmd.Flags().String("config", "quarantine.yml", "Path to configuration file")
 
 	return cmd
 }

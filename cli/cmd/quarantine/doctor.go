@@ -14,9 +14,7 @@ import (
 
 // runDoctor implements the doctor command logic.
 func runDoctor(cmd *cobra.Command, args []string) error {
-	configPath, _ := cmd.Flags().GetString("config")
-
-	cfg, err := config.Load(configPath)
+	cfg, err := config.Load(".quarantine/config.yml")
 	if err != nil {
 		cmd.Printf("Error: quarantine.yml not found in the current directory.\nRun 'quarantine init' to create one.\n")
 		return fmt.Errorf("quarantine.yml not found")
@@ -53,15 +51,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Valid config — print resolved configuration.
 	cmd.Printf("quarantine.yml is valid.\n\nResolved configuration:\n")
 	cmd.Printf("  version:         %d\n", cfg.Version)
-	cmd.Printf("  framework:       %s\n", cfg.Framework)
 	cmd.Printf("  retries:         %d\n", cfg.Retries)
-
-	defaultJunit := config.FrameworkDefaultJUnit(cfg.Framework)
-	junitxmlNote := ""
-	if cfg.JUnitXML == defaultJunit {
-		junitxmlNote = " (default)"
-	}
-	cmd.Printf("  junitxml:        %s%s\n", cfg.JUnitXML, junitxmlNote)
 
 	// github.owner / github.repo — auto-detect if not set from config.
 	var detectedOwner, detectedRepo string
@@ -90,7 +80,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	cmd.Printf("  storage.branch:  %s%s\n", cfg.Storage.Branch, branchNote)
 
 	// Scan for retryTimes in jest config files relative to the repo root.
-	retryHits := detectRetryTimesInRepo(configPath)
+	retryHits := detectRetryTimesInRepo(".quarantine/config.yml")
 	if len(retryHits) > 0 {
 		cmd.Printf("\nWarning: %s contains 'retryTimes'. Framework-level retries hide\nfailures from JUnit XML, preventing quarantine from detecting flaky tests.\nRemove retryTimes before using quarantine.\n", strings.Join(retryHits, ", "))
 	}

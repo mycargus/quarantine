@@ -25,333 +25,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const separatorErrorMsg = "Error: missing '--' separator. Usage: quarantine run [flags] -- <test command>\n\nExample: quarantine run --retries 3 -- jest --ci"
-
 // runRun implements the `quarantine run` command logic.
 func runRun(cmd *cobra.Command, args []string) error {
-	configPath, _ := cmd.Flags().GetString("config")
-	cfg, cfgErr := config.Load(configPath)
+	cfg, cfgErr := config.Load(".quarantine/config.yml")
 
-	// Suite mode: config has test_suites key (even if empty). The -- separator is not used.
-	if cfgErr == nil && cfg.IsSuiteConfig() {
-		if cmd.ArgsLenAtDash() != -1 {
-			cmd.PrintErrln("Error: the -- separator is not used with suite configs. Usage: quarantine run <suite-name>")
-			return exitCodeError(2)
-		}
-		return runSuiteMode(cmd, args, cfg)
-	}
-
-	// Legacy mode: config has framework (quarantine.yml format). Requires --.
-	if cfgErr != nil {
+	if cfgErr != nil || !cfg.IsSuiteConfig() {
 		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
 		return fmt.Errorf("not initialized")
 	}
 
-	// Check for -- separator.
-	if cmd.ArgsLenAtDash() == -1 {
-		cmd.PrintErrln(separatorErrorMsg)
-		return fmt.Errorf("missing separator")
-	}
-
-	if len(args) == 0 {
-		cmd.PrintErrln(separatorErrorMsg)
-		return fmt.Errorf("missing test command")
-	}
-
-	// Check mutually exclusive flags.
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	quiet, _ := cmd.Flags().GetBool("quiet")
-	if verbose && quiet {
-		cmd.PrintErrln("Error: --verbose and --quiet are mutually exclusive.")
-		return fmt.Errorf("verbose and quiet are mutually exclusive")
-	}
-
-	// QUARANTINE_DEBUG=1 enables debug output equivalent to --verbose.
-	// --quiet takes precedence over QUARANTINE_DEBUG.
-	if os.Getenv("QUARANTINE_DEBUG") == "1" && !quiet {
-		verbose = true
-	}
-
-	runStart := time.Now()
-	defer func() {
-		if verbose {
-			cmd.PrintErrf("[quarantine] total time: %dms\n", time.Since(runStart).Milliseconds())
-		}
-	}()
-
-	// Snapshot pre-defaults values for verbose source attribution.
-	cfgRetries := cfg.Retries
-	cfgJUnitXML := cfg.JUnitXML
-
-	// Read CLI flags before ApplyDefaults so we know what was explicitly set.
-	junitxmlFlag, _ := cmd.Flags().GetString("junitxml")
-	retriesFlag, _ := cmd.Flags().GetInt("retries")
-
-	cfg.ApplyDefaults()
-
-	// Apply CLI flag overrides (after defaults, so flags win).
-	if junitxmlFlag != "" {
-		cfg.JUnitXML = junitxmlFlag
-	}
-	if retriesFlag != 0 {
-		if retriesFlag < 1 || retriesFlag > 10 {
-			cmd.PrintErrf("Error: --retries value %d is out of range. Must be between 1 and 10.\n", retriesFlag)
-			return fmt.Errorf("retries out of range")
-		}
-		cfg.Retries = retriesFlag
-	}
-
-	if verbose {
-		for _, line := range configResolutionTrace(cfg, retriesFlag, cfgRetries, junitxmlFlag, cfgJUnitXML) {
-			cmd.PrintErrln(line)
-		}
-	}
-
-	// Verify test command exists.
-	testCmd := args[0]
-	testArgs := args[1:]
-	if _, err := exec.LookPath(testCmd); err != nil {
-		cmd.PrintErrf("Error: command not found: %q. Ensure the test runner is installed and on PATH.\n", testCmd)
-		return fmt.Errorf("command not found: %s", testCmd)
-	}
-
-	// Check quarantine/state branch exists.
-	check, err := checkBranchExists(cfg)
-	if err != nil {
-		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
-		return err
-	}
-	if check.warnMsg != "" {
-		cmd.PrintErrf("[quarantine] WARNING: %s\n", check.warnMsg)
-	}
-	if verbose {
-		if check.skipped {
-			cmd.PrintErrf("[quarantine] API: skipped (no token)\n")
-		} else if check.endpoint != "" {
-			elapsedMs := check.elapsed.Milliseconds()
-			if check.apiErr != nil {
-				cmd.PrintErrf("[quarantine] %s -> error (%dms)\n", check.endpoint, elapsedMs)
-			} else if check.exists {
-				cmd.PrintErrf("[quarantine] %s -> 200 (%dms)\n", check.endpoint, elapsedMs)
-			} else {
-				cmd.PrintErrf("[quarantine] %s -> 404 (%dms)\n", check.endpoint, elapsedMs)
-			}
-		}
-	}
-	if !check.skipped && check.apiErr == nil && !check.exists {
-		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
-		return fmt.Errorf("not initialized")
-	}
-
-	ctx := context.Background()
-
-	strict, _ := cmd.Flags().GetBool("strict")
-
-	// Create a single GitHub client shared across all quarantine state operations.
-	// Rate-limit warnings are forwarded to stderr via cmd.PrintErrln.
-	var ghClient *gh.Client
-	if owner, repo := resolveOwnerRepo(cfg); owner != "" && repo != "" {
-		if c, clientErr := gh.NewClient(owner, repo); clientErr == nil {
-			c.SetRateLimitWarningFunc(func(msg string) { cmd.PrintErrln(msg) })
-			if verbose {
-				c.SetVerboseLogFunc(func(msg string) { cmd.PrintErrln(msg) })
-			}
-			ghClient = c
-		} else {
-			// Detect missing token specifically for a clearer message.
-			reason := fmt.Sprintf("%v", clientErr)
-			if strings.Contains(reason, "no GitHub token") {
-				reason = "No GitHub token found. Running in degraded mode."
-			}
-			if strict {
-				cmd.PrintErrf("[quarantine] ERROR: infrastructure failure (--strict mode): %v\n", clientErr)
-				cmd.PrintErrf("[quarantine] ERROR: exiting with code 2. Remove --strict to run in degraded mode.\n")
-				return exitCodeError(2)
-			}
-			emitDegradedWarning(cmd, reason)
-		}
-	}
-
-	// Read quarantine state from the quarantine/state branch.
-	qState, qStateContent, qStateSHA := loadQuarantineState(ctx, cmd, cfg, ghClient, "quarantine.json")
-
-	// In --strict mode, a nil state from a non-nil client means the API was unreachable.
-	if strict && ghClient != nil && qState == nil {
-		cmd.PrintErrf("[quarantine] ERROR: infrastructure failure (--strict mode): unable to read quarantine state\n")
-		cmd.PrintErrf("[quarantine] ERROR: exiting with code 2. Remove --strict to run in degraded mode.\n")
+	if cmd.ArgsLenAtDash() != -1 {
+		cmd.PrintErrln("Error: the -- separator is not used with suite configs. Usage: quarantine run <suite-name>")
 		return exitCodeError(2)
 	}
 
-	// Batch-check closed issues and remove unquarantined tests from in-memory state.
-	var removedEntries []qstate.Entry
-	if qState != nil {
-		removedEntries = removeUnquarantinedTests(ctx, cmd, cfg, qState, ghClient)
-	}
-	removedTestIDs := make([]string, len(removedEntries))
-	for i, e := range removedEntries {
-		removedTestIDs[i] = e.TestID
-	}
-
-	// Augment the test command with framework-specific exclusion flags.
-	if qState != nil && qState.Tests != nil {
-		exclusionArgs := buildExclusionArgsFromState(runner.Framework(cfg.Framework), qState)
-		if len(exclusionArgs) > 0 {
-			testArgs = append(testArgs, exclusionArgs...)
-		}
-	}
-
-	// Execute test command.
-	if !quiet {
-		cmd.PrintErrf("[quarantine] Running: %s %s\n", testCmd, strings.Join(testArgs, " "))
-	}
-
-	exitCode, runErr := runner.Run(ctx, testCmd, testArgs, os.Stdout, os.Stderr)
-	if runErr != nil {
-		cmd.PrintErrf("[quarantine] WARNING: Failed to execute test command: %v\n", runErr)
-		return fmt.Errorf("test command execution failed")
-	}
-
-	// Parse JUnit XML.
-	testResults, parseWarnings := parseJUnitXML(cfg.JUnitXML)
-	for _, w := range parseWarnings {
-		cmd.PrintErrf("[quarantine] WARNING: %s\n", w)
-	}
-
-	// If no XML found, log warning and exit early regardless of runner exit code.
-	if testResults == nil {
-		if exitCode != 0 {
-			cmd.PrintErrf("[quarantine] WARNING: No JUnit XML found at '%s'. Cannot determine test results. Suggest checking --junitxml flag or test runner configuration.\n", cfg.JUnitXML)
-			return exitCodeError(exitCode)
-		}
-		// Runner exited 0 but no XML: warn and exit cleanly without quarantine processing.
-		cmd.PrintErrf("[quarantine] WARNING: No JUnit XML found at '%s'. Cannot determine test results.\n", cfg.JUnitXML)
-		return nil
-	}
-
-	// For RSpec, apply post-execution filtering to suppress quarantined failures.
-	if qState != nil && runner.Framework(cfg.Framework) == runner.RSpec {
-		testResults = qstate.FilterQuarantinedFailures(testResults, qState)
-	}
-
-	// Collect exclude patterns: merge config and CLI flag values.
-	excludeFlag, _ := cmd.Flags().GetStringArray("exclude")
-	excludePatterns := mergeExcludePatterns(cfg.Exclude, excludeFlag)
-
-	// Retry failing tests individually (skip quarantined and excluded tests).
-	// Legacy mode: rerun command crash is treated as genuine failure (not unresolved).
-	retryOutcomes, retryWarnings := retryFailingTests(ctx, testResults, cfg, excludePatterns, false)
-	for _, w := range retryWarnings {
-		cmd.PrintErrf("[quarantine] WARNING: %s", w)
-	}
-
-	// Build results.
-	meta := buildMetadata(cfg)
-	res := result.BuildWithRetries(testResults, retryOutcomes, meta)
-
-	// Classify flaky tests by PR scope (ADR-022): detect new-to-PR tests so we
-	// can skip issue creation and quarantine state for them.
-	baseRef := os.Getenv("GITHUB_BASE_REF")
-	skipReasons := checkPRScopeForTests(baseRef, buildPRScopeInputs(res))
-
-	// Annotate results with issue_skipped_reason for new-to-PR tests.
-	for i, t := range res.Tests {
-		if reason := skipReasons[t.TestID]; reason != "" {
-			r := reason
-			res.Tests[i].IssueSkippedReason = &r
-		}
-	}
-
-	// Add newly detected flaky tests to quarantine state and write via CAS.
-	// New-to-PR flaky tests are excluded (no persistent quarantine without a GitHub Issue per ADR-017).
-	dryRun, _ := cmd.Flags().GetBool("dry-run")
-	if qState != nil && !dryRun {
-		flakyAdded := addNewFlakyTests(qState, res, excludePatterns, skipReasons)
-		stateChanged := flakyAdded || len(removedTestIDs) > 0
-		if stateChanged {
-			writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA, ghClient, removedTestIDs, "quarantine.json")
-		}
-	} else if dryRun && res.Summary.FlakyDetected > 0 {
-		printDryRunSummary(cmd, res)
-	}
-
-	// Create GitHub issues for newly detected flaky tests and post PR comment.
-	if !dryRun && ghClient != nil {
-		prFlag, _ := cmd.Flags().GetInt("pr")
-		eventPath := os.Getenv("GITHUB_EVENT_PATH")
-		prNumber, _ := detectPRNumber(prFlag, eventPath)
-
-		branch := meta.Branch
-		commitSHA := meta.CommitSHA
-
-		issueRefs := createIssuesForNewFlakyTests(ctx, cmd, ghClient, res, excludePatterns, branch, commitSHA, prNumber, skipReasons, "")
-
-		// Backfill issue numbers into result entries so results.json includes them.
-		backfillIssueNumbers(res.Tests, issueRefs)
-
-		prCommentEnabled := cfg.Notifications.GitHubPRComment == nil || *cfg.Notifications.GitHubPRComment
-		if prCommentEnabled {
-			flakyWithIssue, flakyNewToPR := buildFlakyEntries(res, issueRefs, skipReasons)
-			commentData := PRCommentData{
-				Total:              res.Summary.Total,
-				Passed:             res.Summary.Passed,
-				Failed:             res.Summary.Failed,
-				Flaky:              res.Summary.FlakyDetected,
-				Quarantined:        res.Summary.Quarantined,
-				Version:            version,
-				NewlyFlaky:         flakyWithIssue,
-				NewToPRFlaky:       flakyNewToPR,
-				QuarantinedTests:   buildQuarantinedEntries(qState),
-				UnquarantinedTests: buildUnquarantinedEntries(removedEntries),
-				Failures:           buildFailureEntries(res),
-			}
-			commentBody := renderPRComment(commentData, PRCommentMarker)
-			postOrUpdatePRComment(ctx, cmd, ghClient, prNumber, commentBody, PRCommentMarker)
-		}
-	}
-
-	// Warn when all tests are quarantined (nothing meaningful ran or all suppressed).
-	// Only fire when quarantine state was loaded and had entries — otherwise
-	// Total==0 could just mean an empty test suite or degraded mode.
-	hadQuarantinedTests := qState != nil && len(qState.Tests) > 0
-	if hadQuarantinedTests && allTestsQuarantined(res) {
-		cmd.PrintErrln("[quarantine] WARNING: All tests are quarantined. The entire test suite was skipped. Review and close resolved quarantine issues.")
-	}
-
-	// Write results.json.
-	outputPath, _ := cmd.Flags().GetString("output")
-	if err := writeResults(res, outputPath); err != nil {
-		cmd.PrintErrf("[quarantine] WARNING: Failed to write results: %v\n", err)
-	} else if !quiet {
-		cmd.PrintErrf("[quarantine] Results written to %s\n", outputPath)
-	}
-
-	// Print summary (unless quiet).
-	if !quiet {
-		cmd.PrintErrf("\n[quarantine] Results:\n")
-		cmd.PrintErrf("  Total:        %d\n", res.Summary.Total)
-		cmd.PrintErrf("  Passed:       %d\n", res.Summary.Passed)
-		cmd.PrintErrf("  Failed:       %d\n", res.Summary.Failed)
-		cmd.PrintErrf("  Skipped:      %d\n", res.Summary.Skipped)
-		cmd.PrintErrf("  Flaky:        %d\n", res.Summary.FlakyDetected)
-		cmd.PrintErrf("  Quarantined:  %d\n", res.Summary.Quarantined)
-		cmd.PrintErrf("\n")
-		cmd.PrintErrf("  Skipped:      Tests marked as skipped by your test framework.\n")
-		cmd.PrintErrf("  Flaky:        Tests that failed initially but passed on retry. Will be excluded (quarantined) in future test runs.\n")
-		cmd.PrintErrf("  Quarantined:  Tests excluded from this run due to known flakiness.\n")
-	}
-
-	// Determine exit code based on test results.
-	if res.Summary.Failed > 0 {
-		return exitCodeError(1)
-	}
-
-	// If the test runner exited non-zero but we parsed 0 failures,
-	// still respect the runner's exit code.
-	if exitCode != 0 && len(testResults) == 0 {
-		return exitCodeError(exitCode)
-	}
-
-	return nil
+	return runSuiteMode(cmd, args, cfg)
 }
 
 // runSuiteMode handles `quarantine run <suite-name>` when the config contains test_suites.
@@ -493,10 +181,6 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		return nil
 	}
 
-	// Collect exclude patterns.
-	excludeFlag, _ := cmd.Flags().GetStringArray("exclude")
-	excludePatterns := mergeExcludePatterns(cfg.Exclude, excludeFlag)
-
 	// Determine retries: suite-level > config-level > default.
 	retries := suite.Retries
 	if retries == 0 {
@@ -506,14 +190,10 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		retries = 3
 	}
 
-	// Build a config-like view for retryFailingTests (reuses existing retry logic).
-	retryCfg := &config.Config{
-		Retries:      retries,
-		RerunCommand: strings.Join(suite.RerunCommand, " "),
-	}
+	rerunCommand := strings.Join(suite.RerunCommand, " ")
 
 	// Suite mode: rerun command crash is classified as unresolved (infrastructure failure).
-	retryOutcomes, retryWarnings := retryFailingTests(ctx, testResults, retryCfg, excludePatterns, true)
+	retryOutcomes, retryWarnings := retryFailingTests(ctx, testResults, retries, rerunCommand, true)
 	for _, w := range retryWarnings {
 		cmd.PrintErrf("[quarantine] WARNING: %s", w)
 	}
@@ -527,7 +207,7 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 
 	// Write quarantine state.
 	if qState != nil && !dryRun {
-		flakyAdded := addNewFlakyTests(qState, res, excludePatterns, skipReasons)
+		flakyAdded := addNewFlakyTests(qState, res, skipReasons)
 		stateChanged := flakyAdded || len(removedTestIDs) > 0
 		if stateChanged {
 			writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA, ghClient, removedTestIDs, statePath)
@@ -541,11 +221,12 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		prNumber, _ := detectPRNumber(prFlag, eventPath)
 		branch := meta.Branch
 		commitSHA := meta.CommitSHA
-		issueRefs := createIssuesForNewFlakyTests(ctx, cmd, ghClient, res, excludePatterns, branch, commitSHA, prNumber, skipReasons, suiteName)
+		issueRefs := createIssuesForNewFlakyTests(ctx, cmd, ghClient, res, nil, branch, commitSHA, prNumber, skipReasons, suiteName)
 		backfillIssueNumbers(res.Tests, issueRefs)
 
 		// Post PR comment with suite-specific marker.
-		if prNumber > 0 {
+		prCommentEnabled := cfg.Notifications.GitHubPRComment == nil || *cfg.Notifications.GitHubPRComment
+		if prNumber > 0 && prCommentEnabled {
 			suiteMarker := suitePRCommentMarker(suiteName)
 			flakyWithIssue, flakyNewToPR := buildFlakyEntries(res, issueRefs, skipReasons)
 			// Use the quarantined count from state (not results summary) because suite mode
@@ -569,8 +250,14 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		}
 	}
 
+	// Warn when all tests are quarantined.
+	hadQuarantinedTests := qState != nil && len(qState.Tests) > 0
+	if hadQuarantinedTests && allTestsQuarantined(res) {
+		cmd.PrintErrln("[quarantine] WARNING: All tests are quarantined. The entire test suite was skipped. Review and close resolved quarantine issues.")
+	}
+
 	// Write results.json.
-	outputPath, _ := cmd.Flags().GetString("output")
+	outputPath := fmt.Sprintf(".quarantine/%s/results.json", suiteName)
 	if err := writeResults(res, outputPath); err != nil {
 		cmd.PrintErrf("[quarantine] WARNING: Failed to write results: %v\n", err)
 	} else if !quiet {
@@ -677,31 +364,16 @@ func removeUnquarantinedTests(ctx context.Context, cmd *cobra.Command, cfg *conf
 	return removed
 }
 
-// buildExclusionArgsFromState returns the framework-specific exclusion flags
-// for tests in the quarantine state. Pure logic wrapped in I/O context.
-// This is a thin adapter — pure function is in runner.BuildExclusionArgs.
-func buildExclusionArgsFromState(fw runner.Framework, state *qstate.State) []string {
-	entries := make([]qstate.Entry, 0, len(state.Tests))
-	for _, e := range state.Tests {
-		entries = append(entries, e)
-	}
-	return runner.BuildExclusionArgs(fw, entries)
-}
-
 // addNewFlakyTests adds newly detected flaky tests from the run results to the
 // quarantine state. A test is newly flaky if it is not already in the state
-// and its result status is "flaky". Tests matching excludePatterns are skipped.
-// Tests in skipReasons are skipped (new-to-PR tests per ADR-022 — no persistent
-// quarantine without a GitHub Issue).
+// and its result status is "flaky". Tests in skipReasons are skipped
+// (new-to-PR tests per ADR-022 — no persistent quarantine without a GitHub Issue).
 // Returns true if the state was modified.
-func addNewFlakyTests(state *qstate.State, res result.Result, excludePatterns []string, skipReasons map[string]string) bool {
+func addNewFlakyTests(state *qstate.State, res result.Result, skipReasons map[string]string) bool {
 	changed := false
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, t := range res.Tests {
 		if t.Status != "flaky" {
-			continue
-		}
-		if runner.MatchesExcludePattern(t.TestID, excludePatterns) {
 			continue
 		}
 		if skipReasons[t.TestID] != "" {
@@ -776,15 +448,14 @@ func writeUpdatedQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *c
 	}
 }
 
-// retryFailingTests reruns each failed test individually up to cfg.Retries times.
+// retryFailingTests reruns each failed test individually up to retries times.
 // Returns a map of TestID -> RetryOutcome for tests that were retried, and a
 // slice of warning messages for tests whose rerun command failed to execute.
 // Exits the retry loop early on the first passing attempt or if the rerun
-// command itself fails to execute. Tests whose TestID matches any excludePattern
-// are skipped entirely.
+// command itself fails to execute.
 // When classifyRerunCrashAsUnresolved is true (suite mode), a rerun command that
 // fails to execute marks the outcome as Unresolved rather than as a failed attempt.
-func retryFailingTests(ctx context.Context, tests []parser.TestResult, cfg *config.Config, excludePatterns []string, classifyRerunCrashAsUnresolved bool) (map[string]result.RetryOutcome, []string) {
+func retryFailingTests(ctx context.Context, tests []parser.TestResult, retries int, rerunCommand string, classifyRerunCrashAsUnresolved bool) (map[string]result.RetryOutcome, []string) {
 	outcomes := make(map[string]result.RetryOutcome)
 	var warnings []string
 
@@ -792,26 +463,22 @@ func retryFailingTests(ctx context.Context, tests []parser.TestResult, cfg *conf
 		if t.Status != "failed" && t.Status != "error" {
 			continue
 		}
-		if runner.MatchesExcludePattern(t.TestID, excludePatterns) {
-			continue
-		}
 
 		rerunCmd, rerunArgs := runner.RerunCommand(
-			runner.Framework(cfg.Framework),
 			t.Name, t.Classname, t.FilePath,
-			cfg.RerunCommand,
+			rerunCommand,
 		)
 
 		var attempts []result.RetryEntry
 		unresolved := false
-		for attempt := 1; attempt <= cfg.Retries; attempt++ {
+		for attempt := 1; attempt <= retries; attempt++ {
 			rerunExitCode, runErr := runner.Run(ctx, rerunCmd, rerunArgs, os.Stdout, os.Stderr)
 			// Treat two conditions as rerun infrastructure failures (not test failures):
 			//  1. runErr != nil — the binary failed to start at all (ENOENT)
 			//  2. rerunExitCode == 127 — the command ran but "command not found" (shell convention)
 			rerunCrash := runErr != nil || (classifyRerunCrashAsUnresolved && rerunExitCode == 127)
 			if rerunCrash {
-				warnings = append(warnings, rerunFailureWarning(t.Name, rerunCmd, runner.Framework(cfg.Framework)))
+				warnings = append(warnings, rerunFailureWarning(t.Name, rerunCmd))
 				if classifyRerunCrashAsUnresolved {
 					unresolved = true
 				} else {
@@ -841,28 +508,13 @@ func retryFailingTests(ctx context.Context, tests []parser.TestResult, cfg *conf
 	return outcomes, warnings
 }
 
-// rerunFailureWarning returns a multi-line warning message for a rerun command
-// that failed to execute, including framework-specific rerun_command examples.
+// rerunFailureWarning returns a warning message for a rerun command that
+// failed to execute.
 // This is a pure function — no I/O.
-func rerunFailureWarning(testName, rerunCmd string, fw runner.Framework) string {
+func rerunFailureWarning(testName, rerunCmd string) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "Rerun failed for %q (%s exited with error).\n", testName, rerunCmd)
-	sb.WriteString("  If your project uses pnpm, bun, or a non-standard setup, set rerun_command in quarantine.yml.\n")
-	sb.WriteString("  Examples:\n")
-	switch fw {
-	case runner.RSpec:
-		sb.WriteString("    rerun_command: \"bundle exec rspec -e '{name}'\"\n")
-		sb.WriteString("    rerun_command: \"bin/rspec -e '{name}'\"\n")
-		sb.WriteString("    rerun_command: \"bundle exec rspec --format progress -e '{name}'\"\n")
-	case runner.Vitest:
-		sb.WriteString("    rerun_command: \"pnpm exec vitest run --reporter=junit {file} -t '{name}'\"\n")
-		sb.WriteString("    rerun_command: \"bunx vitest run --reporter=junit {file} -t '{name}'\"\n")
-		sb.WriteString("    rerun_command: \"npx vitest run --reporter=junit --config vitest.ci.config.ts {file} -t '{name}'\"\n")
-	default: // Jest (and unknown frameworks)
-		sb.WriteString("    rerun_command: \"pnpm exec jest --testNamePattern '{name}'\"\n")
-		sb.WriteString("    rerun_command: \"bunx jest --testNamePattern '{name}'\"\n")
-		sb.WriteString("    rerun_command: \"npx jest --config jest.ci.config.js --testNamePattern '{name}'\"\n")
-	}
+	sb.WriteString("  Check that the rerun_command in your suite config is correct.\n")
 	return sb.String()
 }
 
@@ -1022,18 +674,6 @@ func mergeParseResults(attempts []parseAttempt) ([]parser.TestResult, []string) 
 	return allResults, warnings
 }
 
-// buildMetadata constructs result metadata from config and environment.
-func buildMetadata(cfg *config.Config) result.Metadata {
-	owner, repo := resolveOwnerRepo(cfg)
-	branch := getEnvOrGit("GITHUB_REF_NAME", "git", "rev-parse", "--abbrev-ref", "HEAD")
-	commitSHA := getEnvOrGit("GITHUB_SHA", "git", "rev-parse", "HEAD")
-	runID := os.Getenv("GITHUB_RUN_ID")
-	if runID == "" {
-		runID = fmt.Sprintf("local-%d", time.Now().UnixNano())
-	}
-	return assembleMetadata(owner, repo, branch, commitSHA, runID, cfg.Framework, cfg.Retries)
-}
-
 // assembleMetadata builds a Metadata struct from pre-resolved values.
 // This is a pure function — no I/O.
 func assembleMetadata(owner, repo, branch, commitSHA, runID, framework string, retries int) result.Metadata {
@@ -1071,27 +711,6 @@ func repoString(owner, repo string) string {
 	return owner + "/" + repo
 }
 
-// mergeExcludePatterns combines exclude patterns from the config file and
-// CLI --exclude flags into a single slice.
-// This is a pure function — no I/O.
-func mergeExcludePatterns(fromConfig, fromFlags []string) []string {
-	merged := make([]string, 0, len(fromConfig)+len(fromFlags))
-	merged = append(merged, fromConfig...)
-	merged = append(merged, fromFlags...)
-	return merged
-}
-
-// printDryRunSummary prints the dry-run summary to stderr listing each test
-// that would have been quarantined.
-func printDryRunSummary(cmd *cobra.Command, res result.Result) {
-	cmd.PrintErrf("[quarantine] DRY RUN — no changes written.\n")
-	for _, t := range res.Tests {
-		if t.Status == "flaky" {
-			cmd.PrintErrf("  Would quarantine: %s\n", t.Name)
-		}
-	}
-}
-
 // writeResults writes the result JSON to the given path, creating directories
 // as needed.
 func writeResults(res result.Result, path string) error {
@@ -1106,37 +725,6 @@ func writeResults(res result.Result, path string) error {
 	}
 
 	return os.WriteFile(path, data, 0644)
-}
-
-// configResolutionTrace returns verbose log lines describing how each config field
-// was resolved. This is a pure function — no I/O.
-//
-// Parameters:
-//   - cfg: config after ApplyDefaults and flag overrides have been applied
-//   - retriesFlag: value from --retries flag (0 = not set)
-//   - cfgRetries: cfg.Retries before ApplyDefaults (0 = not set in file)
-//   - junitxmlFlag: value from --junitxml flag ("" = not set)
-//   - cfgJUnitXML: cfg.JUnitXML before ApplyDefaults ("" = not set in file)
-func configResolutionTrace(cfg *config.Config, retriesFlag, cfgRetries int, junitxmlFlag, cfgJUnitXML string) []string {
-	retriesSource := "from default"
-	if retriesFlag != 0 {
-		retriesSource = "from cli flag"
-	} else if cfgRetries != 0 {
-		retriesSource = "from quarantine.yml"
-	}
-
-	junitxmlSource := "from default"
-	if junitxmlFlag != "" {
-		junitxmlSource = "from cli flag"
-	} else if cfgJUnitXML != "" {
-		junitxmlSource = "from quarantine.yml"
-	}
-
-	return []string{
-		fmt.Sprintf("[quarantine] config: framework=%s (from quarantine.yml)", cfg.Framework),
-		fmt.Sprintf("[quarantine] config: retries=%d (%s)", cfg.Retries, retriesSource),
-		fmt.Sprintf("[quarantine] config: junitxml=%s (%s)", cfg.JUnitXML, junitxmlSource),
-	}
 }
 
 // emitDegradedWarning prints a [quarantine] WARNING to stderr and, when running

@@ -4,86 +4,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mycargus/quarantine/cli/internal/config"
 	"github.com/mycargus/quarantine/cli/internal/parser"
 	qstate "github.com/mycargus/quarantine/cli/internal/quarantine"
 	"github.com/mycargus/quarantine/cli/internal/result"
-	"github.com/mycargus/quarantine/cli/internal/runner"
 	riteway "github.com/mycargus/riteway-golang"
 )
 
-func TestConfigResolutionTrace(t *testing.T) {
-	cfg := &config.Config{
-		Framework: "jest",
-		Retries:   3,
-		JUnitXML:  "junit.xml",
-	}
-
-	lines := configResolutionTrace(cfg, 0, 0, "", "")
-
-	riteway.Assert(t, riteway.Case[int]{
-		Given:    "jest config with all values at defaults",
-		Should:   "return 3 trace lines (no header line)",
-		Actual:   len(lines),
-		Expected: 3,
-	})
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "jest config with all values at defaults",
-		Should:   "include framework with quarantine.yml source",
-		Actual:   lines[0],
-		Expected: "[quarantine] config: framework=jest (from quarantine.yml)",
-	})
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "retries not set in config file or flag",
-		Should:   "report retries as default source",
-		Actual:   lines[1],
-		Expected: "[quarantine] config: retries=3 (from default)",
-	})
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "junitxml not set in config file or flag",
-		Should:   "report junitxml as default source",
-		Actual:   lines[2],
-		Expected: "[quarantine] config: junitxml=junit.xml (from default)",
-	})
-}
-
-func TestConfigResolutionTraceSourceAttribution(t *testing.T) {
-	cfg := &config.Config{
-		Framework: "rspec",
-		Retries:   5,
-		JUnitXML:  "override.xml",
-	}
-
-	// Both values came from the CLI flag.
-	linesFromFlag := configResolutionTrace(cfg, 5, 0, "override.xml", "")
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "retries set via --retries flag",
-		Should:   "report retries as cli flag source",
-		Actual:   linesFromFlag[1],
-		Expected: "[quarantine] config: retries=5 (from cli flag)",
-	})
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "junitxml set via --junitxml flag",
-		Should:   "report junitxml as cli flag source",
-		Actual:   linesFromFlag[2],
-		Expected: "[quarantine] config: junitxml=override.xml (from cli flag)",
-	})
-
-	// Both values came from the config file (not overridden by flag).
-	linesFromConfig := configResolutionTrace(cfg, 0, 5, "", "override.xml")
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "retries set in config file (not flag)",
-		Should:   "report retries as quarantine.yml source",
-		Actual:   linesFromConfig[1],
-		Expected: "[quarantine] config: retries=5 (from quarantine.yml)",
-	})
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "junitxml set in config file (not flag)",
-		Should:   "report junitxml as quarantine.yml source",
-		Actual:   linesFromConfig[2],
-		Expected: "[quarantine] config: junitxml=override.xml (from quarantine.yml)",
-	})
-}
 
 func TestMergeParseResults(t *testing.T) {
 	r1 := []parser.TestResult{{TestID: "a", Status: "passed"}}
@@ -344,7 +270,7 @@ func TestAddNewFlakyTestsUpdatesExistingEntry(t *testing.T) {
 		}},
 	}
 
-	changed := addNewFlakyTests(state, res, nil, nil)
+	changed := addNewFlakyTests(state, res, nil)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a flaky test already present in quarantine state",
@@ -370,70 +296,20 @@ func TestAddNewFlakyTestsUpdatesExistingEntry(t *testing.T) {
 	})
 }
 
-func TestRerunFailureWarningJest(t *testing.T) {
-	msg := rerunFailureWarning("should apply discount", "npx", runner.Jest)
+func TestRerunFailureWarning(t *testing.T) {
+	msg := rerunFailureWarning("should apply discount", "npx")
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a Jest rerun command that fails to execute",
+		Given:    "a rerun command that fails to execute",
 		Should:   "include the test name in the warning",
 		Actual:   strings.Contains(msg, `"should apply discount"`),
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a Jest rerun command that fails to execute",
+		Given:    "a rerun command that fails to execute",
 		Should:   "include the rerun command in the warning",
 		Actual:   strings.Contains(msg, "npx exited with error"),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a Jest rerun command that fails to execute",
-		Should:   "include pnpm example with testNamePattern",
-		Actual:   strings.Contains(msg, "pnpm exec jest --testNamePattern '{name}'"),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a Jest rerun command that fails to execute",
-		Should:   "include bun example with testNamePattern",
-		Actual:   strings.Contains(msg, "bunx jest --testNamePattern '{name}'"),
-		Expected: true,
-	})
-}
-
-func TestRerunFailureWarningRSpec(t *testing.T) {
-	msg := rerunFailureWarning("should process payment", "bundle", runner.RSpec)
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "an RSpec rerun command that fails to execute",
-		Should:   "include the test name in the warning",
-		Actual:   strings.Contains(msg, `"should process payment"`),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "an RSpec rerun command that fails to execute",
-		Should:   "include rspec -e example",
-		Actual:   strings.Contains(msg, "rspec -e '{name}'"),
-		Expected: true,
-	})
-}
-
-func TestRerunFailureWarningVitest(t *testing.T) {
-	msg := rerunFailureWarning("renders correctly", "npx", runner.Vitest)
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a Vitest rerun command that fails to execute",
-		Should:   "include the test name in the warning",
-		Actual:   strings.Contains(msg, `"renders correctly"`),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a Vitest rerun command that fails to execute",
-		Should:   "include pnpm vitest example",
-		Actual:   strings.Contains(msg, "pnpm exec vitest run"),
 		Expected: true,
 	})
 }
