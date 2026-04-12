@@ -25,6 +25,11 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	errs, warns := cfg.Validate()
 
+	// Validate test_suites when present.
+	if len(cfg.TestSuites) > 0 {
+		errs = append(errs, config.ValidateSuites(cfg.TestSuites)...)
+	}
+
 	// Check for GitHub token — append warning if missing.
 	if ghclient.ResolveToken() == "" {
 		warns = append(warns, "No GitHub token found in environment. 'quarantine run' will fail unless QUARANTINE_GITHUB_TOKEN or GITHUB_TOKEN is set.")

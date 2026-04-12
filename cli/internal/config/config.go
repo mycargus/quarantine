@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -22,6 +23,7 @@ type Config struct {
 	Storage       StorageConfig  `yaml:"storage,omitempty"`
 	Exclude       []string       `yaml:"exclude,omitempty"`
 	RerunCommand  string         `yaml:"rerun_command,omitempty"`
+	TestSuites    []TestSuite    `yaml:"test_suites,omitempty"`
 
 	// unknownTopLevel holds any top-level keys not in the known schema.
 	// Populated by Parse; consumed by Validate to emit warnings.
@@ -34,6 +36,23 @@ type Config struct {
 	// unknownStorage holds any keys under `storage` not in the known schema.
 	// Populated by Parse; consumed by Validate to emit errors.
 	unknownStorage []string
+}
+
+// TestSuite represents a single test suite entry in the test_suites array.
+// The Command field uses a raw yaml.Node so we can detect whether the YAML
+// author wrote it as a string (invalid) or as a sequence (valid).
+type TestSuite struct {
+	Name         string    `yaml:"name"`
+	CommandNode  yaml.Node `yaml:"command"`
+	JUnitXML     string    `yaml:"junitxml"`
+	RerunCommand []string  `yaml:"rerun_command,omitempty"`
+	Retries      int       `yaml:"retries,omitempty"`
+}
+
+// CommandIsString reports whether the suite's command was provided as a YAML
+// scalar (string) rather than a sequence (array).
+func (s *TestSuite) CommandIsString() bool {
+	return s.CommandNode.Kind == yaml.ScalarNode
 }
 
 // GitHubConfig holds repository identification settings.
@@ -72,6 +91,7 @@ var knownTopLevelKeys = map[string]bool{
 	"storage":       true,
 	"exclude":       true,
 	"rerun_command": true,
+	"test_suites":   true,
 }
 
 // knownNotificationKeys is the full set of keys under `notifications` in the v1 schema.
@@ -268,4 +288,79 @@ func (c *Config) Validate() (errs []string, warns []string) {
 	}
 
 	return errs, warns
+}
+
+// ValidateSuiteName reports a non-nil error when the suite name does not match
+// the required pattern [a-z0-9][a-z0-9-]* (max 30 chars).
+// This is a pure function — no I/O.
+func ValidateSuiteName(name string) error {
+	if name == "" || len(name) > 30 {
+		return fmt.Errorf("name must match [a-z0-9][a-z0-9-]* (max 30 chars)")
+	}
+	for i, ch := range name {
+		switch {
+		case ch >= 'a' && ch <= 'z':
+			// valid in all positions
+		case ch >= '0' && ch <= '9':
+			// valid in all positions
+		case ch == '-' && i > 0:
+			// valid after the first character
+		default:
+			return fmt.Errorf("name must match [a-z0-9][a-z0-9-]* (max 30 chars)")
+		}
+	}
+	return nil
+}
+
+// ValidateSuiteCommand returns a non-nil error when the suite's command field
+// was given as a YAML scalar (string) rather than a sequence (array).
+// This is a pure function — no I/O.
+func ValidateSuiteCommand(suite *TestSuite) error {
+	if suite.CommandIsString() {
+		parts := strings.Fields(suite.CommandNode.Value)
+		quoted := make([]string, len(parts))
+		for i, p := range parts {
+			quoted[i] = fmt.Sprintf("%q", p)
+		}
+		return fmt.Errorf(
+			"command must be a YAML array, not a string. Use: command: [%s]",
+			strings.Join(quoted, ", "),
+		)
+	}
+	return nil
+}
+
+// ValidateSuiteJUnitXML returns a non-nil error when the suite's junitxml
+// field is absent or empty.
+// This is a pure function — no I/O.
+func ValidateSuiteJUnitXML(junitxml string) error {
+	if junitxml == "" {
+		return fmt.Errorf("junitxml is required")
+	}
+	return nil
+}
+
+// ValidateSuites collects all validation errors across every suite entry in
+// the config. Each error message is prefixed with the suite name so the caller
+// can display them without further formatting.
+// This is a pure function — no I/O.
+func ValidateSuites(suites []TestSuite) []string {
+	var errs []string
+	for i := range suites {
+		s := &suites[i]
+		prefix := fmt.Sprintf("suite %q", s.Name)
+
+		if err := ValidateSuiteName(s.Name); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %s", prefix, err))
+		}
+
+		if err := ValidateSuiteCommand(s); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %s", prefix, err))
+		}
+
+		if err := ValidateSuiteJUnitXML(s.JUnitXML); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %s", prefix, err))
+		}
+	}
+	return errs
 }
