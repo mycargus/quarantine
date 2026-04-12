@@ -55,6 +55,19 @@ func (s *TestSuite) CommandIsString() bool {
 	return s.CommandNode.Kind == yaml.ScalarNode
 }
 
+// Commands returns the suite's command as a string slice. Returns nil if the
+// command was not provided as a YAML sequence. This is a pure function — no I/O.
+func (s *TestSuite) Commands() []string {
+	if s.CommandNode.Kind != yaml.SequenceNode {
+		return nil
+	}
+	result := make([]string, 0, len(s.CommandNode.Content))
+	for _, node := range s.CommandNode.Content {
+		result = append(result, node.Value)
+	}
+	return result
+}
+
 // GitHubConfig holds repository identification settings.
 type GitHubConfig struct {
 	Owner string `yaml:"owner,omitempty"`

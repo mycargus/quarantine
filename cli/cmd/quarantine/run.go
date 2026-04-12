@@ -29,6 +29,24 @@ const separatorErrorMsg = "Error: missing '--' separator. Usage: quarantine run 
 
 // runRun implements the `quarantine run` command logic.
 func runRun(cmd *cobra.Command, args []string) error {
+	configPath, _ := cmd.Flags().GetString("config")
+	cfg, cfgErr := config.Load(configPath)
+
+	// Suite mode: config has test_suites. The -- separator is not used.
+	if cfgErr == nil && len(cfg.TestSuites) > 0 {
+		if cmd.ArgsLenAtDash() != -1 {
+			cmd.PrintErrln("Error: the -- separator is not used with suite configs. Usage: quarantine run <suite-name>")
+			return exitCodeError(2)
+		}
+		return runSuiteMode(cmd, args, cfg)
+	}
+
+	// Legacy mode: config has framework (quarantine.yml format). Requires --.
+	if cfgErr != nil {
+		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
+		return fmt.Errorf("not initialized")
+	}
+
 	// Check for -- separator.
 	if cmd.ArgsLenAtDash() == -1 {
 		cmd.PrintErrln(separatorErrorMsg)
@@ -60,13 +78,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 			cmd.PrintErrf("[quarantine] total time: %dms\n", time.Since(runStart).Milliseconds())
 		}
 	}()
-
-	configPath, _ := cmd.Flags().GetString("config")
-	cfg, err := config.Load(configPath)
-	if err != nil {
-		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
-		return fmt.Errorf("not initialized")
-	}
 
 	// Snapshot pre-defaults values for verbose source attribution.
 	cfgRetries := cfg.Retries
@@ -340,6 +351,192 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// runSuiteMode handles `quarantine run <suite-name>` when the config contains test_suites.
+// It selects the named suite, executes its command unmodified via exec.Command, parses
+// the suite's JUnit XML output, and exits 0 on success.
+func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
+	if len(args) == 0 {
+		cmd.PrintErrln("Error: missing suite name. Usage: quarantine run <suite-name>")
+		return exitCodeError(2)
+	}
+
+	suiteName := args[0]
+	suite, err := findSuite(cfg.TestSuites, suiteName)
+	if err != nil {
+		cmd.PrintErrf("Error: %v\n", err)
+		return exitCodeError(2)
+	}
+
+	suiteCmd := suite.Commands()
+	if len(suiteCmd) == 0 {
+		cmd.PrintErrf("Error: suite %q has no executable command\n", suiteName)
+		return exitCodeError(2)
+	}
+
+	// Check quarantine/state branch exists.
+	cfg.ApplyDefaults()
+	check, checkErr := checkBranchExists(cfg)
+	if checkErr != nil {
+		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
+		return checkErr
+	}
+	if check.warnMsg != "" {
+		cmd.PrintErrf("[quarantine] WARNING: %s\n", check.warnMsg)
+	}
+	if !check.skipped && check.apiErr == nil && !check.exists {
+		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
+		return fmt.Errorf("not initialized")
+	}
+
+	ctx := context.Background()
+
+	// Create a shared GitHub client.
+	var ghClient *gh.Client
+	if owner, repo := resolveOwnerRepo(cfg); owner != "" && repo != "" {
+		if c, clientErr := gh.NewClient(owner, repo); clientErr == nil {
+			c.SetRateLimitWarningFunc(func(msg string) { cmd.PrintErrln(msg) })
+			ghClient = c
+		} else {
+			reason := fmt.Sprintf("%v", clientErr)
+			if strings.Contains(reason, "no GitHub token") {
+				reason = "No GitHub token found. Running in degraded mode."
+			}
+			emitDegradedWarning(cmd, reason)
+		}
+	}
+
+	// Load quarantine state.
+	qState, qStateContent, qStateSHA := loadQuarantineState(ctx, cmd, cfg, ghClient)
+
+	// Batch-check closed issues and remove unquarantined tests.
+	var removedEntries []qstate.Entry
+	if qState != nil {
+		removedEntries = removeUnquarantinedTests(ctx, cmd, cfg, qState, ghClient)
+	}
+	removedTestIDs := make([]string, len(removedEntries))
+	for i, e := range removedEntries {
+		removedTestIDs[i] = e.TestID
+	}
+
+	// Execute suite command unmodified via exec.Command.
+	quiet, _ := cmd.Flags().GetBool("quiet")
+	if !quiet {
+		cmd.PrintErrf("[quarantine] Running: %s\n", strings.Join(suiteCmd, " "))
+	}
+	exitCode, runErr := runner.Run(ctx, suiteCmd[0], suiteCmd[1:], os.Stdout, os.Stderr)
+	if runErr != nil {
+		cmd.PrintErrf("[quarantine] WARNING: Failed to execute test command: %v\n", runErr)
+		return fmt.Errorf("test command execution failed")
+	}
+
+	// Parse JUnit XML using the suite's junitxml path.
+	testResults, parseWarnings := parseJUnitXML(suite.JUnitXML)
+	for _, w := range parseWarnings {
+		cmd.PrintErrf("[quarantine] WARNING: %s\n", w)
+	}
+
+	if testResults == nil {
+		if exitCode != 0 {
+			cmd.PrintErrf("[quarantine] WARNING: No JUnit XML found at '%s'. Cannot determine test results.\n", suite.JUnitXML)
+			return exitCodeError(exitCode)
+		}
+		cmd.PrintErrf("[quarantine] WARNING: No JUnit XML found at '%s'. Cannot determine test results.\n", suite.JUnitXML)
+		return nil
+	}
+
+	// Collect exclude patterns.
+	excludeFlag, _ := cmd.Flags().GetStringArray("exclude")
+	excludePatterns := mergeExcludePatterns(cfg.Exclude, excludeFlag)
+
+	// Determine retries: suite-level > config-level > default.
+	retries := suite.Retries
+	if retries == 0 {
+		retries = cfg.Retries
+	}
+	if retries == 0 {
+		retries = 3
+	}
+
+	// Build a config-like view for retryFailingTests (reuses existing retry logic).
+	retryCfg := &config.Config{
+		Retries:      retries,
+		RerunCommand: strings.Join(suite.RerunCommand, " "),
+	}
+
+	retryOutcomes, retryWarnings := retryFailingTests(ctx, testResults, retryCfg, excludePatterns)
+	for _, w := range retryWarnings {
+		cmd.PrintErrf("[quarantine] WARNING: %s", w)
+	}
+
+	// Build results using the suite name.
+	meta := assembleSuiteMetadata(cfg, suiteName, retries)
+	res := result.BuildWithRetries(testResults, retryOutcomes, meta)
+
+	// Skip PR scope checks (will be wired in a later scenario).
+	skipReasons := map[string]string{}
+
+	// Write quarantine state.
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	if qState != nil && !dryRun {
+		flakyAdded := addNewFlakyTests(qState, res, excludePatterns, skipReasons)
+		stateChanged := flakyAdded || len(removedTestIDs) > 0
+		if stateChanged {
+			writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA, ghClient, removedTestIDs)
+		}
+	}
+
+	// Create GitHub issues.
+	if !dryRun && ghClient != nil {
+		prFlag, _ := cmd.Flags().GetInt("pr")
+		eventPath := os.Getenv("GITHUB_EVENT_PATH")
+		prNumber, _ := detectPRNumber(prFlag, eventPath)
+		branch := meta.Branch
+		commitSHA := meta.CommitSHA
+		issueRefs := createIssuesForNewFlakyTests(ctx, cmd, ghClient, res, excludePatterns, branch, commitSHA, prNumber, skipReasons)
+		backfillIssueNumbers(res.Tests, issueRefs)
+	}
+
+	// Write results.json.
+	outputPath, _ := cmd.Flags().GetString("output")
+	if err := writeResults(res, outputPath); err != nil {
+		cmd.PrintErrf("[quarantine] WARNING: Failed to write results: %v\n", err)
+	} else if !quiet {
+		cmd.PrintErrf("[quarantine] Results written to %s\n", outputPath)
+	}
+
+	// Print summary.
+	if !quiet {
+		cmd.PrintErrf("\n[quarantine] Results:\n")
+		cmd.PrintErrf("  Total:        %d\n", res.Summary.Total)
+		cmd.PrintErrf("  Passed:       %d\n", res.Summary.Passed)
+		cmd.PrintErrf("  Failed:       %d\n", res.Summary.Failed)
+		cmd.PrintErrf("  Skipped:      %d\n", res.Summary.Skipped)
+		cmd.PrintErrf("  Flaky:        %d\n", res.Summary.FlakyDetected)
+		cmd.PrintErrf("  Quarantined:  %d\n", res.Summary.Quarantined)
+	}
+
+	if res.Summary.Failed > 0 {
+		return exitCodeError(1)
+	}
+	if exitCode != 0 && len(testResults) == 0 {
+		return exitCodeError(exitCode)
+	}
+
+	return nil
+}
+
+// assembleSuiteMetadata builds result metadata for a named suite run.
+func assembleSuiteMetadata(cfg *config.Config, suiteName string, retries int) result.Metadata {
+	owner, repo := resolveOwnerRepo(cfg)
+	branch := getEnvOrGit("GITHUB_REF_NAME", "git", "rev-parse", "--abbrev-ref", "HEAD")
+	commitSHA := getEnvOrGit("GITHUB_SHA", "git", "rev-parse", "HEAD")
+	runID := os.Getenv("GITHUB_RUN_ID")
+	if runID == "" {
+		runID = fmt.Sprintf("local-%d", time.Now().UnixNano())
+	}
+	return assembleMetadata(owner, repo, branch, commitSHA, runID, suiteName, retries)
 }
 
 // loadQuarantineState reads the quarantine.json file from the quarantine/state branch.
@@ -902,4 +1099,30 @@ func degradedMsg(err error) string {
 func isTimeoutError(err error) bool {
 	var netErr net.Error
 	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+// findSuite returns the suite with the given name from the suites slice.
+// Returns an error if no suite with that name is found.
+// This is a pure function — no I/O.
+func findSuite(suites []config.TestSuite, name string) (config.TestSuite, error) {
+	for _, s := range suites {
+		if s.Name == name {
+			return s, nil
+		}
+	}
+	return config.TestSuite{}, fmt.Errorf("suite %q not found; available suites: %s",
+		name, suitesString(suites))
+}
+
+// suitesString returns a comma-separated list of suite names for error messages.
+// This is a pure function — no I/O.
+func suitesString(suites []config.TestSuite) string {
+	if len(suites) == 0 {
+		return "(none)"
+	}
+	names := make([]string, len(suites))
+	for i, s := range suites {
+		names[i] = s.Name
+	}
+	return strings.Join(names, ", ")
 }

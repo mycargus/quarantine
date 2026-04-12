@@ -24,6 +24,67 @@ func parseSuiteYAML(t *testing.T, yamlContent string) config.TestSuite {
 	return cfg.TestSuites[0]
 }
 
+// --- TestSuite.Commands() unit tests ---
+
+func TestCommandsValidSequence(t *testing.T) {
+	suite := parseSuiteYAML(t, `
+version: 1
+test_suites:
+  - name: backend
+    command: ["bundle", "exec", "rspec"]
+    junitxml: "rspec.xml"
+`)
+
+	cmds := suite.Commands()
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a suite with command as a YAML sequence",
+		Should:   "return a slice with 3 elements",
+		Actual:   len(cmds),
+		Expected: 3,
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a suite with command [\"bundle\", \"exec\", \"rspec\"]",
+		Should:   "return 'bundle' as first element",
+		Actual:   cmds[0],
+		Expected: "bundle",
+	})
+}
+
+func TestCommandsStringReturnsNil(t *testing.T) {
+	suite := parseSuiteYAML(t, `
+version: 1
+test_suites:
+  - name: backend
+    command: "bundle exec rspec"
+    junitxml: "rspec.xml"
+`)
+
+	cmds := suite.Commands()
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a suite with command as a YAML string (invalid)",
+		Should:   "return nil (not a sequence)",
+		Actual:   cmds == nil,
+		Expected: true,
+	})
+}
+
+func TestCommandsZeroValueReturnsNil(t *testing.T) {
+	// A zero-value TestSuite has no CommandNode set.
+	suite := config.TestSuite{}
+
+	cmds := suite.Commands()
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a zero-value TestSuite with no command set",
+		Should:   "return nil",
+		Actual:   cmds == nil,
+		Expected: true,
+	})
+}
+
 // --- ValidateSuiteName ---
 
 func TestValidateSuiteNameValidLowercase(t *testing.T) {
