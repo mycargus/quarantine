@@ -423,6 +423,43 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		removedTestIDs[i] = e.TestID
 	}
 
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+	// In --dry-run mode, skip command execution and read existing JUnit XML directly.
+	// This lets developers analyze results without re-running tests.
+	if dryRun {
+		testResults, parseWarnings := parseJUnitXML(suite.JUnitXML)
+		for _, w := range parseWarnings {
+			cmd.PrintErrf("[quarantine] WARNING: %s\n", w)
+		}
+		if testResults == nil {
+			cmd.PrintErrf("[quarantine] WARNING: No JUnit XML found at '%s'. Cannot determine test results.\n", suite.JUnitXML)
+			return nil
+		}
+		// Print dry-run analysis and exit without writing anything.
+		cmd.PrintErrf("[quarantine] DRY RUN — reading existing JUnit XML at '%s'.\n", suite.JUnitXML)
+		quarantinedCount := 0
+		if qState != nil {
+			quarantinedCount = len(qState.Tests)
+		}
+		nonQuarantinedFailures := 0
+		quarantinedFailures := 0
+		for _, tr := range testResults {
+			if tr.FailureMessage != nil {
+				if qState != nil && qState.Tests[tr.TestID].TestID != "" {
+					quarantinedFailures++
+				} else {
+					nonQuarantinedFailures++
+				}
+			}
+		}
+		cmd.PrintErrf("[quarantine] DRY RUN analysis:\n")
+		cmd.PrintErrf("  Quarantined tests in state: %d\n", quarantinedCount)
+		cmd.PrintErrf("  Failures in XML (non-quarantined): %d\n", nonQuarantinedFailures)
+		cmd.PrintErrf("  Failures in XML (quarantined): %d\n", quarantinedFailures)
+		return nil
+	}
+
 	// Execute suite command unmodified via exec.Command.
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	if !quiet {
@@ -489,7 +526,6 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 	skipReasons := map[string]string{}
 
 	// Write quarantine state.
-	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	if qState != nil && !dryRun {
 		flakyAdded := addNewFlakyTests(qState, res, excludePatterns, skipReasons)
 		stateChanged := flakyAdded || len(removedTestIDs) > 0
@@ -512,14 +548,20 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		if prNumber > 0 {
 			suiteMarker := suitePRCommentMarker(suiteName)
 			flakyWithIssue, flakyNewToPR := buildFlakyEntries(res, issueRefs, skipReasons)
+			// Use the quarantined count from state (not results summary) because suite mode
+			// excludes quarantined tests from the command entirely — they never appear in XML.
+			quarantinedStateCount := 0
+			if qState != nil {
+				quarantinedStateCount = len(qState.Tests)
+			}
 			commentData := PRCommentData{
-				Total:       res.Summary.Total,
-				Passed:      res.Summary.Passed,
-				Failed:      res.Summary.Failed,
-				Flaky:       res.Summary.FlakyDetected,
-				Quarantined: res.Summary.Quarantined,
-				Version:     version,
-				NewlyFlaky:  flakyWithIssue,
+				Total:        res.Summary.Total,
+				Passed:       res.Summary.Passed,
+				Failed:       res.Summary.Failed,
+				Flaky:        res.Summary.FlakyDetected,
+				Quarantined:  quarantinedStateCount,
+				Version:      version,
+				NewlyFlaky:   flakyWithIssue,
 				NewToPRFlaky: flakyNewToPR,
 			}
 			commentBody := renderPRComment(commentData, suiteMarker)
