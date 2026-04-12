@@ -35,10 +35,8 @@ exit 0
 		t.Fatal(err)
 	}
 
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-`)
+	xmlPath := filepath.Join(dir, "junit.xml")
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
 
 	server := fakeGitHubAPI(t, true)
 	defer server.Close()
@@ -47,11 +45,9 @@ framework: jest
 	binary := buildTestBinary(t)
 	cmd := exec.Command(binary,
 		"run",
-		"--config", configPath,
-		"--junitxml", filepath.Join(dir, "junit.xml"),
-		"--output", filepath.Join(dir, "results.json"),
-		"--", scriptPath,
+		"unit",
 	)
+	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
 		"QUARANTINE_GITHUB_TOKEN=ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL="+server.URL,

@@ -16,11 +16,7 @@ import (
 	"github.com/mycargus/quarantine/cli/internal/quarantine"
 )
 
-// fakeWarningsGitHubAPI creates a test server with configurable search response and PUT behavior.
-// searchTotalCount controls the total_count returned by search (for truncation testing).
-// searchItems is the list of closed issue numbers to return.
-// putStatusCode controls the HTTP status returned by PUT /contents/quarantine.json.
-// rateLimitRemaining/rateLimitTotal, if non-zero, are added to all response headers.
+// fakeWarningsGitHubAPI creates a test server with configurable responses.
 func fakeWarningsGitHubAPI(
 	t *testing.T,
 	qs *quarantine.State,
@@ -52,7 +48,7 @@ func fakeWarningsGitHubAPI(
 		case strings.Contains(r.URL.Path, "/git/ref/heads/quarantine/state"):
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc123","type":"commit"}}`)
 
-		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/"):
 			if len(stateContent) == 0 {
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -77,7 +73,7 @@ func fakeWarningsGitHubAPI(
 				"items":       items,
 			})
 
-		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(putStatusCode)
 
 		default:
@@ -91,7 +87,6 @@ func fakeWarningsGitHubAPI(
 func TestRunSearchTruncatedEmitsWarning(t *testing.T) {
 	dir := t.TempDir()
 
-	// Quarantine state: one test with issue #1 (in the top 1000).
 	qs := quarantine.NewEmptyState()
 	entry := quarantine.Entry{
 		TestID:   "src/foo.test.js::Foo::passes",
@@ -114,13 +109,9 @@ func TestRunSearchTruncatedEmitsWarning(t *testing.T) {
 		t.Fatalf("write xml: %v", err)
 	}
 	scriptPath := writeTestScript(t, dir, "", "", 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-`)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
-	// Search returns 1000 items but total_count is 2000 (truncated).
-	// Build 1000 closed issue numbers.
 	closedItems := make([]int, 1000)
 	for i := range closedItems {
 		closedItems[i] = i + 1
@@ -128,12 +119,8 @@ framework: jest
 	server := fakeWarningsGitHubAPI(t, qs, closedItems, 2000, http.StatusOK, 0, 0)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
 	output, err := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
@@ -166,36 +153,22 @@ framework: jest
 func TestRunRateLimitLowEmitsWarningAndContinues(t *testing.T) {
 	dir := t.TempDir()
 
-	// Empty quarantine state — no tests to quarantine.
 	qs := quarantine.NewEmptyState()
-
-	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="1" failures="0">
-  <testsuite name="suite" tests="1" failures="0">
-    <testcase classname="S" name="passes" time="0.1"/>
-  </testsuite>
-</testsuites>`
+	junitXML := passingJUnitXML
 
 	xmlPath := filepath.Join(dir, "junit.xml")
 	if err := os.WriteFile(xmlPath, []byte(junitXML), 0644); err != nil {
 		t.Fatalf("write xml: %v", err)
 	}
 	scriptPath := writeTestScript(t, dir, "", "", 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-`)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
-	// Fake API returns rate limit headers: 50 remaining out of 1000 (5% — below threshold).
 	server := fakeWarningsGitHubAPI(t, qs, []int{}, 0, http.StatusOK, 50, 1000)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
 	output, err := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
@@ -228,10 +201,8 @@ framework: jest
 func TestRunSizeLimitExceededEmitsWarningAndExits0(t *testing.T) {
 	dir := t.TempDir()
 
-	// Start with empty quarantine state — new flaky test will be detected this run.
 	qs := quarantine.NewEmptyState()
 
-	// JUnit XML: one test fails initially, passes on retry → flaky.
 	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites tests="1" failures="1">
   <testsuite name="src/payment.test.js" tests="1" failures="1">
@@ -248,45 +219,35 @@ func TestRunSizeLimitExceededEmitsWarningAndExits0(t *testing.T) {
 		t.Fatalf("write rerun script: %v", err)
 	}
 	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 1)
+	writeSuiteConfigWithRerunScript(t, dir, xmlPath, scriptPath, rerunScriptPath)
+	chdirTest(t, dir)
 
-	configPath := writeTempConfig(t, fmt.Sprintf(`
-version: 1
-framework: jest
-retries: 1
-rerun_command: %s
-`, rerunScriptPath))
-
-	// PUT returns 422 (size limit exceeded).
 	server := fakeWarningsGitHubAPI(t, qs, []int{}, 0, http.StatusUnprocessableEntity, 0, 0)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
 	output, err := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "PUT quarantine.json returns 422 (file exceeds 1 MB GitHub limit)",
+		Given:    "PUT quarantine state returns 422 (file exceeds 1 MB GitHub limit)",
 		Should:   "exit with code 0 (size limit is a warning, not fatal)",
 		Actual:   err == nil,
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "PUT quarantine.json returns 422",
+		Given:    "PUT quarantine state returns 422",
 		Should:   "log warning mentioning 1 MB limit",
 		Actual:   strings.Contains(output, "1 MB"),
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "PUT quarantine.json returns 422",
+		Given:    "PUT quarantine state returns 422",
 		Should:   "log warning mentioning skipping state update",
 		Actual:   strings.Contains(output, "Skipping state update"),
 		Expected: true,
@@ -298,10 +259,8 @@ rerun_command: %s
 func TestRunCASExhaustionEmitsWarningAndExits0(t *testing.T) {
 	dir := t.TempDir()
 
-	// Start with empty quarantine state — new flaky test will be detected.
 	qs := quarantine.NewEmptyState()
 
-	// JUnit XML: one test fails initially, passes on retry → flaky.
 	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites tests="1" failures="1">
   <testsuite name="src/payment.test.js" tests="1" failures="1">
@@ -318,21 +277,15 @@ func TestRunCASExhaustionEmitsWarningAndExits0(t *testing.T) {
 		t.Fatalf("write rerun script: %v", err)
 	}
 	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 1)
+	writeSuiteConfigWithRerunScript(t, dir, xmlPath, scriptPath, rerunScriptPath)
+	chdirTest(t, dir)
 
-	configPath := writeTempConfig(t, fmt.Sprintf(`
-version: 1
-framework: jest
-retries: 1
-rerun_command: %s
-`, rerunScriptPath))
-
-	// Fake API: all PUTs return 409 (CAS exhaustion), GET returns empty state.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case strings.Contains(r.URL.Path, "/git/ref/heads/quarantine/state"):
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc123","type":"commit"}}`)
-		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/"):
 			if len(qs.Tests) == 0 {
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -348,7 +301,7 @@ rerun_command: %s
 				"total_count": 0,
 				"items":       []interface{}{},
 			})
-		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/"):
 			// Always 409 — forces CAS exhaustion.
 			w.WriteHeader(http.StatusConflict)
 		default:
@@ -357,12 +310,8 @@ rerun_command: %s
 	}))
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
 	output, err := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,

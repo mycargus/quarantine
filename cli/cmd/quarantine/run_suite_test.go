@@ -56,6 +56,9 @@ func TestRunExecutesSuiteCommandUnmodified(t *testing.T) {
 	}
 	configPath := filepath.Join(suiteConfigDir, "config.yml")
 	configContent := `version: 1
+github:
+  owner: testowner
+  repo: testrepo
 test_suites:
   - name: backend
     command: ["` + fakeBin + `"]
@@ -66,14 +69,13 @@ test_suites:
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+	chdirTest(t, dir)
 
 	server := fakeGitHubAPI(t, true)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "backend", "results.json")
 	_, err := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--output", resultsPath,
 		"backend",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
@@ -142,6 +144,9 @@ func TestRunSuiteMissingNameExitstwo(t *testing.T) {
 	configPath := filepath.Join(suiteConfigDir, "config.yml")
 	// Two suites: no suite name arg → ambiguous → exit 2 (Scenario 119).
 	configContent := `version: 1
+github:
+  owner: testowner
+  repo: testrepo
 test_suites:
   - name: backend
     command: ["bundle", "exec", "rspec"]
@@ -153,9 +158,9 @@ test_suites:
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+	chdirTest(t, dir)
 
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
@@ -179,6 +184,9 @@ func TestRunSuiteUnknownNameExitsTwo(t *testing.T) {
 	}
 	configPath := filepath.Join(suiteConfigDir, "config.yml")
 	configContent := `version: 1
+github:
+  owner: testowner
+  repo: testrepo
 test_suites:
   - name: backend
     command: ["bundle", "exec", "rspec"]
@@ -187,9 +195,9 @@ test_suites:
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+	chdirTest(t, dir)
 
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
 		"frontend",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
@@ -214,6 +222,9 @@ func TestRunRejectsDashDashSeparatorInSuiteMode(t *testing.T) {
 	}
 	configPath := filepath.Join(suiteConfigDir, "config.yml")
 	configContent := `version: 1
+github:
+  owner: testowner
+  repo: testrepo
 test_suites:
   - name: backend
     command: ["bundle", "exec", "rspec", "--format", "progress"]
@@ -223,9 +234,9 @@ test_suites:
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+	chdirTest(t, dir)
 
 	output, err := executeRunCmd(t, []string{
-		"--config", configPath,
 		"--", "bundle", "exec", "rspec",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",

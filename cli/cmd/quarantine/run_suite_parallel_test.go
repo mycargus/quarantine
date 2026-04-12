@@ -85,6 +85,9 @@ func buildFlakySuiteConfig(
 	}
 	configPath := filepath.Join(suiteConfigDir, "config.yml")
 	configContent := fmt.Sprintf(`version: 1
+github:
+  owner: testowner
+  repo: testrepo
 test_suites:
   - name: backend
     command: ["%s"]
@@ -101,6 +104,7 @@ test_suites:
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config.yml: %v", err)
 	}
+	chdirTest(t, dir)
 	return configPath
 }
 
@@ -151,26 +155,21 @@ func TestRunParallelSuitesUseSeparateStatePaths(t *testing.T) {
 	backendBin := buildFlakySuiteCommand(t, dir, "backend", backendXML)
 	frontendBin := buildFlakySuiteCommand(t, dir, "frontend", frontendXML)
 
-	configPath := buildFlakySuiteConfig(t, dir, backendBin, backendXML, frontendBin, frontendXML)
+	buildFlakySuiteConfig(t, dir, backendBin, backendXML, frontendBin, frontendXML)
+	chdirTest(t, dir)
 
 	var backendPutCalled, frontendPutCalled int32
 	server := fakeTwoSuiteAPI(t, &backendPutCalled, &frontendPutCalled)
 	defer server.Close()
 
-	backendResultsPath := filepath.Join(dir, "backend-results.json")
 	_, backendErr := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--output", backendResultsPath,
 		"backend",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
 	})
 
-	frontendResultsPath := filepath.Join(dir, "frontend-results.json")
 	_, frontendErr := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--output", frontendResultsPath,
 		"frontend",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",

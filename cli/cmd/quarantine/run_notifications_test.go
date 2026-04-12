@@ -113,19 +113,19 @@ func TestRenderPRComment(t *testing.T) {
 			},
 		},
 	}
-	comment := renderPRComment(data, PRCommentMarker)
+	comment := renderPRComment(data, suitePRCommentMarker("test"))
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "PR comment rendered",
-		Should:   "start with <!-- quarantine-bot --> on the first line",
-		Actual:   strings.HasPrefix(comment, "<!-- quarantine-bot -->"),
+		Should:   "start with the suite marker on the first line",
+		Actual:   strings.HasPrefix(comment, suitePRCommentMarker("test")),
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "PR comment rendered with one newly flaky test",
-		Should:   "contain the quarantine-bot marker",
-		Actual:   strings.Contains(comment, "<!-- quarantine-bot -->"),
+		Should:   "contain the suite marker",
+		Actual:   strings.Contains(comment, suitePRCommentMarker("test")),
 		Expected: true,
 	})
 

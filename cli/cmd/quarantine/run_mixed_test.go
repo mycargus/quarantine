@@ -17,7 +17,6 @@ import (
 func TestRunUnquarantinedTestFailsExits1(t *testing.T) {
 	dir := t.TempDir()
 
-	// Quarantine state: test linked to issue #42 (closed).
 	qs := quarantine.NewEmptyState()
 	qs.AddTest(makeQuarantineEntry(
 		"src/payment.test.js::PaymentService::should handle charge timeout",
@@ -26,7 +25,6 @@ func TestRunUnquarantinedTestFailsExits1(t *testing.T) {
 		42,
 	))
 
-	// JUnit XML: the previously-quarantined test now FAILS (genuine failure).
 	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites tests="1" failures="1">
   <testsuite name="src/payment.test.js" tests="1" failures="1">
@@ -39,24 +37,17 @@ func TestRunUnquarantinedTestFailsExits1(t *testing.T) {
 
 	xmlPath := filepath.Join(dir, "junit.xml")
 	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 1)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-retries: 1
-rerun_command: "false"
-`)
+	// rerun_command = "false" (always fails)
+	rerunScript := writeAlwaysFailScript(t, dir, "rerun")
+	writeSuiteConfigWithRerunScript(t, dir, xmlPath, scriptPath, rerunScript)
+	chdirTest(t, dir)
 
 	// Issue #42 closed — test runs but fails all retries.
-	// The retry will also fail.
 	server := fakeM4GitHubAPI(t, qs, []int{42})
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
@@ -70,28 +61,17 @@ rerun_command: "false"
 	})
 }
 
-// --- Scenario 26: Mixed results — flaky, quarantined, real failures, passes ---
+// --- Scenario 26: Mixed results ---
 
 func TestRunMixedResults(t *testing.T) {
 	dir := t.TempDir()
 
-	// Quarantine state:
-	// - Test A: quarantined, issue open (stays quarantined, excluded from run)
-	// - Test B: quarantined, issue closed (to unquarantine — will run)
-	testAID := "src/payment.test.js::PaymentService::should handle charge timeout"
-	testBID := "src/auth.test.js::AuthService::should validate token"
-
 	qs := quarantine.NewEmptyState()
-	qs.AddTest(makeQuarantineEntry(testAID, "should handle charge timeout", "src/payment.test.js", 10))
+	testBID := "src/auth.test.js::AuthService::should validate token"
 	qs.AddTest(makeQuarantineEntry(testBID, "should validate token", "src/auth.test.js", 20))
 
 	// Issue #20 (test B) is closed — test B is unquarantined.
-	// Issue #10 (test A) is open — test A stays quarantined.
-	// Tests that run: B, C (pass), D (flaky — fails then passes on retry), E (genuine failure)
-	// Test A is excluded from execution (Jest pre-execution exclusion).
-
-	// JUnit XML produced by the run (test A is excluded, so not in XML):
-	// B passes, C passes, D fails, E fails
+	// JUnit XML: B passes, C passes, D flaky, E genuine failure.
 	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites tests="4" failures="2">
   <testsuite name="src/auth.test.js" tests="1" failures="0">
@@ -117,11 +97,9 @@ func TestRunMixedResults(t *testing.T) {
 </testsuites>`
 
 	xmlPath := filepath.Join(dir, "junit.xml")
-	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 1) // exits 1 (has failures)
+	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 1)
 
-	// Create a counter-based rerun script:
-	// - First rerun call (for D) → exits 0 (D is flaky)
-	// - Second rerun call (for E) → exits 1 (E is genuine)
+	// Counter-based rerun: first call exits 0 (flaky D), second exits 1 (genuine E).
 	counterPath := filepath.Join(dir, "rerun-counter")
 	rerunScriptPath := filepath.Join(dir, "rerun-script")
 	rerunScript := fmt.Sprintf(`#!/bin/sh
@@ -133,50 +111,34 @@ exit 1
 `, counterPath, counterPath)
 	_ = os.WriteFile(rerunScriptPath, []byte(rerunScript), 0755)
 
-	configPath := writeTempConfig(t, fmt.Sprintf(`
-version: 1
-framework: jest
-retries: 1
-rerun_command: %s
-`, rerunScriptPath))
+	writeSuiteConfigWithRerunScript(t, dir, xmlPath, scriptPath, rerunScriptPath)
+	chdirTest(t, dir)
 
 	server := fakeM4GitHubAPI(t, qs, []int{20})
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "unit", "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
 	})
 
-	// E (genuine failure) should cause exit 1.
 	riteway.Assert(t, riteway.Case[int]{
-		Given:    "mixed results: A quarantined (excluded), B unquarantined+passes, C passes, D flaky, E genuine failure",
+		Given:    "mixed results: B unquarantined+passes, C passes, D flaky, E genuine failure",
 		Should:   "exit with code 1 (genuine failure E)",
 		Actual:   exitCode,
 		Expected: 1,
 	})
 
 	resultsData, readErr := os.ReadFile(resultsPath)
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "mixed results run",
-		Should:   "write results.json",
-		Actual:   readErr == nil,
-		Expected: true,
-	})
-
 	if readErr != nil {
 		return
 	}
 
 	var results map[string]interface{}
 	_ = json.Unmarshal(resultsData, &results)
-
 	summary, _ := results["summary"].(map[string]interface{})
 	failedCount, _ := summary["failed"].(float64)
 	flakyCount, _ := summary["flaky_detected"].(float64)

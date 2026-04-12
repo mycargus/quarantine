@@ -20,13 +20,10 @@ const passingJUnitXML = `<?xml version="1.0" encoding="UTF-8"?>
   </testsuite>
 </testsuites>`
 
-// makeRunArgs builds the standard run arguments for degraded-HTTP tests.
-func makeRunArgs(configPath, xmlPath, outputPath, scriptPath string) []string {
+// makeSuiteRunArgs builds suite-mode run arguments.
+func makeSuiteRunArgs() []string {
 	return []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", outputPath,
-		"--", scriptPath,
+		"unit",
 	}
 }
 
@@ -37,13 +34,8 @@ func TestRunDegradedWith401(t *testing.T) {
 	dir := t.TempDir()
 	xmlPath := filepath.Join(dir, "junit.xml")
 	scriptPath := writeTestScript(t, dir, xmlPath, passingJUnitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -51,7 +43,7 @@ github:
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc","type":"commit"}}`)
 			return
 		}
-		if strings.Contains(r.URL.Path, "/contents/quarantine.json") {
+		if strings.Contains(r.URL.Path, "/contents/") {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = fmt.Fprint(w, `{"message":"Bad credentials"}`)
 			return
@@ -60,12 +52,11 @@ github:
 	}))
 	defer server.Close()
 
-	output, err := executeRunCmd(t, makeRunArgs(
-		configPath, xmlPath, filepath.Join(dir, "results.json"), scriptPath,
-	), map[string]string{
-		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
-	})
+	output, err := executeRunCmd(t, makeSuiteRunArgs(),
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+		})
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "GitHub API returns 401 for quarantine state read",
@@ -96,13 +87,8 @@ func TestRunDegradedWith403NoRetryAfter(t *testing.T) {
 	dir := t.TempDir()
 	xmlPath := filepath.Join(dir, "junit.xml")
 	scriptPath := writeTestScript(t, dir, xmlPath, passingJUnitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -110,7 +96,7 @@ github:
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc","type":"commit"}}`)
 			return
 		}
-		if strings.Contains(r.URL.Path, "/contents/quarantine.json") {
+		if strings.Contains(r.URL.Path, "/contents/") {
 			w.Header().Set("X-GitHub-Request-Id", "req123abc")
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = fmt.Fprint(w, `{"message":"Forbidden"}`)
@@ -120,12 +106,11 @@ github:
 	}))
 	defer server.Close()
 
-	output, err := executeRunCmd(t, makeRunArgs(
-		configPath, xmlPath, filepath.Join(dir, "results.json"), scriptPath,
-	), map[string]string{
-		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
-	})
+	output, err := executeRunCmd(t, makeSuiteRunArgs(),
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+		})
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "GitHub API returns 403 with X-GitHub-Request-Id header",
@@ -156,13 +141,8 @@ func TestRunDegradedWith403AndRetryAfterSucceeds(t *testing.T) {
 	dir := t.TempDir()
 	xmlPath := filepath.Join(dir, "junit.xml")
 	scriptPath := writeTestScript(t, dir, xmlPath, passingJUnitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
 	var contentsRequests int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -171,16 +151,14 @@ github:
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc","type":"commit"}}`)
 			return
 		}
-		if strings.Contains(r.URL.Path, "/contents/quarantine.json") {
+		if strings.Contains(r.URL.Path, "/contents/") {
 			n := atomic.AddInt32(&contentsRequests, 1)
 			if n == 1 {
-				// First request: return 403 with Retry-After to trigger retry.
 				w.Header().Set("Retry-After", "1")
 				w.WriteHeader(http.StatusForbidden)
 				_, _ = fmt.Fprint(w, `{"message":"Forbidden"}`)
 				return
 			}
-			// Second request (retry): return empty state (file not found).
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = fmt.Fprint(w, `{"message":"Not Found"}`)
 			return
@@ -189,12 +167,11 @@ github:
 	}))
 	defer server.Close()
 
-	output, err := executeRunCmd(t, makeRunArgs(
-		configPath, xmlPath, filepath.Join(dir, "results.json"), scriptPath,
-	), map[string]string{
-		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
-	})
+	output, err := executeRunCmd(t, makeSuiteRunArgs(),
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+		})
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "GitHub API returns 403+Retry-After on first attempt and 200 on retry",
@@ -202,10 +179,6 @@ github:
 		Actual:   err == nil,
 		Expected: true,
 	})
-
-	if strings.Contains(output, "[quarantine] WARNING:") {
-		t.Logf("unexpected WARNING in output (should not be in degraded mode after successful retry):\n%s", output)
-	}
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "retry succeeded after 403+Retry-After",
@@ -222,13 +195,8 @@ func TestRunDegradedWith5xxAfterRetry(t *testing.T) {
 	dir := t.TempDir()
 	xmlPath := filepath.Join(dir, "junit.xml")
 	scriptPath := writeTestScript(t, dir, xmlPath, passingJUnitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -236,7 +204,7 @@ github:
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc","type":"commit"}}`)
 			return
 		}
-		if strings.Contains(r.URL.Path, "/contents/quarantine.json") {
+		if strings.Contains(r.URL.Path, "/contents/") {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_, _ = fmt.Fprint(w, `{"message":"Service Unavailable"}`)
 			return
@@ -245,12 +213,11 @@ github:
 	}))
 	defer server.Close()
 
-	output, err := executeRunCmd(t, makeRunArgs(
-		configPath, xmlPath, filepath.Join(dir, "results.json"), scriptPath,
-	), map[string]string{
-		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
-	})
+	output, err := executeRunCmd(t, makeSuiteRunArgs(),
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+		})
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "GitHub API returns 503 on all contents requests",
@@ -274,20 +241,14 @@ func TestRunDegradedWithNetworkError(t *testing.T) {
 	dir := t.TempDir()
 	xmlPath := filepath.Join(dir, "junit.xml")
 	scriptPath := writeTestScript(t, dir, xmlPath, passingJUnitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
-	exitCode := executeRunCmdWithExitCode(t, makeRunArgs(
-		configPath, xmlPath, filepath.Join(dir, "results.json"), scriptPath,
-	), map[string]string{
-		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
-	})
+	exitCode := executeRunCmdWithExitCode(t, makeSuiteRunArgs(),
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
+		})
 
 	riteway.Assert(t, riteway.Case[int]{
 		Given:    "GitHub API is unreachable (network error)",
@@ -302,20 +263,14 @@ func TestRunDegradedWithNetworkErrorLogsWarning(t *testing.T) {
 	dir := t.TempDir()
 	xmlPath := filepath.Join(dir, "junit.xml")
 	scriptPath := writeTestScript(t, dir, xmlPath, passingJUnitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
-	output, _ := executeRunCmd(t, makeRunArgs(
-		configPath, xmlPath, filepath.Join(dir, "results.json"), scriptPath,
-	), map[string]string{
-		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
-	})
+	output, _ := executeRunCmd(t, makeSuiteRunArgs(),
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
+		})
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "GitHub API is unreachable (network error)",
@@ -332,13 +287,8 @@ func TestRunDegradedWith429ShortRetryAfterSucceeds(t *testing.T) {
 	dir := t.TempDir()
 	xmlPath := filepath.Join(dir, "junit.xml")
 	scriptPath := writeTestScript(t, dir, xmlPath, passingJUnitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
 	var contentsRequests int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -347,17 +297,15 @@ github:
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc","type":"commit"}}`)
 			return
 		}
-		if strings.Contains(r.URL.Path, "/contents/quarantine.json") {
+		if strings.Contains(r.URL.Path, "/contents/") {
 			n := atomic.AddInt32(&contentsRequests, 1)
 			if n == 1 {
-				// First request: 429 with short Retry-After.
 				w.Header().Set("Retry-After", "1")
 				w.Header().Set("X-RateLimit-Remaining", "0")
 				w.WriteHeader(http.StatusTooManyRequests)
 				_, _ = fmt.Fprint(w, `{"message":"rate limited"}`)
 				return
 			}
-			// Retry: return empty state (file not found).
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = fmt.Fprint(w, `{"message":"Not Found"}`)
 			return
@@ -366,12 +314,11 @@ github:
 	}))
 	defer server.Close()
 
-	output, err := executeRunCmd(t, makeRunArgs(
-		configPath, xmlPath, filepath.Join(dir, "results.json"), scriptPath,
-	), map[string]string{
-		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
-	})
+	output, err := executeRunCmd(t, makeSuiteRunArgs(),
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+		})
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "GitHub API returns 429+Retry-After:1 on first attempt, 404 on retry",
@@ -379,10 +326,6 @@ github:
 		Actual:   err == nil,
 		Expected: true,
 	})
-
-	if strings.Contains(output, "[quarantine] WARNING:") {
-		t.Logf("unexpected WARNING in output (should not be in degraded mode after successful retry):\n%s", output)
-	}
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "retry succeeded after 429+Retry-After:1",
@@ -399,13 +342,8 @@ func TestRunDegradedWith429LongRetryAfter(t *testing.T) {
 	dir := t.TempDir()
 	xmlPath := filepath.Join(dir, "junit.xml")
 	scriptPath := writeTestScript(t, dir, xmlPath, passingJUnitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -413,7 +351,7 @@ github:
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc","type":"commit"}}`)
 			return
 		}
-		if strings.Contains(r.URL.Path, "/contents/quarantine.json") {
+		if strings.Contains(r.URL.Path, "/contents/") {
 			w.Header().Set("Retry-After", "31")
 			w.WriteHeader(http.StatusTooManyRequests)
 			_, _ = fmt.Fprint(w, `{"message":"rate limited"}`)
@@ -423,12 +361,11 @@ github:
 	}))
 	defer server.Close()
 
-	output, err := executeRunCmd(t, makeRunArgs(
-		configPath, xmlPath, filepath.Join(dir, "results.json"), scriptPath,
-	), map[string]string{
-		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
-		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
-	})
+	output, err := executeRunCmd(t, makeSuiteRunArgs(),
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+		})
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "GitHub API returns 429 with Retry-After: 31 (exceeds 30s threshold)",

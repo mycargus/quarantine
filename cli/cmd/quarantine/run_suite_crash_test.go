@@ -79,6 +79,9 @@ func writeSuiteConfig(t *testing.T, dir, suiteName, command, junitxml, rerunComm
 	}
 	configPath := filepath.Join(suiteConfigDir, "config.yml")
 	configContent := fmt.Sprintf(`version: 1
+github:
+  owner: testowner
+  repo: testrepo
 test_suites:
   - name: %s
     command: ["%s"]
@@ -105,16 +108,15 @@ func TestRunSuiteCommandCrashExitsTwo(t *testing.T) {
 		t.Fatalf("write crash script: %v", err)
 	}
 
-	configPath := writeSuiteConfig(t, dir, "frontend", crashScript, xmlPath, "npx jest")
+	writeSuiteConfig(t, dir, "frontend", crashScript, xmlPath, "npx jest")
+	chdirTest(t, dir)
 
 	issueCreated := false
 	server := fakeSuiteCrashAPI(t, &issueCreated)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "frontend", "results.json")
 	output, exitErr := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--output", resultsPath,
 		"frontend",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
@@ -188,16 +190,15 @@ func TestRunSuiteRerunFailureClassifiesUnresolved(t *testing.T) {
 	}
 
 	// Rerun command uses a nonexistent binary so it fails with exit 127.
-	configPath := writeSuiteConfig(t, dir, "backend", mainScript, xmlPath, "/nonexistent-rerun-binary-xyz")
+	writeSuiteConfig(t, dir, "backend", mainScript, xmlPath, "/nonexistent-rerun-binary-xyz")
+	chdirTest(t, dir)
 
 	issueCreated := false
 	server := fakeSuiteCrashAPI(t, &issueCreated)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "backend", "results.json")
 	output, exitErr := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--output", resultsPath,
 		"backend",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
@@ -342,6 +343,9 @@ esac
 	}
 	configPath := filepath.Join(suiteConfigDir, "config.yml")
 	configContent := fmt.Sprintf(`version: 1
+github:
+  owner: testowner
+  repo: testrepo
 test_suites:
   - name: backend
     command: ["%s"]
@@ -352,14 +356,13 @@ test_suites:
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config.yml: %v", err)
 	}
+	chdirTest(t, dir)
 
 	server := fakeSuiteCrashAPI(t, nil)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "backend", "results.json")
 	_, exitErr := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--output", resultsPath,
 		"backend",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",

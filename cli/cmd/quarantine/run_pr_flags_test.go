@@ -35,11 +35,11 @@ func fakePRFlagsGitHubAPI(
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc123","type":"commit"}}`)
 
 		// Read quarantine state — empty (no file yet).
-		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusNotFound)
 
 		// CAS write — always succeed.
-		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusOK)
 
 		// Batch closed-issue search (unquarantine check).
@@ -125,31 +125,19 @@ func TestRunNoPRFlagNoEventPathSkipsPRComment(t *testing.T) {
 	initialScript := writeTestScript(t, dir, xmlPath, failXML, 1)
 	rerunScript := writeAlwaysPassScript(t, dir, "rerun-script")
 
-	configPath := writeTempConfig(t, fmt.Sprintf(`
-version: 1
-framework: jest
-github:
-  owner: test-owner
-  repo: test-repo
-rerun_command: %s
-`, rerunScript))
+	writeSuiteConfigFull(t, dir, "test-owner", "test-repo", xmlPath, initialScript, rerunScript)
+	chdirTest(t, dir)
 
 	// Use prNumber=0 so the fake server never receives PR comment calls.
-	// The server tracks POST/PATCH counts even if they would be on unknown paths.
 	var prCommentCreated int32
 	var prCommentUpdated int32
 	server := fakePRFlagsGitHubAPI(t, 0, "", &prCommentCreated, &prCommentUpdated)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
 
 	// No --pr flag and GITHUB_EVENT_PATH intentionally not set (non-PR build).
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--retries", "3",
-		"--", initialScript,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
@@ -198,16 +186,24 @@ func TestRunPRCommentSuppressedByConfig(t *testing.T) {
 	rerunScript := writeAlwaysPassScript(t, dir, "rerun-script")
 
 	// Config has github_pr_comment: false.
-	configPath := writeTempConfig(t, fmt.Sprintf(`
-version: 1
-framework: jest
+	suiteDir := filepath.Join(dir, ".quarantine")
+	_ = os.MkdirAll(suiteDir, 0755)
+	configPath := filepath.Join(suiteDir, "config.yml")
+	configContent := fmt.Sprintf(`version: 1
 github:
   owner: test-owner
   repo: test-repo
 notifications:
   github_pr_comment: false
-rerun_command: %s
-`, rerunScript))
+test_suites:
+  - name: unit
+    command: ["%s"]
+    junitxml: "%s"
+    rerun_command: ["%s"]
+    retries: 3
+`, initialScript, xmlPath, rerunScript)
+	_ = os.WriteFile(configPath, []byte(configContent), 0644)
+	chdirTest(t, dir)
 
 	prNumber := 77
 	var prCommentCreated int32
@@ -215,14 +211,10 @@ rerun_command: %s
 	server := fakePRFlagsGitHubAPI(t, prNumber, "", &prCommentCreated, &prCommentUpdated)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "unit", "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--retries", "3",
 		"--pr", fmt.Sprintf("%d", prNumber),
-		"--", initialScript,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
@@ -278,32 +270,21 @@ func TestRunSecondRunUpdatesPRCommentInsteadOfCreating(t *testing.T) {
 	initialScript := writeTestScript(t, dir, xmlPath, failXML, 1)
 	rerunScript := writeAlwaysPassScript(t, dir, "rerun-script")
 
-	configPath := writeTempConfig(t, fmt.Sprintf(`
-version: 1
-framework: jest
-github:
-  owner: test-owner
-  repo: test-repo
-rerun_command: %s
-`, rerunScript))
+	writeSuiteConfigFull(t, dir, "test-owner", "test-repo", xmlPath, initialScript, rerunScript)
+	chdirTest(t, dir)
 
 	prNumber := 42
-	// Simulate an existing quarantine-bot comment from a previous run.
-	existingBody := "<!-- quarantine-bot -->\n## Quarantine Summary\n\nPrevious run content."
+	// Simulate an existing suite-bot comment from a previous run.
+	existingBody := suitePRCommentMarker("unit") + "\n## Quarantine Summary\n\nPrevious run content."
 
 	var prCommentCreated int32
 	var prCommentUpdated int32
 	server := fakePRFlagsGitHubAPI(t, prNumber, existingBody, &prCommentCreated, &prCommentUpdated)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--retries", "3",
 		"--pr", fmt.Sprintf("%d", prNumber),
-		"--", initialScript,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,

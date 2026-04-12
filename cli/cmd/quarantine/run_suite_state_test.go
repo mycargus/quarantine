@@ -94,12 +94,9 @@ func runFlakySuiteIntegration(t *testing.T, suiteName string, prNumber int) flak
 	)
 	defer server.Close()
 
-	configPath, _ := buildFlakySuiteScenario(t, dir, suiteName)
-	resultsPath := filepath.Join(dir, "results.json")
+	buildFlakySuiteScenario(t, dir, suiteName)
 
 	_, result.err = executeRunCmd(t, []string{
-		"--config", configPath,
-		"--output", resultsPath,
 		"--pr", fmt.Sprintf("%d", prNumber),
 		suiteName,
 	}, map[string]string{
@@ -263,6 +260,9 @@ exit 0
 	}
 	configPath = filepath.Join(suiteConfigDir, "config.yml")
 	configContent := fmt.Sprintf(`version: 1
+github:
+  owner: testowner
+  repo: testrepo
 test_suites:
   - name: %s
     command: ["%s"]
@@ -273,6 +273,7 @@ test_suites:
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config.yml: %v", err)
 	}
+	chdirTest(t, dir)
 
 	return configPath, xmlPath
 }

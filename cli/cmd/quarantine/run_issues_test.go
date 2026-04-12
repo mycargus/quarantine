@@ -37,11 +37,11 @@ func fakeM5GitHubAPI(
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc123","type":"commit"}}`)
 
 		// Read quarantine state — return empty (404 = no file yet).
-		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusNotFound)
 
 		// CAS write — always succeed.
-		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusOK)
 
 		// Batch closed-issue search (for unquarantine check).
@@ -109,14 +109,8 @@ func TestRunDetectsFlakyTestCreatesIssueAndPRComment(t *testing.T) {
 	initialScript := writeTestScript(t, dir, xmlPath, failXML, 1)
 	rerunScript := writeAlwaysPassScript(t, dir, "rerun-script")
 
-	configPath := writeTempConfig(t, fmt.Sprintf(`
-version: 1
-framework: jest
-github:
-  owner: test-owner
-  repo: test-repo
-rerun_command: %s
-`, rerunScript))
+	writeSuiteConfigFull(t, dir, "test-owner", "test-repo", xmlPath, initialScript, rerunScript)
+	chdirTest(t, dir)
 
 	prNumber := 99
 	var issueCreated int32
@@ -124,14 +118,9 @@ rerun_command: %s
 	server := fakeM5GitHubAPI(t, prNumber, &issueCreated, &prCommentCreated)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--retries", "3",
 		"--pr", fmt.Sprintf("%d", prNumber),
-		"--", initialScript,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
@@ -181,11 +170,11 @@ func fakeMultiFlakyGitHubAPI(
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc123","type":"commit"}}`)
 
 		// Read quarantine state — empty (404 = no file yet).
-		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusNotFound)
 
 		// CAS write — always succeed.
-		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusOK)
 
 		// Batch closed-issue search (unquarantine check).
@@ -267,14 +256,8 @@ func TestRunMultipleFlakyTestsCreatesIssuesAndSinglePRComment(t *testing.T) {
 	// Rerun script: always exits 0 (both tests pass on retry).
 	rerunScript := writeAlwaysPassScript(t, dir, "rerun-script")
 
-	configPath := writeTempConfig(t, fmt.Sprintf(`
-version: 1
-framework: jest
-github:
-  owner: test-owner
-  repo: test-repo
-rerun_command: %s
-`, rerunScript))
+	writeSuiteConfigFull(t, dir, "test-owner", "test-repo", xmlPath, initialScript, rerunScript)
+	chdirTest(t, dir)
 
 	prNumber := 88
 	var issueCreateCount int32
@@ -283,14 +266,10 @@ rerun_command: %s
 	server := fakeMultiFlakyGitHubAPI(t, prNumber, &issueCreateCount, &prCommentCount, &prCommentBody)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "unit", "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--retries", "3",
 		"--pr", fmt.Sprintf("%d", prNumber),
-		"--", initialScript,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,

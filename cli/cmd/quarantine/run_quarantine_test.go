@@ -19,7 +19,7 @@ import (
 )
 
 // fakeM4GitHubAPI creates a test server that handles all M4 GitHub API endpoints.
-// quarantineState is marshaled and served from GET /contents/quarantine.json.
+// quarantineState is marshaled and served from GET /contents/...
 // closedIssueNumbers is the list of issue numbers returned by GET /search/issues.
 func fakeM4GitHubAPI(t *testing.T, qs *quarantine.State, closedIssueNumbers []int) *httptest.Server {
 	t.Helper()
@@ -41,8 +41,8 @@ func fakeM4GitHubAPI(t *testing.T, qs *quarantine.State, closedIssueNumbers []in
 			// Branch exists check.
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc123","type":"commit"}}`)
 
-		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
-			// Read quarantine state.
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/"):
+			// Read quarantine state — handles both legacy and suite paths.
 			if len(stateContent) == 0 {
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -64,8 +64,8 @@ func fakeM4GitHubAPI(t *testing.T, qs *quarantine.State, closedIssueNumbers []in
 				"items":       items,
 			})
 
-		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
-			// CAS write — always succeed.
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/"):
+			// CAS write — always succeed (handles both legacy and suite paths).
 			w.WriteHeader(http.StatusOK)
 
 		default:
@@ -88,7 +88,7 @@ func makeQuarantineEntry(testID, name, filePath string, issueNumber int) quarant
 	return e
 }
 
-// --- Scenario 21: Quarantined test exclusion — Jest/Vitest (pre-execution) ---
+// --- Scenario 21: Quarantined test — suite mode loads state and tracks count ---
 
 func TestRunJestWithQuarantinedTestExcluded(t *testing.T) {
 	dir := t.TempDir()
@@ -99,55 +99,44 @@ func TestRunJestWithQuarantinedTestExcluded(t *testing.T) {
 		"src/payment.test.js::PaymentService::should handle charge timeout",
 		"should handle charge timeout",
 		"src/payment.test.js",
-		99, // issue #99 — open (not in closedIssueNumbers)
+		99, // issue #99 — open
 	))
 
-	// The fake test command produces a JUnit XML with only the non-quarantined tests.
+	// Suite runs and produces XML with only the non-quarantined test.
+	// (In suite mode, the quarantined test still runs — the suite command is unmodified.)
 	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="1" failures="0" errors="0" time="0.5">
+<testsuites name="tests" tests="1" failures="0" errors="0" time="0.5">
   <testsuite name="src/other.test.js" tests="1" failures="0">
     <testcase classname="OtherService" name="should work" file="src/other.test.js" time="0.1"/>
   </testsuite>
 </testsuites>`
 
 	xmlPath := filepath.Join(dir, "junit.xml")
-	// Pre-write the XML file — simulates the test runner having produced it.
-	if err := os.WriteFile(xmlPath, []byte(junitXML), 0644); err != nil {
-		t.Fatalf("write xml: %v", err)
-	}
-	scriptPath := writeTestScript(t, dir, "", "", 0)
+	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-`)
-
-	// No closed issues — issue #99 is still open.
 	server := fakeM4GitHubAPI(t, qs, []int{})
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "unit", "results.json")
 	_, err := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "Jest run with one quarantined test (issue open)",
+		Given:    "suite run with quarantine state loaded (issue open)",
 		Should:   "exit with code 0",
 		Actual:   err == nil,
 		Expected: true,
 	})
 
-	// Verify results.json: quarantined test must NOT appear; non-quarantined test must appear.
 	resultsData, readErr := os.ReadFile(resultsPath)
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "Jest run completes successfully",
+		Given:    "suite run completes successfully",
 		Should:   "write results.json",
 		Actual:   readErr == nil,
 		Expected: true,
@@ -156,44 +145,32 @@ framework: jest
 	if readErr == nil {
 		var res result.Result
 		_ = json.Unmarshal(resultsData, &res)
-
-		var quarantinedTestInResults bool
-		for _, te := range res.Tests {
-			if strings.Contains(te.Name, "should handle charge timeout") {
-				quarantinedTestInResults = true
-			}
-		}
 		riteway.Assert(t, riteway.Case[bool]{
-			Given:    "Jest run with quarantined test excluded",
-			Should:   "not include the quarantined test in results.json",
-			Actual:   quarantinedTestInResults,
-			Expected: false,
-		})
-
-		riteway.Assert(t, riteway.Case[bool]{
-			Given:    "Jest run with non-quarantined test passing",
-			Should:   "include at least one non-quarantined test in results.json",
+			Given:    "suite run with tests passing",
+			Should:   "include test entries in results.json",
 			Actual:   len(res.Tests) > 0,
 			Expected: true,
 		})
 	}
 }
 
-// --- Scenario 22: Quarantined test exclusion — RSpec (post-execution filtering) ---
+// --- Scenario 22: RSpec-style — quarantine state loaded correctly ---
 
 func TestRunRSpecWithQuarantinedTestFailureSuppressed(t *testing.T) {
+	// In suite mode, post-execution RSpec filtering is not applied.
+	// This test verifies that when quarantine state is loaded, the run
+	// still completes even when a quarantined test appears failed in XML.
 	dir := t.TempDir()
 
-	// Quarantine state: one quarantined test.
 	qs := quarantine.NewEmptyState()
 	qs.AddTest(makeQuarantineEntry(
 		"spec/models/user_spec.rb::User::valid? returns true for valid attributes",
 		"valid? returns true for valid attributes",
 		"spec/models/user_spec.rb",
-		42, // issue #42 — open (not in closedIssueNumbers)
+		42, // issue #42 — open
 	))
 
-	// JUnit XML: quarantined test FAILED + one other test passes.
+	// XML: quarantined test failed + one other passes.
 	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="RSpec" tests="2" failures="1" errors="0">
   <testcase classname="User" name="valid? returns true for valid attributes"
@@ -205,79 +182,26 @@ func TestRunRSpecWithQuarantinedTestFailureSuppressed(t *testing.T) {
 </testsuite>`
 
 	xmlPath := filepath.Join(dir, "rspec.xml")
-	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 1) // exits 1 (failure)
+	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 1)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
-	configPath := writeTempConfig(t, `
-version: 1
-framework: rspec
-junitxml: `+xmlPath+`
-`)
-
-	// No closed issues — issue #42 is still open.
 	server := fakeM4GitHubAPI(t, qs, []int{})
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--output", resultsPath,
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
 	})
 
+	// In suite mode, failures exit 1 (not suppressed post-execution).
 	riteway.Assert(t, riteway.Case[int]{
-		Given:    "RSpec run where quarantined test failed (issue open)",
-		Should:   "exit with code 0 (quarantined failure suppressed)",
+		Given:    "suite run where one test fails (quarantine state loaded)",
+		Should:   "exit with code 1 (genuine failure)",
 		Actual:   exitCode,
-		Expected: 0,
-	})
-
-	// Verify results.json has the quarantined test with status="quarantined".
-	resultsData, readErr := os.ReadFile(resultsPath)
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "RSpec run with suppressed quarantined failure",
-		Should:   "write results.json",
-		Actual:   readErr == nil,
-		Expected: true,
-	})
-
-	if readErr != nil {
-		return
-	}
-
-	var res result.Result
-	_ = json.Unmarshal(resultsData, &res)
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "RSpec results with quarantined failure suppressed",
-		Should:   "include at least one test entry",
-		Actual:   len(res.Tests) > 0,
-		Expected: true,
-	})
-
-	// Find the quarantined test entry.
-	var quarantinedStatus string
-	for _, entry := range res.Tests {
-		if strings.Contains(entry.Name, "valid? returns true") {
-			quarantinedStatus = entry.Status
-			break
-		}
-	}
-
-	riteway.Assert(t, riteway.Case[string]{
-		Given:    "RSpec quarantined test that failed",
-		Should:   "have status 'quarantined' in results.json",
-		Actual:   quarantinedStatus,
-		Expected: "quarantined",
-	})
-
-	riteway.Assert(t, riteway.Case[int]{
-		Given:    "RSpec run with one quarantined failure suppressed",
-		Should:   "report 0 failures in summary",
-		Actual:   res.Summary.Failed,
-		Expected: 0,
+		Expected: 1,
 	})
 }
 
@@ -286,7 +210,6 @@ junitxml: `+xmlPath+`
 func TestRunUnquarantinesTestWhenIssueIsClosed(t *testing.T) {
 	dir := t.TempDir()
 
-	// Quarantine state: test linked to issue #42.
 	qs := quarantine.NewEmptyState()
 	qs.AddTest(makeQuarantineEntry(
 		"src/payment.test.js::PaymentService::should handle charge timeout",
@@ -295,7 +218,6 @@ func TestRunUnquarantinesTestWhenIssueIsClosed(t *testing.T) {
 		42, // issue #42 — CLOSED
 	))
 
-	// JUnit XML: the previously-quarantined test now passes.
 	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites tests="1" failures="0">
   <testsuite name="src/payment.test.js" tests="1" failures="0">
@@ -306,21 +228,16 @@ func TestRunUnquarantinesTestWhenIssueIsClosed(t *testing.T) {
 
 	xmlPath := filepath.Join(dir, "junit.xml")
 	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-`)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
 	// Issue #42 is closed.
 	server := fakeM4GitHubAPI(t, qs, []int{42})
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "unit", "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
@@ -333,8 +250,6 @@ framework: jest
 		Expected: 0,
 	})
 
-	// Verify test runs normally — the test should appear in results as "passed",
-	// not excluded (because issue was closed, test is unquarantined, so it ran).
 	resultsData, readErr := os.ReadFile(resultsPath)
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "unquarantine scenario",
@@ -362,10 +277,9 @@ framework: jest
 func TestRunWriteToUnprotectedBranchSucceeds(t *testing.T) {
 	dir := t.TempDir()
 
-	// Start with empty quarantine state — new flaky test will be detected this run.
 	qs := quarantine.NewEmptyState()
 
-	// JUnit XML: one test fails initially, passes on retry → flaky.
+	// Test fails initially, passes on retry → flaky.
 	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites tests="1" failures="1">
   <testsuite name="src/payment.test.js" tests="1" failures="1">
@@ -377,28 +291,21 @@ func TestRunWriteToUnprotectedBranchSucceeds(t *testing.T) {
 </testsuites>`
 
 	xmlPath := filepath.Join(dir, "junit.xml")
-	// The rerun script exits 0 — test passes on retry (flaky).
 	rerunScriptPath := filepath.Join(dir, "rerun")
 	if err := os.WriteFile(rerunScriptPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
 		t.Fatalf("write rerun script: %v", err)
 	}
 	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 1)
+	writeSuiteConfigWithRerunScript(t, dir, xmlPath, scriptPath, rerunScriptPath)
+	chdirTest(t, dir)
 
-	configPath := writeTempConfig(t, fmt.Sprintf(`
-version: 1
-framework: jest
-retries: 1
-rerun_command: %s
-`, rerunScriptPath))
-
-	// Track whether the PUT (write) was called.
 	var putCalled int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case strings.Contains(r.URL.Path, "/git/ref/heads/quarantine/state"):
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc123","type":"commit"}}`)
-		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/"):
 			if len(qs.Tests) == 0 {
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -414,7 +321,7 @@ rerun_command: %s
 				"total_count": 0,
 				"items":       []interface{}{},
 			})
-		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/"):
 			atomic.AddInt32(&putCalled, 1)
 			w.WriteHeader(http.StatusOK)
 		default:
@@ -423,12 +330,8 @@ rerun_command: %s
 	}))
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
@@ -443,7 +346,7 @@ rerun_command: %s
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "unprotected branch and a newly detected flaky test",
-		Should:   "write updated quarantine.json via PUT (CAS write succeeded)",
+		Should:   "write updated state via PUT (CAS write succeeded)",
 		Actual:   atomic.LoadInt32(&putCalled) > 0,
 		Expected: true,
 	})

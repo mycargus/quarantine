@@ -18,45 +18,47 @@ import (
 
 // ── #12 PR comment format ────────────────────────────────────────────────────
 
-// TestContractPRCommentMarkerIsFirstLine verifies that the quarantine-bot
-// marker is the very first line of every rendered PR comment.
+// TestContractSuitePRCommentMarkerIsFirstLine verifies that the suite-specific
+// quarantine marker is the very first line of every rendered PR comment.
 // Contract: the marker MUST be the first line for update-vs-create detection.
-func TestContractPRCommentMarkerIsFirstLine(t *testing.T) {
+func TestContractSuitePRCommentMarkerIsFirstLine(t *testing.T) {
+	marker := suitePRCommentMarker("backend")
 	data := PRCommentData{Total: 1, Passed: 1, Version: "0.1.0"}
-	comment := renderPRComment(data, PRCommentMarker)
+	comment := renderPRComment(data, marker)
 	firstLine := strings.SplitN(comment, "\n", 2)[0]
 
 	riteway.Assert(t, riteway.Case[string]{
-		Given:    "renderPRComment with any data",
-		Should:   "have PRCommentMarker as the exact first line",
+		Given:    "renderPRComment with any data and suite marker",
+		Should:   "have the suite marker as the exact first line",
 		Actual:   firstLine,
-		Expected: PRCommentMarker,
+		Expected: marker,
 	})
 }
 
-// TestContractPRCommentMarkerDetectsExistingComment verifies that a comment
-// body starting with PRCommentMarker is recognised as an existing bot comment.
+// TestContractSuitePRCommentMarkerDetectsExistingComment verifies that a comment
+// body starting with the suite marker is recognised as an existing bot comment.
 // This is the update-vs-create heuristic used in postOrUpdatePRComment.
-func TestContractPRCommentMarkerDetectsExistingComment(t *testing.T) {
-	body := renderPRComment(PRCommentData{Total: 1, Passed: 1, Version: "0.1.0"}, PRCommentMarker)
+func TestContractSuitePRCommentMarkerDetectsExistingComment(t *testing.T) {
+	marker := suitePRCommentMarker("backend")
+	body := renderPRComment(PRCommentData{Total: 1, Passed: 1, Version: "0.1.0"}, marker)
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a PR comment rendered by renderPRComment",
-		Should:   "start with PRCommentMarker (detected as existing bot comment)",
-		Actual:   strings.HasPrefix(body, PRCommentMarker),
+		Given:    "a PR comment rendered by renderPRComment with a suite marker",
+		Should:   "start with the suite marker (detected as existing bot comment)",
+		Actual:   strings.HasPrefix(body, marker),
 		Expected: true,
 	})
 }
 
-// TestContractPRCommentMarkerValue locks down the exact string value of the
-// marker constant. Changing PRCommentMarker breaks update detection for all
-// existing bot comments in the wild.
-func TestContractPRCommentMarkerValue(t *testing.T) {
+// TestContractSuitePRCommentMarkerFormat locks down the exact format of the
+// suite-specific PR comment marker. Changing suitePRCommentMarker breaks
+// update detection for all existing bot comments in the wild.
+func TestContractSuitePRCommentMarkerFormat(t *testing.T) {
 	riteway.Assert(t, riteway.Case[string]{
-		Given:    "PRCommentMarker constant",
-		Should:   "equal '<!-- quarantine-bot -->'",
-		Actual:   PRCommentMarker,
-		Expected: "<!-- quarantine-bot -->",
+		Given:    "suitePRCommentMarker(\"backend\")",
+		Should:   "equal '<!-- quarantine:backend -->'",
+		Actual:   suitePRCommentMarker("backend"),
+		Expected: "<!-- quarantine:backend -->",
 	})
 }
 

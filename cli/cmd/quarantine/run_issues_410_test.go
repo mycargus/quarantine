@@ -37,11 +37,11 @@ func fakeIssues410GitHubAPI(
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc123","type":"commit"}}`)
 
 		// Read quarantine state — empty (404 = no file yet).
-		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusNotFound)
 
 		// CAS write — always succeed.
-		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusOK)
 
 		// Batch closed-issue search (unquarantine check).
@@ -116,14 +116,8 @@ func TestRunIssues410SkipsAllIssueCreationAndContinues(t *testing.T) {
 	initialScript := writeTestScript(t, dir, xmlPath, failXML, 1)
 	rerunScript := writeAlwaysPassScript(t, dir, "rerun-script-410")
 
-	configPath := writeTempConfig(t, fmt.Sprintf(`
-version: 1
-framework: jest
-github:
-  owner: test-owner
-  repo: test-repo
-rerun_command: %s
-`, rerunScript))
+	writeSuiteConfigFull(t, dir, "test-owner", "test-repo", xmlPath, initialScript, rerunScript)
+	chdirTest(t, dir)
 
 	prNumber := 77
 	var issueAttemptCount int32
@@ -132,7 +126,7 @@ rerun_command: %s
 	server := fakeIssues410GitHubAPI(t, prNumber, &issueAttemptCount, &prCommentPosted, &prCommentBody)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "unit", "results.json")
 
 	// Capture combined output so we can check warning messages.
 	for k, v := range map[string]string{
@@ -148,12 +142,8 @@ rerun_command: %s
 	rootCmd.SetErr(&output)
 	rootCmd.SetArgs([]string{
 		"run",
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--retries", "3",
 		"--pr", fmt.Sprintf("%d", prNumber),
-		"--", initialScript,
+		"unit",
 	})
 	runErr := rootCmd.Execute()
 

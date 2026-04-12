@@ -35,11 +35,11 @@ func fakePRScopeGitHubAPI(
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc123","type":"commit"}}`)
 
 		// Read quarantine state — empty.
-		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusNotFound)
 
 		// CAS write — track it (should NOT be called for new-to-PR tests).
-		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/"):
 			atomic.AddInt32(casWrittenPtr, 1)
 			w.WriteHeader(http.StatusOK)
 
@@ -111,14 +111,8 @@ func TestRunPreExistingTestInPreExistingFileScopedToPR(t *testing.T) {
 	initialScript := writeTestScript(t, dir, xmlPath, failXML, 1)
 	rerunScript := writeAlwaysPassScript(t, dir, "rerun-scope-73")
 
-	configPath := writeTempConfig(t, fmt.Sprintf(`
-version: 1
-framework: jest
-github:
-  owner: test-owner
-  repo: test-repo
-rerun_command: %s
-`, rerunScript))
+	writeSuiteConfigFull(t, dir, "test-owner", "test-repo", xmlPath, initialScript, rerunScript)
+	chdirTest(t, dir)
 
 	prNumber := 77
 	var issueCreated int32
@@ -128,14 +122,10 @@ rerun_command: %s
 	server := fakePRScopeGitHubAPI(t, prNumber, &issueCreated, &casWritten, &prCommentBody, &prCommentCreated)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "unit", "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--retries", "3",
 		"--pr", fmt.Sprintf("%d", prNumber),
-		"--", initialScript,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,

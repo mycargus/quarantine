@@ -109,7 +109,7 @@ func TestPostOrUpdatePRCommentNilClientIsNoOp(t *testing.T) {
 	// The test passes by not panicking and not making any network calls.
 	cmd := discardCmd()
 	// prNumber=5 (non-zero), client=nil → must be a no-op.
-	postOrUpdatePRComment(context.Background(), cmd, nil, 5, "body", PRCommentMarker)
+	postOrUpdatePRComment(context.Background(), cmd, nil, 5, "body", suitePRCommentMarker("test"))
 	// Reaching here means it returned early; test passes.
 }
 
@@ -130,7 +130,7 @@ func TestPostOrUpdatePRCommentZeroPRNumberIsNoOp(t *testing.T) {
 	cmd := discardCmd()
 
 	// prNumber=0 with a valid client → must be a no-op (no HTTP requests).
-	postOrUpdatePRComment(context.Background(), cmd, client, 0, "body", PRCommentMarker)
+	postOrUpdatePRComment(context.Background(), cmd, client, 0, "body", suitePRCommentMarker("test"))
 
 	riteway.Assert(t, riteway.Case[int32]{
 		Given:    "prNumber is 0 with a non-nil client",
@@ -140,25 +140,26 @@ func TestPostOrUpdatePRCommentZeroPRNumberIsNoOp(t *testing.T) {
 	})
 }
 
-// --- Mutation 11: strings.HasPrefix(c.Body, PRCommentMarker) → negated ---
+// --- Mutation 11: strings.HasPrefix(c.Body, the suite marker) → negated ---
 
 // TestPostOrUpdatePRCommentUpdatesExistingMarkedComment kills the mutation on
-// line 284: `strings.HasPrefix(c.Body, PRCommentMarker)` → negated.
-// When an existing comment starts with PRCommentMarker, the function must call
+// line 284: `strings.HasPrefix(c.Body, the suite marker)` → negated.
+// When an existing comment starts with the suite marker, the function must call
 // UpdatePRComment (PATCH) instead of CreatePRComment (POST).
 func TestPostOrUpdatePRCommentUpdatesExistingMarkedComment(t *testing.T) {
 	var createCalls, updateCalls int32
+	marker := suitePRCommentMarker("test")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.Method == "GET" && strings.Contains(r.URL.Path, "/issues/") &&
 			strings.Contains(r.URL.Path, "/comments"):
-			// Return one existing comment whose body starts with PRCommentMarker.
+			// Return one existing comment whose body starts with the suite marker.
 			_ = json.NewEncoder(w).Encode([]map[string]interface{}{
 				{
 					"id":   int64(9001),
-					"body": PRCommentMarker + "\n## Quarantine Summary\n",
+					"body": suitePRCommentMarker("test") + "\n## Quarantine Summary\n",
 				},
 			})
 
@@ -181,17 +182,17 @@ func TestPostOrUpdatePRCommentUpdatesExistingMarkedComment(t *testing.T) {
 	client := newNotifTestClient(t, server.URL)
 	cmd := discardCmd()
 
-	postOrUpdatePRComment(context.Background(), cmd, client, 7, PRCommentMarker+"\n## Updated Summary", PRCommentMarker)
+	postOrUpdatePRComment(context.Background(), cmd, client, 7, marker+"\n## Updated Summary", marker)
 
 	riteway.Assert(t, riteway.Case[int32]{
-		Given:    "an existing PR comment that starts with PRCommentMarker",
+		Given:    "an existing PR comment that starts with the suite marker",
 		Should:   "call UpdatePRComment (PATCH), not CreatePRComment (POST)",
 		Actual:   atomic.LoadInt32(&updateCalls),
 		Expected: 1,
 	})
 
 	riteway.Assert(t, riteway.Case[int32]{
-		Given:    "an existing PR comment that starts with PRCommentMarker",
+		Given:    "an existing PR comment that starts with the suite marker",
 		Should:   "not call CreatePRComment (POST)",
 		Actual:   atomic.LoadInt32(&createCalls),
 		Expected: 0,
@@ -199,9 +200,10 @@ func TestPostOrUpdatePRCommentUpdatesExistingMarkedComment(t *testing.T) {
 }
 
 // TestPostOrUpdatePRCommentCreatesWhenNoMarkedComment verifies the counterpart:
-// when no existing comment has the PRCommentMarker, a new comment is created.
+// when no existing comment has the the suite marker, a new comment is created.
 func TestPostOrUpdatePRCommentCreatesWhenNoMarkedComment(t *testing.T) {
 	var createCalls, updateCalls int32
+	marker := suitePRCommentMarker("test")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -235,17 +237,17 @@ func TestPostOrUpdatePRCommentCreatesWhenNoMarkedComment(t *testing.T) {
 	client := newNotifTestClient(t, server.URL)
 	cmd := discardCmd()
 
-	postOrUpdatePRComment(context.Background(), cmd, client, 7, PRCommentMarker+"\n## Summary", PRCommentMarker)
+	postOrUpdatePRComment(context.Background(), cmd, client, 7, marker+"\n## Summary", marker)
 
 	riteway.Assert(t, riteway.Case[int32]{
-		Given:    "no existing comment with PRCommentMarker",
+		Given:    "no existing comment with the suite marker",
 		Should:   "call CreatePRComment (POST), not UpdatePRComment (PATCH)",
 		Actual:   atomic.LoadInt32(&createCalls),
 		Expected: 1,
 	})
 
 	riteway.Assert(t, riteway.Case[int32]{
-		Given:    "no existing comment with PRCommentMarker",
+		Given:    "no existing comment with the suite marker",
 		Should:   "not call UpdatePRComment (PATCH)",
 		Actual:   atomic.LoadInt32(&updateCalls),
 		Expected: 0,

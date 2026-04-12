@@ -138,6 +138,9 @@ func TestRunSuiteZeroFailuresWritesResultsAndComment(t *testing.T) {
 	}
 	configPath := filepath.Join(suiteConfigDir, "config.yml")
 	configContent := fmt.Sprintf(`version: 1
+github:
+  owner: testowner
+  repo: testrepo
 test_suites:
   - name: backend
     command: ["%s"]
@@ -147,16 +150,15 @@ test_suites:
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config.yml: %v", err)
 	}
+	chdirTest(t, dir)
 
 	var commentBody string
 	var putCalled int32
 	server := fakeZeroFailureAPI(t, prNumber, &commentBody, &putCalled)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "backend", "results.json")
 	_, runErr := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--output", resultsPath,
 		"--pr", fmt.Sprintf("%d", prNumber),
 		"backend",
 	}, map[string]string{
@@ -310,6 +312,9 @@ func TestRunSuiteDryRunAnalyzesExistingXML(t *testing.T) {
 	}
 	configPath := filepath.Join(suiteConfigDir, "config.yml")
 	configContent := fmt.Sprintf(`version: 1
+github:
+  owner: testowner
+  repo: testrepo
 test_suites:
   - name: backend
     command: ["%s"]
@@ -319,15 +324,14 @@ test_suites:
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config.yml: %v", err)
 	}
+	chdirTest(t, dir)
 
 	var putCalled int32
 	server := fakeStateBranchAPI(t, qs, "backend", &putCalled)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "backend", "results.json")
 	output, runErr := executeRunCmdCaptureBoth(t, []string{
-		"--config", configPath,
-		"--output", resultsPath,
 		"--dry-run",
 		"backend",
 	}, map[string]string{
@@ -396,6 +400,9 @@ func TestRunSuiteDryRunNoXMLExitsZeroWithWarning(t *testing.T) {
 	}
 	configPath := filepath.Join(suiteConfigDir, "config.yml")
 	configContent := fmt.Sprintf(`version: 1
+github:
+  owner: testowner
+  repo: testrepo
 test_suites:
   - name: backend
     command: ["%s"]
@@ -405,13 +412,13 @@ test_suites:
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config.yml: %v", err)
 	}
+	chdirTest(t, dir)
 
 	var putCalled int32
 	server := fakeStateBranchAPI(t, nil, "backend", &putCalled)
 	defer server.Close()
 
 	output, runErr := executeRunCmdCaptureBoth(t, []string{
-		"--config", configPath,
 		"--dry-run",
 		"backend",
 	}, map[string]string{

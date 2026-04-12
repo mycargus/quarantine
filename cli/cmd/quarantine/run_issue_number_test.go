@@ -29,11 +29,11 @@ func fakeNewIssueGitHubAPI(t *testing.T, issueNumber int) *httptest.Server {
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc123","type":"commit"}}`)
 
 		// Read quarantine state — empty (404 = no file yet).
-		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusNotFound)
 
 		// CAS write — always succeed.
-		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusOK)
 
 		// All search requests — return empty (no existing issues for new-issue test).
@@ -79,26 +79,16 @@ func TestRunResultsJSONIncludesIssueNumberForNewlyCreatedIssue(t *testing.T) {
 	initialScript := writeTestScript(t, dir, xmlPath, failXML, 1)
 	rerunScript := writeAlwaysPassScript(t, dir, "rerun-script-107")
 
-	configPath := writeTempConfig(t, fmt.Sprintf(`
-version: 1
-framework: jest
-github:
-  owner: test-owner
-  repo: test-repo
-rerun_command: %s
-`, rerunScript))
+	writeSuiteConfigFull(t, dir, "test-owner", "test-repo", xmlPath, initialScript, rerunScript)
+	chdirTest(t, dir)
 
 	issueNumber := 42
 	server := fakeNewIssueGitHubAPI(t, issueNumber)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "unit", "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--retries", "3",
-		"--", initialScript,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
@@ -186,11 +176,11 @@ func fakeDedupExistingIssueGitHubAPI(t *testing.T, existingIssueNumber int, exis
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc123","type":"commit"}}`)
 
 		// Read quarantine state — empty (404 = no file yet).
-		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusNotFound)
 
 		// CAS write — always succeed.
-		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusOK)
 
 		// All search requests — dispatch based on decoded query.
@@ -245,27 +235,17 @@ func TestRunResultsJSONIncludesIssueNumberFromDedupExistingIssue(t *testing.T) {
 	initialScript := writeTestScript(t, dir, xmlPath, failXML, 1)
 	rerunScript := writeAlwaysPassScript(t, dir, "rerun-script-108")
 
-	configPath := writeTempConfig(t, fmt.Sprintf(`
-version: 1
-framework: jest
-github:
-  owner: test-owner
-  repo: test-repo
-rerun_command: %s
-`, rerunScript))
+	writeSuiteConfigFull(t, dir, "test-owner", "test-repo", xmlPath, initialScript, rerunScript)
+	chdirTest(t, dir)
 
 	existingIssueNumber := 173
 	existingIssueURL := "https://github.com/test-owner/test-repo/issues/173"
 	server := fakeDedupExistingIssueGitHubAPI(t, existingIssueNumber, existingIssueURL)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "unit", "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--retries", "3",
-		"--", initialScript,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
@@ -335,11 +315,11 @@ func fakeIssue503GitHubAPI(t *testing.T) *httptest.Server {
 			_, _ = fmt.Fprint(w, `{"ref":"refs/heads/quarantine/state","object":{"sha":"abc123","type":"commit"}}`)
 
 		// Read quarantine state — empty (404 = no file yet).
-		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusNotFound)
 
 		// CAS write — always succeed.
-		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/quarantine.json"):
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/contents/"):
 			w.WriteHeader(http.StatusOK)
 
 		// All search requests — return empty (no existing issues).
@@ -381,26 +361,16 @@ func TestRunResultsJSONHasNullIssueNumberWhenIssueCreationFails(t *testing.T) {
 	initialScript := writeTestScript(t, dir, xmlPath, failXML, 1)
 	rerunScript := writeAlwaysPassScript(t, dir, "rerun-script-109")
 
-	configPath := writeTempConfig(t, fmt.Sprintf(`
-version: 1
-framework: jest
-github:
-  owner: test-owner
-  repo: test-repo
-rerun_command: %s
-`, rerunScript))
+	writeSuiteConfigFull(t, dir, "test-owner", "test-repo", xmlPath, initialScript, rerunScript)
+	chdirTest(t, dir)
 
 	server := fakeIssue503GitHubAPI(t)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
+	resultsPath := filepath.Join(dir, ".quarantine", "unit", "results.json")
 
 	combinedOutput, runErr := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--retries", "3",
-		"--", initialScript,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,

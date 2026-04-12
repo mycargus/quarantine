@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -57,6 +58,81 @@ func fakeGitHubAPI(t *testing.T, branchExists bool) *httptest.Server {
 	}))
 }
 
+// writeSuiteConfigFull creates a suite config with custom owner, repo, and rerun command.
+func writeSuiteConfigFull(t *testing.T, dir, owner, repo, xmlPath, scriptPath, rerunScriptPath string) string {
+	t.Helper()
+	suiteDir := filepath.Join(dir, ".quarantine")
+	if err := os.MkdirAll(suiteDir, 0755); err != nil {
+		t.Fatalf("writeSuiteConfigFull: mkdir: %v", err)
+	}
+	configPath := filepath.Join(suiteDir, "config.yml")
+	content := fmt.Sprintf(`version: 1
+github:
+  owner: %s
+  repo: %s
+test_suites:
+  - name: unit
+    command: ["%s"]
+    junitxml: "%s"
+    rerun_command: ["%s"]
+    retries: 3
+`, owner, repo, scriptPath, xmlPath, rerunScriptPath)
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatalf("writeSuiteConfigFull: write config: %v", err)
+	}
+	return configPath
+}
+
+// writeSuiteConfigWithRetries creates a suite config with custom retries count.
+func writeSuiteConfigWithRetries(t *testing.T, dir, xmlPath, scriptPath string, retries int) string {
+	t.Helper()
+	suiteDir := filepath.Join(dir, ".quarantine")
+	if err := os.MkdirAll(suiteDir, 0755); err != nil {
+		t.Fatalf("writeSuiteConfigWithRetries: mkdir: %v", err)
+	}
+	configPath := filepath.Join(suiteDir, "config.yml")
+	content := fmt.Sprintf(`version: 1
+github:
+  owner: testowner
+  repo: testrepo
+test_suites:
+  - name: unit
+    command: ["%s"]
+    junitxml: "%s"
+    rerun_command: ["false"]
+    retries: %d
+`, scriptPath, xmlPath, retries)
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatalf("writeSuiteConfigWithRetries: write config: %v", err)
+	}
+	return configPath
+}
+
+// writeSuiteConfigWithRerunScript creates a suite config with a custom rerun command script.
+func writeSuiteConfigWithRerunScript(t *testing.T, dir, xmlPath, scriptPath, rerunScriptPath string) string {
+	t.Helper()
+	suiteDir := filepath.Join(dir, ".quarantine")
+	if err := os.MkdirAll(suiteDir, 0755); err != nil {
+		t.Fatalf("writeSuiteConfigWithRerunScript: mkdir: %v", err)
+	}
+	configPath := filepath.Join(suiteDir, "config.yml")
+	content := fmt.Sprintf(`version: 1
+github:
+  owner: testowner
+  repo: testrepo
+test_suites:
+  - name: unit
+    command: ["%s"]
+    junitxml: "%s"
+    rerun_command: ["%s"]
+    retries: 3
+`, scriptPath, xmlPath, rerunScriptPath)
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatalf("writeSuiteConfigWithRerunScript: write config: %v", err)
+	}
+	return configPath
+}
+
 // writeTestScript creates an executable shell script that exits with exitCode.
 // It also pre-writes xmlContent to xmlPath before returning so that the
 // CLI can parse it after the script runs.
@@ -103,120 +179,54 @@ func executeRunCmdWithExitCode(t *testing.T, args []string, env map[string]strin
 	return 2
 }
 
+// chdirTest changes the working directory to dir for the duration of the test.
+func chdirTest(t *testing.T, dir string) {
+	t.Helper()
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+}
+
+// gitInit creates a bare git repo in dir with a remote origin URL.
+func gitInit(t *testing.T, dir, remoteURL string) {
+	t.Helper()
+	cmds := [][]string{
+		{"git", "init", "--initial-branch=main", dir},
+		{"git", "-C", dir, "remote", "add", "origin", remoteURL},
+	}
+	for _, args := range cmds {
+		out, err := exec.Command(args[0], args[1:]...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("gitInit %v: %v\n%s", args, err, out)
+		}
+	}
+}
+
 // --- Scenario 12: quarantine run without prior init ---
 
 func TestRunWithoutPriorInit(t *testing.T) {
 	dir := t.TempDir()
-	output, err := executeRunCmd(t, []string{"--config", dir + "/quarantine.yml", "--", "jest", "--ci"}, map[string]string{
+	chdirTest(t, dir)
+	output, err := executeRunCmd(t, nil, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "no quarantine.yml exists",
+		Given:    "no .quarantine/config.yml exists",
 		Should:   "return an error",
 		Actual:   err != nil,
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "no quarantine.yml exists",
+		Given:    "no .quarantine/config.yml exists",
 		Should:   "print message to run quarantine init first",
 		Actual:   strings.Contains(output, "Run 'quarantine init' first"),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "no quarantine.yml exists",
-		Should:   "not contain test runner output (test was not executed)",
-		Actual:   strings.Contains(output, "jest"),
-		Expected: false,
-	})
-}
-
-// --- Scenario 52: quarantine run without -- separator ---
-
-func TestRunWithoutSeparator(t *testing.T) {
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-`)
-
-	output, err := executeRunCmd(t, []string{"--config", configPath, "jest", "--ci"}, map[string]string{
-		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "quarantine run without -- separator",
-		Should:   "return an error",
-		Actual:   err != nil,
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "quarantine run without -- separator",
-		Should:   "print error about missing separator",
-		Actual:   strings.Contains(output, "missing '--' separator"),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "quarantine run without -- separator",
-		Should:   "print usage example",
-		Actual:   strings.Contains(output, "quarantine run [flags] -- <test command>"),
-		Expected: true,
-	})
-}
-
-// --- Scenario 52 (variant): -- separator present but no command after it ---
-
-func TestRunEmptyArgsAfterSeparator(t *testing.T) {
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-`)
-
-	output, err := executeRunCmd(t, []string{"--config", configPath, "--"}, map[string]string{
-		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "-- separator present but no command after it",
-		Should:   "return an error",
-		Actual:   err != nil,
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "-- separator present but no command after it",
-		Should:   "print error about missing test command",
-		Actual:   strings.Contains(output, "missing '--' separator"),
-		Expected: true,
-	})
-}
-
-// --- Scenario 53: Test command not found ---
-
-func TestRunCommandNotFound(t *testing.T) {
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-`)
-	args := []string{"--config", configPath, "--", "jset", "--ci"}
-	env := map[string]string{"QUARANTINE_GITHUB_TOKEN": "ghp_test"}
-
-	exitCode := executeRunCmdWithExitCode(t, args, env)
-	riteway.Assert(t, riteway.Case[int]{
-		Given:    "a typo in the test command (jset instead of jest)",
-		Should:   "exit with quarantine error code (2)",
-		Actual:   exitCode,
-		Expected: 2,
-	})
-
-	output, _ := executeRunCmd(t, args, env)
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "a typo in the test command (jset instead of jest)",
-		Should:   "print command not found error with the command name",
-		Actual:   strings.Contains(output, `command not found: "jset"`),
 		Expected: true,
 	})
 }

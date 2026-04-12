@@ -8,43 +8,33 @@ import (
 	riteway "github.com/mycargus/riteway-golang"
 )
 
-// fakeUnreachableAPI returns an httptest server URL that always returns 503.
-// The server is started, then closed immediately so all connections fail.
-// We use a fake URL instead so no TCP connection is even attempted.
+// fakeUnreachableAPI returns a URL for a port that is not listening.
 func fakeUnreachableAPIURL(t *testing.T) string {
 	t.Helper()
 	t.Setenv("QUARANTINE_RETRY_DELAY_SECONDS", "0")
-	// Use a port that is not listening — TCP connection refused.
 	return "http://127.0.0.1:19999"
+}
+
+func suiteXML() string {
+	return `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="0">
+  <testsuite name="suite" tests="1" failures="0">
+    <testcase classname="S" name="passes" time="0.1"/>
+  </testsuite>
+</testsuites>`
 }
 
 // --- Scenario 35: No GitHub token — degraded mode ---
 
 func TestRunDegradedNoToken(t *testing.T) {
 	dir := t.TempDir()
-
-	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="1" failures="0">
-  <testsuite name="suite" tests="1" failures="0">
-    <testcase classname="S" name="passes" time="0.1"/>
-  </testsuite>
-</testsuites>`
-
 	xmlPath := filepath.Join(dir, "junit.xml")
-	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	scriptPath := writeTestScript(t, dir, xmlPath, suiteXML(), 0)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
 	output, err := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", filepath.Join(dir, "results.json"),
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "",
 		"GITHUB_TOKEN":            "",
@@ -76,29 +66,13 @@ github:
 
 func TestRunDegradedAPIUnreachable(t *testing.T) {
 	dir := t.TempDir()
-
-	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="1" failures="0">
-  <testsuite name="suite" tests="1" failures="0">
-    <testcase classname="S" name="passes" time="0.1"/>
-  </testsuite>
-</testsuites>`
-
 	xmlPath := filepath.Join(dir, "junit.xml")
-	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	scriptPath := writeTestScript(t, dir, xmlPath, suiteXML(), 0)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", filepath.Join(dir, "results.json"),
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
@@ -112,37 +86,16 @@ github:
 	})
 }
 
-// TestRunBranchCheckWarnMsgIsPrinted verifies that check.warnMsg (from
-// checkBranchExists) is printed at line 105. When the API is unreachable but
-// the token is valid, GetRef fails with an API error and sets warnMsg to
-// "Could not check branch '...'". This string only appears if line 105's guard
-// fires; it is distinct from the loadQuarantineState warning.
-// Kills mutation: `check.warnMsg != ""` → `check.warnMsg == ""`.
+// TestRunBranchCheckWarnMsgIsPrinted verifies the branch check warning is printed.
 func TestRunBranchCheckWarnMsgIsPrinted(t *testing.T) {
 	dir := t.TempDir()
-
-	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="1" failures="0">
-  <testsuite name="suite" tests="1" failures="0">
-    <testcase classname="S" name="passes" time="0.1"/>
-  </testsuite>
-</testsuites>`
-
 	xmlPath := filepath.Join(dir, "junit.xml")
-	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	scriptPath := writeTestScript(t, dir, xmlPath, suiteXML(), 0)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
 	output, _ := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", filepath.Join(dir, "results.json"),
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
@@ -158,29 +111,13 @@ github:
 
 func TestRunDegradedAPIUnreachableLogsWarning(t *testing.T) {
 	dir := t.TempDir()
-
-	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="1" failures="0">
-  <testsuite name="suite" tests="1" failures="0">
-    <testcase classname="S" name="passes" time="0.1"/>
-  </testsuite>
-</testsuites>`
-
 	xmlPath := filepath.Join(dir, "junit.xml")
-	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	scriptPath := writeTestScript(t, dir, xmlPath, suiteXML(), 0)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
 	output, _ := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", filepath.Join(dir, "results.json"),
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
@@ -196,29 +133,13 @@ github:
 
 func TestRunDegradedAPIUnreachableGHAAnnotation(t *testing.T) {
 	dir := t.TempDir()
-
-	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="1" failures="0">
-  <testsuite name="suite" tests="1" failures="0">
-    <testcase classname="S" name="passes" time="0.1"/>
-  </testsuite>
-</testsuites>`
-
 	xmlPath := filepath.Join(dir, "junit.xml")
-	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	scriptPath := writeTestScript(t, dir, xmlPath, suiteXML(), 0)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
 	output, _ := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", filepath.Join(dir, "results.json"),
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
@@ -233,37 +154,17 @@ github:
 	})
 }
 
-// --- Scenario 33: No API + empty cache — run all tests without exclusions ---
+// --- Scenario 33: No API + empty cache ---
 
 func TestRunDegradedNoAPINoCache(t *testing.T) {
 	dir := t.TempDir()
-
-	// JUnit XML with 2 tests (including one that "was quarantined" — but with no
-	// state available, it runs normally and passes).
-	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="2" failures="0">
-  <testsuite name="suite" tests="2" failures="0">
-    <testcase classname="S" name="test one" time="0.1"/>
-    <testcase classname="S" name="test two" time="0.1"/>
-  </testsuite>
-</testsuites>`
-
 	xmlPath := filepath.Join(dir, "junit.xml")
-	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	scriptPath := writeTestScript(t, dir, xmlPath, suiteXML(), 0)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
-	resultsPath := filepath.Join(dir, "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
@@ -279,29 +180,13 @@ github:
 
 func TestRunDegradedNoAPINoCacheLogsMessage(t *testing.T) {
 	dir := t.TempDir()
-
-	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="1" failures="0">
-  <testsuite name="suite" tests="1" failures="0">
-    <testcase classname="S" name="passes" time="0.1"/>
-  </testsuite>
-</testsuites>`
-
 	xmlPath := filepath.Join(dir, "junit.xml")
-	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-github:
-  owner: testowner
-  repo: testrepo
-`)
+	scriptPath := writeTestScript(t, dir, xmlPath, suiteXML(), 0)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
 	output, _ := executeRunCmd(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", filepath.Join(dir, "results.json"),
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
@@ -319,35 +204,19 @@ github:
 
 func TestRunDashboardUnreachableHasNoEffect(t *testing.T) {
 	dir := t.TempDir()
-
-	junitXML := `<?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="1" failures="0">
-  <testsuite name="suite" tests="1" failures="0">
-    <testcase classname="S" name="passes" time="0.1"/>
-  </testsuite>
-</testsuites>`
-
 	xmlPath := filepath.Join(dir, "junit.xml")
-	scriptPath := writeTestScript(t, dir, xmlPath, junitXML, 0)
-	configPath := writeTempConfig(t, `
-version: 1
-framework: jest
-`)
+	scriptPath := writeTestScript(t, dir, xmlPath, suiteXML(), 0)
+	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
+	chdirTest(t, dir)
 
-	// Normal GitHub API (branch exists, no quarantine state).
 	server := fakeM4GitHubAPI(t, nil, nil)
 	defer server.Close()
 
-	resultsPath := filepath.Join(dir, "results.json")
 	exitCode := executeRunCmdWithExitCode(t, []string{
-		"--config", configPath,
-		"--junitxml", xmlPath,
-		"--output", resultsPath,
-		"--", scriptPath,
+		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
-		// Dashboard URL intentionally NOT set — it doesn't exist in CLI config.
 	})
 
 	riteway.Assert(t, riteway.Case[int]{

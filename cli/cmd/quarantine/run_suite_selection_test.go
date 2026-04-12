@@ -38,6 +38,9 @@ func TestRunSingleSuiteAutoSelected(t *testing.T) {
 	}
 	configPath := filepath.Join(suiteConfigDir, "config.yml")
 	configContent := `version: 1
+github:
+  owner: testowner
+  repo: testrepo
 test_suites:
   - name: unit
     command: ["` + fakeBin + `"]
@@ -46,13 +49,13 @@ test_suites:
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+	chdirTest(t, dir)
 
 	server := fakeGitHubAPI(t, true)
 	defer server.Close()
 
 	// Run with NO suite name argument — should auto-select the only suite.
 	_, err := executeRunCmd(t, []string{
-		"--config", configPath,
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
@@ -86,6 +89,9 @@ func TestRunMultipleSuitesNoArgExitsTwo(t *testing.T) {
 	}
 	configPath := filepath.Join(suiteConfigDir, "config.yml")
 	configContent := `version: 1
+github:
+  owner: testowner
+  repo: testrepo
 test_suites:
   - name: backend
     command: ["bundle", "exec", "rspec"]
@@ -97,10 +103,10 @@ test_suites:
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+	chdirTest(t, dir)
 
 	// Run with NO suite name argument.
 	_, err := executeRunCmd(t, []string{
-		"--config", configPath,
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
@@ -127,15 +133,18 @@ func TestRunNoSuitesConfiguredExitsTwo(t *testing.T) {
 	// Empty test_suites: [] sets hasSuitesKey=true so the CLI enters suite mode
 	// and selectSuite returns an error.
 	configContent := `version: 1
+github:
+  owner: testowner
+  repo: testrepo
 test_suites: []
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+	chdirTest(t, dir)
 
 	// Exit code 2: unit test of selectSuite verifies the message content.
 	_, err := executeRunCmd(t, []string{
-		"--config", configPath,
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "ghp_test",
 	})
