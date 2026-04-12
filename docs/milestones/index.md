@@ -54,6 +54,19 @@ Phase 5 -- GitHub App Integration (v2, depends on M5-M8 being complete)
     M12: Installation discovery (depends on M11)
     M13: github-app mode integration + user permission filtering (depends on M12)
     M14: E2E integration + CI (depends on M13)
+
+Phase 6 -- Multi-Suite Conversion (depends on M1-M8 verified)
+    MS1a: Core conversion. Config (.quarantine/config.yml, test_suites array,
+          junitxml/rerun_command always required), run [suite-name], per-suite
+          state/notifications, init with framework detection, delete old format.
+    MS1b: Additive features. suite list/remove, quarantine status, timeouts,
+          quarantined-files.txt, dashboard migration, schema updates.
+    See docs/plans/multi-suite-support.md.
+
+Phase 7 -- Webhooks (v3, depends on M14 and public endpoint ADR)
+  issue.closed, installation lifecycle, artifact ingestion,
+    state consolidation webhooks
+    (see docs/plans/webhooks.md)
 ```
 
 ---

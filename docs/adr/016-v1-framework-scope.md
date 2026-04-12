@@ -1,6 +1,6 @@
 # ADR-016: v1 Framework Scope (RSpec, Jest, Vitest)
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-030](030-framework-agnostic-design.md)
 **Date:** 2026-03-14
 
 ## Context

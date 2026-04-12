@@ -40,3 +40,13 @@ See `docs/plans/webhooks.md` for the deferred work scope.
 - (-) Artifact ingestion delayed by polling interval (~5 min) instead of near-real-time (~30s).
 - (-) Unquarantine timing unchanged: still happens on next CLI run, not on issue close.
 - (-) v3 will need architectural review for public endpoint exposure.
+
+## Amendment (2026-04-10): Reverted
+
+~~Allow `workflow_run.completed` webhook processing in v2.~~ Reverted after risk
+review. The infrastructure required for even one webhook type (public endpoint,
+webhook secret, HMAC verification, idempotency tracking) is the same as for all
+webhook types. The state consolidation optimization is achievable via a scheduled
+GitHub Actions workflow + a `quarantine state consolidate` CLI command, which
+requires zero webhook infrastructure. See `docs/plans/multi-suite-support.md`
+(D6) for the replacement approach. All webhooks remain deferred to v3.
