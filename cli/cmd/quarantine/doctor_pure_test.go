@@ -283,6 +283,88 @@ retries: -1
 	})
 }
 
+// --- detectRetryTimes pure unit tests (Scenarios 115/116) ---
+
+func TestDetectRetryTimes(t *testing.T) {
+	tests := []struct {
+		name     string
+		files    map[string]string
+		wantHits []string
+	}{
+		{
+			name: "config-style retryTimes with non-zero value is detected",
+			files: map[string]string{
+				"jest.config.js": "module.exports = {\n  retryTimes: 2,\n};\n",
+			},
+			wantHits: []string{"jest.config.js"},
+		},
+		{
+			name: "call-style retryTimes with non-zero value is detected",
+			files: map[string]string{
+				"example.test.js": "jest.retryTimes(3);\n",
+			},
+			wantHits: []string{"example.test.js"},
+		},
+		{
+			name: "retryTimes(0) call-style zero value is not detected",
+			files: map[string]string{
+				"example.test.js": "jest.retryTimes(0);\n",
+			},
+			wantHits: []string{},
+		},
+		{
+			name: "retryTimes: 0 config-style zero value is not detected",
+			files: map[string]string{
+				"jest.config.js": "module.exports = { retryTimes: 0 };\n",
+			},
+			wantHits: []string{},
+		},
+		{
+			name:     "empty files map returns no hits",
+			files:    map[string]string{},
+			wantHits: []string{},
+		},
+		{
+			name: "multiple files only matching ones returned",
+			files: map[string]string{
+				"jest.config.js":  "module.exports = { retryTimes: 5 };\n",
+				"jest.config.ts":  "export default { retries: 3 };\n",
+				"example.test.js": "jest.retryTimes(0);\n",
+			},
+			wantHits: []string{"jest.config.js"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := detectRetryTimes(tt.files)
+
+			riteway.Assert(t, riteway.Case[int]{
+				Given:    tt.name,
+				Should:   "return the correct number of matching files",
+				Actual:   len(actual),
+				Expected: len(tt.wantHits),
+			})
+
+			for _, want := range tt.wantHits {
+				found := false
+				for _, got := range actual {
+					if got == want {
+						found = true
+						break
+					}
+				}
+				riteway.Assert(t, riteway.Case[bool]{
+					Given:    tt.name,
+					Should:   "include expected file path '" + want + "' in hits",
+					Actual:   found,
+					Expected: true,
+				})
+			}
+		})
+	}
+}
+
 // --- || vs && for git detection (line 62) ---
 
 func TestDoctorGitDetectionWithOnlyOwnerSet(t *testing.T) {

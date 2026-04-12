@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/mycargus/quarantine/cli/internal/config"
@@ -88,6 +89,12 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 	cmd.Printf("  storage.branch:  %s%s\n", cfg.Storage.Branch, branchNote)
 
+	// Scan for retryTimes in jest config files relative to the repo root.
+	retryHits := detectRetryTimesInRepo(configPath)
+	if len(retryHits) > 0 {
+		cmd.Printf("\nWarning: %s contains 'retryTimes'. Framework-level retries hide\nfailures from JUnit XML, preventing quarantine from detecting flaky tests.\nRemove retryTimes before using quarantine.\n", strings.Join(retryHits, ", "))
+	}
+
 	if len(warns) > 0 {
 		cmd.Printf("\nWarnings:\n")
 		for _, w := range warns {
@@ -96,6 +103,49 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// detectRetryTimesInRepo reads known jest config files and top-level test files
+// from the repo root and returns file paths where a non-zero retryTimes value
+// was found.
+//
+// I/O shell — reads files from disk, delegates detection to detectRetryTimes.
+func detectRetryTimesInRepo(configPath string) []string {
+	// Determine the repo root from the config path.
+	// If the config lives inside a ".quarantine" directory, go one level up.
+	configDir := filepath.Dir(configPath)
+	repoRoot := configDir
+	if filepath.Base(configDir) == ".quarantine" {
+		repoRoot = filepath.Dir(configDir)
+	}
+
+	// Named jest config files to always check.
+	namedCandidates := []string{
+		"jest.config.js",
+		"jest.config.ts",
+		"jest.config.mjs",
+	}
+
+	files := make(map[string]string)
+	for _, name := range namedCandidates {
+		data, err := os.ReadFile(filepath.Join(repoRoot, name))
+		if err == nil {
+			files[name] = string(data)
+		}
+	}
+
+	// Also scan top-level test files for call-style retryTimes(N) usage.
+	for _, pat := range []string{"*.test.js", "*.test.ts", "*.spec.js", "*.spec.ts"} {
+		matches, _ := filepath.Glob(filepath.Join(repoRoot, pat))
+		for _, m := range matches {
+			data, err := os.ReadFile(m)
+			if err == nil {
+				files[filepath.Base(m)] = string(data)
+			}
+		}
+	}
+
+	return detectRetryTimes(files)
 }
 
 // resolveDisplayOwnerRepo determines owner/repo display values with annotation notes.
