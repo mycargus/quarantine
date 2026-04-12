@@ -11,36 +11,6 @@ import (
 	riteway "github.com/mycargus/riteway-golang"
 )
 
-// --- No frameworks detected ---
-
-func TestInitNoFrameworksDetected(t *testing.T) {
-	dir := t.TempDir()
-	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
-	// No package.json, no Gemfile.
-
-	stdout, err := executeInitCmd(t,
-		"",
-		dir,
-		map[string]string{
-			"QUARANTINE_GITHUB_TOKEN": "ghp_test",
-		},
-	)
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "no package.json and no Gemfile in the directory",
-		Should:   "return an error",
-		Actual:   err != nil,
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "no supported frameworks detected",
-		Should:   "print frameworks-related error message",
-		Actual:   strings.Contains(stdout, "framework"),
-		Expected: true,
-	})
-}
-
 // --- Scenario 6: no GitHub token ---
 
 func TestInitNoGitHubToken(t *testing.T) {

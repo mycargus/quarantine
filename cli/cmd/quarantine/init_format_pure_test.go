@@ -45,6 +45,31 @@ func TestFormatInitSummaryExistingBranch(t *testing.T) {
 	})
 }
 
+func TestFormatInitSummaryNoFrameworks(t *testing.T) {
+	summary := formatInitSummary("my-org", "my-repo", []string{}, false)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no frameworks detected, new branch",
+		Should:   "show config path as created",
+		Actual:   strings.Contains(summary, ".quarantine/config.yml (created)"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no frameworks detected",
+		Should:   "contain 'edit' next-step text (not 'review')",
+		Actual:   strings.Contains(summary, "edit .quarantine/config.yml"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no frameworks detected",
+		Should:   "not contain 'adjust suite names' review text",
+		Actual:   !strings.Contains(summary, "adjust suite names"),
+		Expected: true,
+	})
+}
+
 // --- formatInitConfig unit tests ---
 
 func TestFormatInitConfigJestOnly(t *testing.T) {
@@ -161,6 +186,54 @@ func TestJoinQuotedMultipleItems(t *testing.T) {
 		Should:   "return comma-separated double-quoted strings",
 		Actual:   result,
 		Expected: `"npx", "jest", "--ci"`,
+	})
+}
+
+// --- formatNoFrameworkConfig unit tests ---
+
+func TestFormatNoFrameworkConfigContainsCommentedExample(t *testing.T) {
+	cfg := formatNoFrameworkConfig("my-org", "my-repo")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no frameworks detected",
+		Should:   "contain version: 1",
+		Actual:   strings.Contains(cfg, "version: 1"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no frameworks detected",
+		Should:   "contain github owner",
+		Actual:   strings.Contains(cfg, "owner: my-org"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no frameworks detected",
+		Should:   "contain github repo",
+		Actual:   strings.Contains(cfg, "repo: my-repo"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no frameworks detected",
+		Should:   "contain test_suites: key",
+		Actual:   strings.Contains(cfg, "test_suites:"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no frameworks detected",
+		Should:   "contain commented example suite entry",
+		Actual:   strings.Contains(cfg, "# Add your test suites here"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no frameworks detected",
+		Should:   "not contain a real suite name entry (only comments)",
+		Actual:   !strings.Contains(cfg, "\n  - name:"),
+		Expected: true,
 	})
 }
 

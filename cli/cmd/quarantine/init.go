@@ -26,13 +26,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 	frameworks := detectFrameworks(string(pkgJSON), string(gemfile))
 
 	if len(frameworks) == 0 {
-		cmd.Printf("No supported test frameworks detected.\n")
-		cmd.Printf("Supported frameworks: jest, vitest, rspec.\n")
-		cmd.Printf("Add jest or vitest to package.json devDependencies, or add gem 'rspec' to your Gemfile.\n")
-		return fmt.Errorf("no frameworks detected")
+		cmd.Printf("No test frameworks detected.\n")
+	} else {
+		cmd.Printf("Detected test frameworks: %s\n", strings.Join(frameworks, ", "))
 	}
-
-	cmd.Printf("Detected test frameworks: %s\n", strings.Join(frameworks, ", "))
 
 	// Step 2: Validate GitHub token.
 	token := ghclient.ResolveToken()
@@ -82,7 +79,12 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 		return fmt.Errorf("mkdir .quarantine: %w", err)
 	}
 
-	configContent := formatInitConfig(owner, repo, frameworks)
+	var configContent string
+	if len(frameworks) == 0 {
+		configContent = formatNoFrameworkConfig(owner, repo)
+	} else {
+		configContent = formatInitConfig(owner, repo, frameworks)
+	}
 	if err := os.WriteFile(".quarantine/config.yml", []byte(configContent), 0644); err != nil {
 		cmd.Printf("Error: failed to write .quarantine/config.yml: %v\n", err)
 		return fmt.Errorf("write config: %w", err)
@@ -94,7 +96,9 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 		return fmt.Errorf("write gitignore: %w", err)
 	}
 
-	cmd.Printf("Pre-filled %d suite entries in .quarantine/config.yml\n", len(frameworks))
+	if len(frameworks) > 0 {
+		cmd.Printf("Pre-filled %d suite entries in .quarantine/config.yml\n", len(frameworks))
+	}
 
 	// Step 6: Check and create the quarantine/state branch.
 	_, branchExists, err := client.GetRef(ctx, "quarantine/state")
@@ -264,6 +268,35 @@ test_suites:
 %s`, owner, repo, suites.String())
 }
 
+// formatNoFrameworkConfig generates the content of .quarantine/config.yml when
+// no test frameworks were detected. It uses a commented example suite entry so
+// the developer has a template to work from.
+// This is a pure function — no I/O.
+func formatNoFrameworkConfig(owner, repo string) string {
+	return fmt.Sprintf(`version: 1
+
+github:
+  owner: %s
+  repo: %s
+
+issue_tracker: github
+labels:
+  - quarantine
+notifications:
+  github_pr_comment: true
+storage:
+  branch: quarantine/state
+
+test_suites:
+  # Add your test suites here. Example:
+  # - name: unit
+  #   command: ["npm", "test"]
+  #   junitxml: "junit.xml"
+  #   rerun_command: ["npx", "jest", "--testNamePattern", "{name}"]
+  #   retries: 3
+`, owner, repo)
+}
+
 // joinQuoted returns a comma-separated, double-quoted list of strings for
 // embedding inside a YAML flow sequence: ["npx", "jest", "--ci"].
 // This is a pure function — no I/O.
@@ -292,14 +325,19 @@ func formatInitSummary(owner, repo string, frameworks []string, branchExists boo
 	if branchExists {
 		branchStatus = "already exists"
 	}
+	var nextStep string
+	if len(frameworks) == 0 {
+		nextStep = "Next step: edit .quarantine/config.yml to add your test suites,\nthen run `quarantine doctor` to validate."
+	} else {
+		nextStep = "Next step: review .quarantine/config.yml, adjust suite names and commands,\nthen run `quarantine doctor` to validate."
+	}
 	return fmt.Sprintf(`
 Quarantine initialized.
   Config:   .quarantine/config.yml (created)
   Branch:   quarantine/state (%s)
 
-Next step: review .quarantine/config.yml, adjust suite names and commands,
-then run `+"`quarantine doctor`"+` to validate.
-`, branchStatus)
+%s
+`, branchStatus, nextStep)
 }
 
 // classifyGitHubError returns a user-facing error message for a GitHub API failure.

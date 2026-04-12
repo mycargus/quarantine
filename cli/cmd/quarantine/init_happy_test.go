@@ -217,6 +217,77 @@ func TestInitBranchAlreadyExists(t *testing.T) {
 	})
 }
 
+// --- Scenario 111: no frameworks detected writes commented example ---
+
+func TestInitNoFrameworksDetectedWritesCommentedConfig(t *testing.T) {
+	dir := t.TempDir()
+	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
+	// No package.json and no Gemfile — zero frameworks detected.
+	mockServer := newInitTestServer(t)
+
+	stdout, err := executeInitCmd(t,
+		"",
+		dir,
+		map[string]string{
+			"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+			"QUARANTINE_GITHUB_API_BASE_URL": mockServer.server.URL,
+		},
+	)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no package.json and no Gemfile",
+		Should:   "exit without error (code 0)",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no package.json and no Gemfile",
+		Should:   "print 'No test frameworks detected.'",
+		Actual:   strings.Contains(stdout, "No test frameworks detected."),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no package.json and no Gemfile",
+		Should:   "print 'Quarantine initialized.'",
+		Actual:   strings.Contains(stdout, "Quarantine initialized."),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no package.json and no Gemfile",
+		Should:   "print next step hint to edit config.yml",
+		Actual:   strings.Contains(stdout, "edit .quarantine/config.yml"),
+		Expected: true,
+	})
+
+	// Verify .quarantine/config.yml was created with commented example.
+	content, readErr := os.ReadFile(dir + "/.quarantine/config.yml")
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no frameworks detected",
+		Should:   "create .quarantine/config.yml",
+		Actual:   readErr == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    ".quarantine/config.yml written with no frameworks",
+		Should:   "contain commented example suite entry",
+		Actual:   strings.Contains(string(content), "# Add your test suites here"),
+		Expected: true,
+	})
+
+	// Verify .quarantine/.gitignore was created.
+	_, gitignoreErr := os.Stat(dir + "/.quarantine/.gitignore")
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no frameworks detected",
+		Should:   "create .quarantine/.gitignore",
+		Actual:   gitignoreErr == nil,
+		Expected: true,
+	})
+}
+
 // --- Empty defaultBranch fallback ---
 
 func TestInitEmptyDefaultBranchFallsBackToMain(t *testing.T) {
