@@ -146,7 +146,13 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 			cmd.Printf("Error: failed to create branch: %v\n", err)
 			return fmt.Errorf("create ref: %w", err)
 		}
+	}
 
+	// Write .quarantine/README.md if it does not already exist on the state branch.
+	// Checked independently of branch creation so that re-running init is idempotent
+	// even when a previous attempt failed after creating the branch.
+	_, readmeSHA, readmeGetErr := client.GetContents(ctx, ".quarantine/README.md", "quarantine/state")
+	if readmeGetErr == nil && readmeSHA == "" {
 		readmeContent := []byte(`# quarantine/state
 
 This branch stores quarantine state managed by the quarantine CLI.

@@ -396,6 +396,13 @@ func TestInitPutContentsFailure(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 	})
 	mux.HandleFunc("/repos/my-org/my-project/contents/.quarantine/README.md", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			// File not found → init will attempt the write
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+			return
+		}
 		w.WriteHeader(http.StatusConflict)
 	})
 	server := httptest.NewServer(mux)
