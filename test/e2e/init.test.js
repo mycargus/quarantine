@@ -155,11 +155,11 @@ describe("quarantine init — E2E against real GitHub", () => {
     })
   })
 
-  test("writes README.md to the state branch", async () => {
-    const content = await getFileOnBranch("README.md")
+  test("writes .quarantine/README.md to the state branch", async () => {
+    const content = await getFileOnBranch(".quarantine/README.md")
     assert({
       given: "quarantine/state branch after init",
-      should: "have a README.md file",
+      should: "have a .quarantine/README.md file",
       actual: content.length > 0,
       expected: true,
     })

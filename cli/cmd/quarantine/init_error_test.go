@@ -395,7 +395,7 @@ func TestInitPutContentsFailure(t *testing.T) {
 	mux.HandleFunc("/repos/my-org/my-project/git/refs", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 	})
-	mux.HandleFunc("/repos/my-org/my-project/contents/README.md", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/repos/my-org/my-project/contents/.quarantine/README.md", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusConflict)
 	})
 	server := httptest.NewServer(mux)
@@ -411,16 +411,16 @@ func TestInitPutContentsFailure(t *testing.T) {
 	)
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "PUT /contents/README.md returns 409",
+		Given:    "PUT /contents/.quarantine/README.md returns 409",
 		Should:   "return an error",
 		Actual:   err != nil,
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "PUT /contents/README.md returns 409",
-		Should:   "print error about failed README.md write",
-		Actual:   strings.Contains(stdout, "failed to write README.md"),
+		Given:    "PUT /contents/.quarantine/README.md returns 409",
+		Should:   "print error about failed .quarantine/README.md write",
+		Actual:   strings.Contains(stdout, "failed to write .quarantine/README.md"),
 		Expected: true,
 	})
 }
