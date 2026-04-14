@@ -301,6 +301,57 @@ describe("syncRepo() — partial download failure aborts remaining artifacts", a
   })
 })
 
+describe("syncRepo() — state enumeration 404 handling", async (assert) => {
+  const handle = initDb(":memory:")
+  const owner = "mycargus"
+  const repo = "my-app"
+  const now = new Date("2026-04-14T12:00:00Z")
+  const warnings: string[] = []
+
+  // fetchFn: artifacts list returns one artifact so artifact sync runs normally;
+  // the .quarantine/ directory listing returns 404 (no state branch directory).
+  const artifacts = [makeArtifact(10, "quarantine-results-10")]
+  const fetchFn = makeFakeFetch(artifacts)
+
+  await syncRepo(owner, repo, "fake-token", handle, now, fetchFn, (msg) => warnings.push(msg))
+
+  const projectRow = handle.raw
+    .prepare("SELECT last_pulled_at FROM projects WHERE owner = ? AND repo = ?")
+    .get(owner, repo) as { last_pulled_at: string | null } | undefined
+
+  assert({
+    given: "syncRepo with one artifact and .quarantine/ 404",
+    should: "create a project row for the repo",
+    actual: projectRow !== undefined,
+    expected: true,
+  })
+
+  assert({
+    given: "syncRepo with one artifact and .quarantine/ 404",
+    should: "update last_pulled_at (sync completed fully, not aborted)",
+    actual: projectRow?.last_pulled_at,
+    expected: now.toISOString(),
+  })
+
+  assert({
+    given: "syncRepo with one artifact and .quarantine/ 404",
+    should: "not emit any warnings (404 is treated as empty, not an error)",
+    actual: warnings.length,
+    expected: 0,
+  })
+
+  const testRunCount = (
+    handle.raw.prepare("SELECT COUNT(*) as count FROM test_runs").get() as { count: number }
+  ).count
+
+  assert({
+    given: "syncRepo with one artifact and .quarantine/ 404",
+    should: "still ingest the artifact into test_runs (artifact sync unaffected by 404)",
+    actual: testRunCount,
+    expected: 1,
+  })
+})
+
 describe("syncRepo() — state enumeration: backend (3 tests) + frontend (1 test)", async (assert) => {
   const handle = initDb(":memory:")
   const owner = "mycargus"
