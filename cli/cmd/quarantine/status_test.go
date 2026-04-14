@@ -293,4 +293,146 @@ test_suites:
 	})
 }
 
+// --- Scenario 129: quarantine status backend — no artifacts available ---
+
+func TestStatusOmitsDurationWhenNoArtifactsAvailable(t *testing.T) {
+	// State with 2 quarantined tests. "now" is not pinned — we assert structure only.
+	stateJSON := map[string]interface{}{
+		"version":    1,
+		"updated_at": "2026-04-14T10:00:00Z",
+		"tests": map[string]interface{}{
+			"spec/models/user_spec.rb::User::validates email": map[string]interface{}{
+				"test_id":         "spec/models/user_spec.rb::User::validates email",
+				"file_path":       "spec/models/user_spec.rb",
+				"classname":       "User",
+				"name":            "validates email",
+				"suite":           "backend",
+				"first_flaky_at":  "2026-04-02T10:00:00Z",
+				"last_failure_at": "2026-04-03T10:00:00Z",
+				"flaky_count":     3,
+				"quarantined_at":  "2026-04-02T10:00:00Z",
+				"quarantined_by":  "cli-auto",
+				"issue_number":    42,
+				"issue_url":       "https://github.com/testowner/testrepo/issues/42",
+			},
+			"spec/models/order_spec.rb::Order::calculates total": map[string]interface{}{
+				"test_id":         "spec/models/order_spec.rb::Order::calculates total",
+				"file_path":       "spec/models/order_spec.rb",
+				"classname":       "Order",
+				"name":            "calculates total",
+				"suite":           "backend",
+				"first_flaky_at":  "2026-04-09T10:00:00Z",
+				"last_failure_at": "2026-04-10T10:00:00Z",
+				"flaky_count":     2,
+				"quarantined_at":  "2026-04-09T10:00:00Z",
+				"quarantined_by":  "cli-auto",
+				"issue_number":    51,
+				"issue_url":       "https://github.com/testowner/testrepo/issues/51",
+			},
+		},
+	}
+
+	stateBytes, _ := json.Marshal(stateJSON)
+	stateEncoded := base64.StdEncoding.EncodeToString(stateBytes)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/contents/") && strings.Contains(r.URL.RawQuery, "ref=quarantine"):
+			// State file read — return 2 quarantined tests.
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"content": stateEncoded,
+				"sha":     "state-sha-xyz",
+			})
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/actions/artifacts"):
+			// Artifacts API returns 404 — simulates no artifacts available (expired or new repo).
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	writeTempConfig(t, `
+version: 1
+github:
+  owner: testowner
+  repo: testrepo
+test_suites:
+  - name: backend
+    command: ["bundle", "exec", "rspec"]
+    junitxml: "rspec.xml"
+    rerun_command: ["bundle", "exec", "rspec", "--only-failures"]
+    retries: 3
+`)
+
+	stdout, err := executeStatusCmd(t, []string{"backend"}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a backend suite with 2 quarantined tests and artifacts API returning 404",
+		Should:   "exit without error (code 0)",
+		Actual:   err == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a backend suite with 2 quarantined tests and no artifacts available",
+		Should:   "print suite name",
+		Actual:   strings.Contains(stdout, "Suite: backend"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a backend suite with 2 quarantined tests and no artifacts available",
+		Should:   "print quarantined test count of 2",
+		Actual:   strings.Contains(stdout, "Quarantined tests: 2"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no artifacts available for the backend suite",
+		Should:   "omit the avg quarantined test duration line entirely",
+		Actual:   strings.Contains(stdout, "Avg quarantined test duration"),
+		Expected: false,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "no artifacts available for the backend suite",
+		Should:   "omit the estimated CI time line entirely",
+		Actual:   strings.Contains(stdout, "Estimated CI time per run"),
+		Expected: false,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "2 quarantined tests with issue numbers 42 and 51",
+		Should:   "print validates email test name",
+		Actual:   strings.Contains(stdout, "validates email"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "validates email test with issue #42",
+		Should:   "print issue number #42",
+		Actual:   strings.Contains(stdout, "#42"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "2 quarantined tests with issue numbers 42 and 51",
+		Should:   "print calculates total test name",
+		Actual:   strings.Contains(stdout, "calculates total"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "calculates total test with issue #51",
+		Should:   "print issue number #51",
+		Actual:   strings.Contains(stdout, "#51"),
+		Expected: true,
+	})
+}
+
 // Pure function tests are in status_pure_test.go.
