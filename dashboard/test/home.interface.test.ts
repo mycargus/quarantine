@@ -6,13 +6,13 @@
  * (token: "" prevents sync).
  */
 
-import { unlinkSync, writeFileSync } from "node:fs"
 import { randomUUID } from "node:crypto"
+import { unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe } from "riteway"
-import { bodyText } from "../app/test-helpers.js"
 import { createApp } from "../app/app.js"
+import { bodyText } from "../app/test-helpers.js"
 import { createTestApp, seedTestDb } from "./helpers.js"
 
 describe("GET / — valid config, empty repos", async (assert) => {

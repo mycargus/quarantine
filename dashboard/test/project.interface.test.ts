@@ -13,9 +13,7 @@ import { createTestApp, seedTestDb } from "./helpers.js"
 describe("GET /projects/:owner/:repo — unknown project", async (assert) => {
   const { router, cleanup } = createTestApp({ repos: [{ owner: "acme", repo: "missing" }] })
   try {
-    const response = await router.fetch(
-      new Request("http://localhost/projects/acme/missing"),
-    )
+    const response = await router.fetch(new Request("http://localhost/projects/acme/missing"))
     const html = await bodyText(response)
 
     assert({
@@ -43,9 +41,7 @@ describe("GET /projects/:owner/:repo — known project, no test results", async 
   seedTestDb(dbPath, [{ owner: "acme", repo: "empty-repo" }])
 
   try {
-    const response = await router.fetch(
-      new Request("http://localhost/projects/acme/empty-repo"),
-    )
+    const response = await router.fetch(new Request("http://localhost/projects/acme/empty-repo"))
     const html = await bodyText(response)
 
     assert({
@@ -98,9 +94,7 @@ describe("GET /projects/:owner/:repo — known project with quarantined tests", 
   ])
 
   try {
-    const response = await router.fetch(
-      new Request("http://localhost/projects/acme/payments"),
-    )
+    const response = await router.fetch(new Request("http://localhost/projects/acme/payments"))
     const html = await bodyText(response)
 
     assert({
@@ -142,9 +136,7 @@ describe("GET /projects/:owner/:repo — route parameter extraction", async (ass
   seedTestDb(dbPath, [{ owner: "my-org", repo: "my-service" }])
 
   try {
-    const response = await router.fetch(
-      new Request("http://localhost/projects/my-org/my-service"),
-    )
+    const response = await router.fetch(new Request("http://localhost/projects/my-org/my-service"))
     const html = await bodyText(response)
 
     assert({
