@@ -195,6 +195,7 @@ describe("buildTestRunRecord()", async (assert) => {
       passedTests: 3,
       failedTests: 0,
       flakyTests: 1,
+      unresolvedTests: 0,
     },
   })
 
@@ -203,6 +204,16 @@ describe("buildTestRunRecord()", async (assert) => {
     should: "map prNumber as null",
     actual: buildTestRunRecord({ ...validFixture, pr_number: null }, 1).prNumber,
     expected: null,
+  })
+
+  assert({
+    given: "a TestResult whose summary omits the unresolved field (optional per schema)",
+    should: "default unresolvedTests to 0 via the ?? 0 fallback",
+    actual: buildTestRunRecord(
+      { ...validFixture, summary: { ...validFixture.summary, unresolved: undefined } },
+      1,
+    ).unresolvedTests,
+    expected: 0,
   })
 })
 

@@ -47,6 +47,7 @@ export interface TestResult {
     skipped: number
     quarantined: number
     flaky_detected: number
+    unresolved?: number
   }
   tests: TestEntry[]
 }
@@ -61,6 +62,8 @@ export interface TestEntry {
   duration_ms: number
   failure_message: string | null
   issue_number: number | null
+  error?: string
+  rerun_exit_code?: number
 }
 
 export interface TestRunRecord {
@@ -74,6 +77,7 @@ export interface TestRunRecord {
   passedTests: number
   failedTests: number
   flakyTests: number
+  unresolvedTests: number
 }
 
 /**
@@ -143,6 +147,7 @@ export function buildTestRunRecord(result: TestResult, projectId: number): TestR
     passedTests: result.summary.passed,
     failedTests: result.summary.failed,
     flakyTests: result.summary.flaky_detected,
+    unresolvedTests: result.summary.unresolved ?? 0,
   }
 }
 
@@ -186,6 +191,7 @@ export async function upsertTestRun(
     passed_tests: record.passedTests,
     failed_tests: record.failedTests,
     flaky_tests: record.flakyTests,
+    unresolved_tests: record.unresolvedTests,
   })
   return true
 }

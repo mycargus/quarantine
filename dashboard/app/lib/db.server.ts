@@ -36,6 +36,7 @@ export const testRuns = table({
     passed_tests: c.integer().notNull(),
     failed_tests: c.integer().notNull(),
     flaky_tests: c.integer().notNull(),
+    unresolved_tests: c.integer().notNull(),
   },
 })
 
@@ -126,12 +127,19 @@ function runMigrations(raw: RawDatabase): void {
       total_tests INTEGER NOT NULL,
       passed_tests INTEGER NOT NULL,
       failed_tests INTEGER NOT NULL,
-      flaky_tests INTEGER NOT NULL
+      flaky_tests INTEGER NOT NULL,
+      unresolved_tests INTEGER NOT NULL DEFAULT 0
     );
   `)
 
   try {
     raw.exec("ALTER TABLE projects ADD COLUMN last_pulled_at TEXT")
+  } catch {
+    // Column already exists — ignore
+  }
+
+  try {
+    raw.exec("ALTER TABLE test_runs ADD COLUMN unresolved_tests INTEGER NOT NULL DEFAULT 0")
   } catch {
     // Column already exists — ignore
   }
