@@ -153,15 +153,26 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 	if !quiet {
 		cmd.PrintErrf("[quarantine] Running: %s\n", strings.Join(suiteCmd, " "))
 	}
-	exitCode, runErr := runner.Run(ctx, suiteCmd[0], suiteCmd[1:], os.Stdout, os.Stderr)
+
+	// Resolve timeout: suite-level overrides, zero means no timeout.
+	const gracePeriod = 5 * time.Second
+	timeoutDuration, _ := suite.TimeoutDuration()
+
+	exitCode, timedOut, runErr := runner.RunWithTimeout(ctx, timeoutDuration, gracePeriod, suiteCmd[0], suiteCmd[1:], os.Stdout, os.Stderr)
 	if runErr != nil {
 		cmd.PrintErrf("[quarantine] WARNING: Failed to execute test command: %v\n", runErr)
 		return fmt.Errorf("test command execution failed")
 	}
 
+	// Timeout detection: command was killed by the timeout.
+	if timedOut {
+		cmd.PrintErrf("Error [timeout]: test command timed out after %s.\n", suite.Timeout)
+	}
+
 	// Crash detection: if the command exited non-zero and no JUnit XML file was
 	// produced, the test runner itself crashed before generating results.
-	if exitCode != 0 && !xmlFileExists(suite.JUnitXML) {
+	// (Skip crash detection when the command was killed by timeout — partial XML is expected.)
+	if !timedOut && exitCode != 0 && !xmlFileExists(suite.JUnitXML) {
 		cmd.PrintErrf("Error [crash]: test command exited with code %d but no JUnit XML files found at '%s'. This usually means the test runner crashed before producing results.\n", exitCode, suite.JUnitXML)
 		return exitCodeError(2)
 	}
@@ -172,7 +183,14 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		cmd.PrintErrf("[quarantine] WARNING: %s\n", w)
 	}
 
+	if testResults != nil && timedOut {
+		cmd.PrintErrf("Partial results processed: %d tests from %s.\n", len(testResults), suite.JUnitXML)
+	}
+
 	if testResults == nil {
+		if timedOut {
+			return exitCodeError(2)
+		}
 		if exitCode != 0 {
 			cmd.PrintErrf("[quarantine] WARNING: No JUnit XML found at '%s'. Cannot determine test results.\n", suite.JUnitXML)
 			return exitCodeError(exitCode)
@@ -273,6 +291,12 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		cmd.PrintErrf("  Skipped:      %d\n", res.Summary.Skipped)
 		cmd.PrintErrf("  Flaky:        %d\n", res.Summary.FlakyDetected)
 		cmd.PrintErrf("  Quarantined:  %d\n", res.Summary.Quarantined)
+	}
+
+	// When the command timed out, always exit 2 (quarantine infrastructure error),
+	// regardless of what the partial results would otherwise indicate.
+	if timedOut {
+		return exitCodeError(2)
 	}
 
 	code := resolveExitCode(res)

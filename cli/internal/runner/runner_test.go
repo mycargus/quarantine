@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/mycargus/quarantine/cli/internal/runner"
 	riteway "github.com/mycargus/riteway-golang"
@@ -201,5 +202,72 @@ func TestRunNonZeroExitCodeIsPreserved(t *testing.T) {
 		Should:   "return exit code 42",
 		Actual:   exitCode,
 		Expected: 42,
+	})
+}
+
+// TestRunWithTimeoutKillsProcess verifies that RunWithTimeout sends SIGTERM
+// (and eventually SIGKILL) to a hanging process and returns timedOut=true.
+func TestRunWithTimeoutKillsProcess(t *testing.T) {
+	// Use a very short timeout so the test stays fast.
+	timeout := 200 * time.Millisecond
+	grace := 100 * time.Millisecond
+
+	_, timedOut, err := runner.RunWithTimeout(
+		context.Background(),
+		timeout,
+		grace,
+		"sleep",
+		[]string{"9999"},
+		io.Discard,
+		io.Discard,
+	)
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "a command that hangs and a timeout shorter than its runtime",
+		Should:   "return no runner error (kill is not an error)",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a command that hangs and a timeout shorter than its runtime",
+		Should:   "return timedOut=true",
+		Actual:   timedOut,
+		Expected: true,
+	})
+}
+
+// TestRunWithTimeoutZeroMeansNoTimeout verifies that a zero timeout lets the
+// command run to completion normally.
+func TestRunWithTimeoutZeroMeansNoTimeout(t *testing.T) {
+	exitCode, timedOut, err := runner.RunWithTimeout(
+		context.Background(),
+		0,
+		5*time.Second,
+		"true",
+		nil,
+		io.Discard,
+		io.Discard,
+	)
+
+	riteway.Assert(t, riteway.Case[error]{
+		Given:    "zero timeout and command 'true'",
+		Should:   "return no error",
+		Actual:   err,
+		Expected: nil,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "zero timeout and command 'true'",
+		Should:   "return timedOut=false",
+		Actual:   timedOut,
+		Expected: false,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "zero timeout and command 'true'",
+		Should:   "return exit code 0",
+		Actual:   exitCode,
+		Expected: 0,
 	})
 }

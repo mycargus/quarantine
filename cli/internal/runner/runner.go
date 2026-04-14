@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // RunResult holds the outcome of executing a test command.
@@ -52,6 +53,79 @@ func Run(ctx context.Context, command string, args []string, stdout, stderr io.W
 	}
 
 	return 0, nil
+}
+
+// RunWithTimeout executes the given command. If the timeout elapses before the
+// command exits, it sends SIGTERM, waits gracePeriod, then sends SIGKILL.
+// Returns (exitCode, timedOut, error).
+// timedOut is true if the command was killed by the timeout.
+// When timeout is 0, the command runs without a timeout (identical to Run).
+func RunWithTimeout(ctx context.Context, timeout, gracePeriod time.Duration, command string, args []string, stdout, stderr io.Writer) (int, bool, error) {
+	cmd := exec.CommandContext(ctx, command, args...)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+
+	if err := cmd.Start(); err != nil {
+		return -1, false, fmt.Errorf("failed to execute test command: %w", err)
+	}
+
+	// Forward signals.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+	go func() {
+		for sig := range sigCh {
+			if cmd.Process != nil {
+				_ = cmd.Process.Signal(sig)
+			}
+		}
+	}()
+
+	// If no timeout, just wait.
+	if timeout == 0 {
+		err := cmd.Wait()
+		if err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				return exitErr.ExitCode(), false, nil
+			}
+			return -1, false, fmt.Errorf("failed to execute test command: %w", err)
+		}
+		return 0, false, nil
+	}
+
+	// Wait with timeout.
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+
+	select {
+	case err := <-done:
+		// Command finished before timeout.
+		if err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				return exitErr.ExitCode(), false, nil
+			}
+			return -1, false, fmt.Errorf("failed to execute test command: %w", err)
+		}
+		return 0, false, nil
+
+	case <-time.After(timeout):
+		// Timeout elapsed — send SIGTERM.
+		if cmd.Process != nil {
+			_ = cmd.Process.Signal(syscall.SIGTERM)
+		}
+		// Wait for gracePeriod.
+		select {
+		case <-done:
+			// Exited during grace period.
+		case <-time.After(gracePeriod):
+			// Still running — SIGKILL.
+			if cmd.Process != nil {
+				_ = cmd.Process.Kill()
+			}
+			<-done
+		}
+		return -1, true, nil
+	}
 }
 
 // RerunCommand returns the command and arguments for rerunning a single failed

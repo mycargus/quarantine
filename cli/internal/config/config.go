@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -51,11 +52,13 @@ func (c *Config) IsSuiteConfig() bool {
 // The Command field uses a raw yaml.Node so we can detect whether the YAML
 // author wrote it as a string (invalid) or as a sequence (valid).
 type TestSuite struct {
-	Name         string    `yaml:"name"`
-	CommandNode  yaml.Node `yaml:"command"`
-	JUnitXML     string    `yaml:"junitxml"`
-	RerunCommand []string  `yaml:"rerun_command,omitempty"`
-	Retries      int       `yaml:"retries,omitempty"`
+	Name          string    `yaml:"name"`
+	CommandNode   yaml.Node `yaml:"command"`
+	JUnitXML      string    `yaml:"junitxml"`
+	RerunCommand  []string  `yaml:"rerun_command,omitempty"`
+	Retries       int       `yaml:"retries,omitempty"`
+	Timeout       string    `yaml:"timeout,omitempty"`
+	RerunTimeout  string    `yaml:"rerun_timeout,omitempty"`
 }
 
 // CommandIsString reports whether the suite's command was provided as a YAML
@@ -75,6 +78,24 @@ func (s *TestSuite) Commands() []string {
 		result = append(result, node.Value)
 	}
 	return result
+}
+
+// TimeoutDuration parses the suite's timeout string. Returns (0, nil) if not set.
+// Returns (0, error) if the string cannot be parsed. This is a pure function — no I/O.
+func (s *TestSuite) TimeoutDuration() (time.Duration, error) {
+	if s.Timeout == "" {
+		return 0, nil
+	}
+	return time.ParseDuration(s.Timeout)
+}
+
+// RerunTimeoutDuration parses the suite's rerun_timeout string. Returns (0, nil) if not set.
+// Returns (0, error) if the string cannot be parsed. This is a pure function — no I/O.
+func (s *TestSuite) RerunTimeoutDuration() (time.Duration, error) {
+	if s.RerunTimeout == "" {
+		return 0, nil
+	}
+	return time.ParseDuration(s.RerunTimeout)
 }
 
 // GitHubConfig holds repository identification settings.
