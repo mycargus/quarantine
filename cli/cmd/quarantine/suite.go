@@ -26,11 +26,11 @@ type suiteEntry struct {
 func formatSuiteRows(entries []suiteEntry) string {
 	var buf bytes.Buffer
 	w := tabwriter.NewWriter(&buf, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(w, "SUITE\tCOMMAND\tJUNITXML")
+	_, _ = fmt.Fprintln(w, "SUITE\tCOMMAND\tJUNITXML")
 	for _, e := range entries {
-		fmt.Fprintf(w, "%s\t%s\t%s\n", e.Name, e.Command, e.JUnitXML)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", e.Name, e.Command, e.JUnitXML)
 	}
-	w.Flush()
+	_ = w.Flush()
 	return buf.String()
 }
 

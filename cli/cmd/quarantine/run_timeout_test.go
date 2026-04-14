@@ -375,13 +375,12 @@ func buildPartialRspecXML(n int) string {
 	var sb strings.Builder
 	sb.WriteString(`<?xml version="1.0" encoding="UTF-8"?>`)
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf(`<testsuite name="rspec" tests="%d" skipped="0" failures="0" errors="0" time="10.0">`, n))
+	fmt.Fprintf(&sb, `<testsuite name="rspec" tests="%d" skipped="0" failures="0" errors="0" time="10.0">`, n)
 	sb.WriteString("\n")
 	for i := range n {
-		sb.WriteString(fmt.Sprintf(
-			`  <testcase classname="spec.models.user_spec" name="test %d" file="./spec/models/user_spec.rb" time="0.1"></testcase>`,
+		fmt.Fprintf(&sb, `  <testcase classname="spec.models.user_spec" name="test %d" file="./spec/models/user_spec.rb" time="0.1"></testcase>`,
 			i+1,
-		))
+		)
 		sb.WriteString("\n")
 	}
 	sb.WriteString("</testsuite>\n")

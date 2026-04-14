@@ -38,13 +38,13 @@ type suiteCount struct {
 func computeAllSuitesSummary(counts []suiteCount) string {
 	var buf bytes.Buffer
 	tw := tabwriter.NewWriter(&buf, 0, 0, 4, ' ', 0)
-	fmt.Fprintln(tw, "SUITE\tQUARANTINED")
+	_, _ = fmt.Fprintln(tw, "SUITE\tQUARANTINED")
 	total := 0
 	for _, c := range counts {
-		fmt.Fprintf(tw, "%s\t%d\n", c.Name, c.QuarantinedCount)
+		_, _ = fmt.Fprintf(tw, "%s\t%d\n", c.Name, c.QuarantinedCount)
 		total += c.QuarantinedCount
 	}
-	fmt.Fprintf(tw, "Total\t%d\n", total)
+	_, _ = fmt.Fprintf(tw, "Total\t%d\n", total)
 	_ = tw.Flush()
 	buf.WriteString("\nRun `quarantine status <suite-name>` for details including duration estimates\nand oldest quarantined tests.\n")
 	return buf.String()

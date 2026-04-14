@@ -105,9 +105,9 @@ describe("ingestArtifact() — unresolved tests (Scenario 140)", async (assert) 
     (msg) => warnings.push(msg),
   )
 
-  const testRunRow = raw
-    .prepare("SELECT * FROM test_runs WHERE run_id = ?")
-    .get("run-xyz789") as Record<string, unknown> | undefined
+  const testRunRow = raw.prepare("SELECT * FROM test_runs WHERE run_id = ?").get("run-xyz789") as
+    | Record<string, unknown>
+    | undefined
 
   const quarantinedRows = raw
     .prepare("SELECT test_id FROM quarantined_tests WHERE project_id = ?")

@@ -158,14 +158,16 @@ describe("readSuiteState()", async (assert) => {
     given: "a 200 response with base64-encoded backend state JSON containing 3 tests",
     should: "return parsed QuarantineState with 3 test entries",
     actual: Object.keys(
-      (await readSuiteState(
-        "mycargus",
-        "my-app",
-        "token",
-        "quarantine/state",
-        "backend",
-        makeStateFileFetch200(backendState),
-      ))?.tests ?? {},
+      (
+        await readSuiteState(
+          "mycargus",
+          "my-app",
+          "token",
+          "quarantine/state",
+          "backend",
+          makeStateFileFetch200(backendState),
+        )
+      )?.tests ?? {},
     ).length,
     expected: 3,
   })
@@ -173,14 +175,16 @@ describe("readSuiteState()", async (assert) => {
   assert({
     given: "a 200 response with base64-encoded backend state JSON",
     should: "correctly decode the flaky_count field of the first test entry",
-    actual: (await readSuiteState(
-      "mycargus",
-      "my-app",
-      "token",
-      "quarantine/state",
-      "backend",
-      makeStateFileFetch200(backendState),
-    ))?.tests["auth/login.test.ts::LoginSuite::logs in successfully"]?.flaky_count,
+    actual: (
+      await readSuiteState(
+        "mycargus",
+        "my-app",
+        "token",
+        "quarantine/state",
+        "backend",
+        makeStateFileFetch200(backendState),
+      )
+    )?.tests["auth/login.test.ts::LoginSuite::logs in successfully"]?.flaky_count,
     expected: 5,
   })
 
@@ -188,14 +192,16 @@ describe("readSuiteState()", async (assert) => {
     given: "a 200 response with base64-encoded frontend state JSON containing 1 test",
     should: "return parsed QuarantineState with 1 test entry",
     actual: Object.keys(
-      (await readSuiteState(
-        "mycargus",
-        "my-app",
-        "token",
-        "quarantine/state",
-        "frontend",
-        makeStateFileFetch200(frontendState),
-      ))?.tests ?? {},
+      (
+        await readSuiteState(
+          "mycargus",
+          "my-app",
+          "token",
+          "quarantine/state",
+          "frontend",
+          makeStateFileFetch200(frontendState),
+        )
+      )?.tests ?? {},
     ).length,
     expected: 1,
   })
@@ -203,14 +209,16 @@ describe("readSuiteState()", async (assert) => {
   assert({
     given: "a 200 response with base64-encoded backend state JSON",
     should: "return the correct version field",
-    actual: (await readSuiteState(
-      "mycargus",
-      "my-app",
-      "token",
-      "quarantine/state",
-      "backend",
-      makeStateFileFetch200(backendState),
-    ))?.version,
+    actual: (
+      await readSuiteState(
+        "mycargus",
+        "my-app",
+        "token",
+        "quarantine/state",
+        "backend",
+        makeStateFileFetch200(backendState),
+      )
+    )?.version,
     expected: 1,
   })
 
