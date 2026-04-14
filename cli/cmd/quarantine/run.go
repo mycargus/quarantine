@@ -214,10 +214,19 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 
 	rerunCommand := strings.Join(suite.RerunCommand, " ")
 
+	// Resolve rerun_timeout: suite-level only, zero means no timeout.
+	rerunTimeoutDuration, _ := suite.RerunTimeoutDuration()
+
 	// Suite mode: rerun command crash is classified as unresolved (infrastructure failure).
-	retryOutcomes, retryWarnings := retryFailingTests(ctx, testResults, retries, rerunCommand, true)
+	retryOutcomes, retryWarnings, rerunErrors := retryFailingTests(ctx, testResults, retries, rerunCommand, rerunTimeoutDuration, true)
 	for _, w := range retryWarnings {
 		cmd.PrintErrf("[quarantine] WARNING: %s", w)
+	}
+	for _, e := range rerunErrors {
+		cmd.PrintErrf("%s\n", e)
+	}
+	if len(rerunErrors) > 0 {
+		cmd.PrintErrf("%d test(s) could not be retried — rerun command timed out.\n", len(rerunErrors))
 	}
 
 	// Build results using the suite name.
@@ -477,15 +486,19 @@ func writeUpdatedQuarantineState(ctx context.Context, cmd *cobra.Command, cfg *c
 }
 
 // retryFailingTests reruns each failed test individually up to retries times.
-// Returns a map of TestID -> RetryOutcome for tests that were retried, and a
-// slice of warning messages for tests whose rerun command failed to execute.
+// Returns a map of TestID -> RetryOutcome for tests that were retried, a slice
+// of warning messages for tests whose rerun command failed to execute, and a
+// slice of error messages for tests whose rerun timed out.
 // Exits the retry loop early on the first passing attempt or if the rerun
 // command itself fails to execute.
 // When classifyRerunCrashAsUnresolved is true (suite mode), a rerun command that
 // fails to execute marks the outcome as Unresolved rather than as a failed attempt.
-func retryFailingTests(ctx context.Context, tests []parser.TestResult, retries int, rerunCommand string, classifyRerunCrashAsUnresolved bool) (map[string]result.RetryOutcome, []string) {
+// When rerunTimeout > 0, each rerun is executed with that timeout; a timed-out
+// rerun is classified as Unresolved and recorded in the returned errors slice.
+func retryFailingTests(ctx context.Context, tests []parser.TestResult, retries int, rerunCommand string, rerunTimeout time.Duration, classifyRerunCrashAsUnresolved bool) (map[string]result.RetryOutcome, []string, []string) {
 	outcomes := make(map[string]result.RetryOutcome)
 	var warnings []string
+	var rerunErrors []string
 
 	for _, t := range tests {
 		if t.Status != "failed" && t.Status != "error" {
@@ -500,7 +513,19 @@ func retryFailingTests(ctx context.Context, tests []parser.TestResult, retries i
 		var attempts []result.RetryEntry
 		unresolved := false
 		for attempt := 1; attempt <= retries; attempt++ {
-			rerunExitCode, runErr := runner.Run(ctx, rerunCmd, rerunArgs, os.Stdout, os.Stderr)
+			var rerunExitCode int
+			var timedOut bool
+			var runErr error
+			if rerunTimeout > 0 {
+				rerunExitCode, timedOut, runErr = runner.RunWithTimeout(ctx, rerunTimeout, 0, rerunCmd, rerunArgs, os.Stdout, os.Stderr)
+			} else {
+				rerunExitCode, runErr = runner.Run(ctx, rerunCmd, rerunArgs, os.Stdout, os.Stderr)
+			}
+			if timedOut {
+				rerunErrors = append(rerunErrors, fmt.Sprintf("Error [rerun]: rerun timed out after %s for '%s'", rerunTimeout, t.Name))
+				unresolved = true
+				break
+			}
 			// Treat two conditions as rerun infrastructure failures (not test failures):
 			//  1. runErr != nil — the binary failed to start at all (ENOENT)
 			//  2. rerunExitCode == 127 — the command ran but "command not found" (shell convention)
@@ -533,7 +558,7 @@ func retryFailingTests(ctx context.Context, tests []parser.TestResult, retries i
 		outcomes[t.TestID] = result.RetryOutcome{Attempts: attempts, Unresolved: unresolved}
 	}
 
-	return outcomes, warnings
+	return outcomes, warnings, rerunErrors
 }
 
 // rerunFailureWarning returns a warning message for a rerun command that
