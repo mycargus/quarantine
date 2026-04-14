@@ -7,6 +7,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/reject-secrets-in-files.sh \"$TOOL_INPUT\""
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/reject-puppeteered-e2e.sh \"$TOOL_INPUT\""
           }
         ]
       },

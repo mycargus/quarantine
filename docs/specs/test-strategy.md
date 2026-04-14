@@ -89,9 +89,11 @@ Exercise a single component through its public interface — the CLI binary or H
 
 Exercise the full system — compiled binary + real GitHub API — against dedicated test repositories. E2E tests are written in JavaScript (Vitest + [`riteway`](https://github.com/paralleldrive/riteway) assertions) and located in `test/e2e/` at the repository root. These catch issues that mocks cannot: API behavior changes, response format drift, auth edge cases, and real-world integration bugs.
 
+**E2E tests observe — they do not arrange.** The fixture repo's CI runs the full quarantine pipeline (real test runner, real flaky tests, real GitHub API) on a daily schedule. E2E tests read the output: quarantine state on the state branch, GitHub Issues, artifacts, PR comments, and Search API results. They never run the CLI binary, create fake test runners, or write hand-crafted JUnit XML. If a test needs to run the binary with controlled inputs, it belongs in the Interface layer, not E2E.
+
 **Test fixtures:**
-- `mycargus/quarantine-test-fixture` — PAT-based CLI and dashboard E2E tests (existing `e2e` CI job)
-- `mycargus/quarantine-app-test-fixture` — App-based E2E tests: token exchange, installation discovery, artifact polling with App tokens, CLI with App tokens (separate `e2e-app` CI job). The fixture repo runs quarantine with deliberately flaky tests to produce real quarantine result artifacts.
+- `mycargus/quarantine-test-fixture` — Runs quarantine CI daily with deliberately flaky Jest tests. Produces real artifacts (`quarantine-results-jest-tests-*`), real quarantine state (`.quarantine/jest-tests/state.json` on the `quarantine/state` branch), real GitHub Issues with dedup labels, and a PR comment on a long-lived proxy issue. PAT-based E2E tests observe this output.
+- `mycargus/quarantine-app-test-fixture` — App-based E2E tests: token exchange, installation discovery, artifact polling with App tokens, CLI with App tokens (separate `e2e-app` CI job).
 
 Run on the main branch and on PRs from within the repository (not forks, which cannot access secrets). See `test/e2e/README.md` for setup instructions.
 

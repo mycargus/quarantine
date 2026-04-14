@@ -63,7 +63,7 @@ Project skills (invoke with `/skill-name`):
 - `/verify-milestone` -- Verify implementation against a milestone manifest
 - `/create-milestone` -- Generate a milestone manifest routing document
 - `/create-contract-test` -- Create a Prism-based contract test (offline, no credentials)
-- `/create-e2e-test` -- Create an E2E test verifying real API behavior matches mocks
+- `/create-e2e-test` -- Create an E2E test that observes real fixture CI output (never runs the CLI binary)
 - `/review-adr` -- Check if a change contradicts an existing ADR
 - `/create-adr` -- Propose a new Architecture Decision Record
 - `/create-user-scenario` -- Author Given/When/Then scenarios for a feature or edge case
@@ -95,3 +95,4 @@ Do not expand without discussion:
 - Admit when you're not sure. Ask clarification questions.
 - Consult `docs/` before making design decisions.
 - Do not use milestone identifiers (M1, M2, etc.) in file names, code comments, or variable names. The only acceptable place is the `milestone N:` prefix in git commit subjects.
+- **E2E tests observe fixture CI output -- they never run the CLI binary, create fake test runners, or pre-arrange GitHub state.** If a test needs controlled inputs, it belongs in the Interface layer. See `test/e2e/README.md` and the E2E section in `docs/specs/test-strategy.md`.

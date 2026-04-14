@@ -1,100 +1,85 @@
 # E2E Tests
 
-End-to-end tests that exercise the full Quarantine CLI against real GitHub
-dependencies. Written in JavaScript with Vitest as the runner and
+End-to-end tests that **observe real output** from the quarantine fixture
+repo's CI pipeline. Written in JavaScript with Vitest as the runner and
 [`riteway`](https://github.com/paralleldrive/riteway) assertions.
 
-These tests are intentionally separate from the CLI's unit and integration
-test suite. They run against a dedicated GitHub repository and require
-credentials that are not available in standard CI runs from forks.
+## Philosophy
+
+E2E tests observe — they do not arrange. The fixture repo
+(`mycargus/quarantine-test-fixture`) runs `quarantine run jest-tests` daily
+with deliberately flaky Jest tests. It produces real artifacts, real GitHub
+Issues, real quarantine state, and a real PR comment. The E2E tests in this
+directory read that output and verify it matches expectations.
+
+**E2E tests must never:**
+- Run the quarantine CLI binary
+- Create fake test runners or hand-crafted JUnit XML
+- Pre-populate quarantine state on the state branch
+- Create or close GitHub Issues as test setup
+
+If a test needs to run the binary with controlled inputs, it belongs in the
+Interface test layer (`cli/` with mock HTTP servers), not here.
+
+## What the fixture repo produces
+
+Each daily CI run produces:
+
+| Output | Location | What E2E tests verify |
+|--------|----------|-----------------------|
+| Quarantine state | `.quarantine/jest-tests/state.json` on `quarantine/state` branch | Known flaky tests quarantined, stable tests excluded |
+| GitHub Issues | Open issues with `quarantine` label | Title format, dedup labels (`quarantine:jest-tests:<hash>`), recent creation dates |
+| Closed issues | Closed by the daily cleanup step | Search API shape (`total_count`, `items[].number`) |
+| Artifact | `quarantine-results-jest-tests-<run_id>` | Valid JSON, `suite_name`, stable tests passed |
+| PR comment | Comment on the `e2e-pr-proxy` issue | `<!-- quarantine:jest-tests -->` marker, mentions flaky tests |
 
 ## Requirements
 
-- Node.js ≥ 20
-- The quarantine CLI binary must be built: `make cli-build`
+- Node.js >= 20
 - Three environment variables (see below)
+
+The quarantine CLI binary is **not** required — E2E tests don't run it.
 
 ## Environment Variables
 
 | Variable | Description |
 |---|---|
-| `QUARANTINE_GITHUB_TOKEN` | PAT or fine-grained token with repo read/write access |
-| `QUARANTINE_TEST_OWNER` | GitHub org or username that owns the test repository |
-| `QUARANTINE_TEST_REPO` | Name of the test repository (e.g. `quarantine-test-fixture`) |
-| `QUARANTINE_BIN` | *(optional)* Path to the quarantine binary. Defaults to `../../bin/quarantine`. |
+| `QUARANTINE_GITHUB_TOKEN` | PAT with repo read/write access |
+| `QUARANTINE_TEST_OWNER` | GitHub org or username that owns the fixture repo |
+| `QUARANTINE_TEST_REPO` | Name of the fixture repo (e.g. `quarantine-test-fixture`) |
 
-Tests skip automatically when the required env vars are absent — running
-`npm test` locally without credentials is safe and produces a clean skip.
+Tests fail immediately when required env vars are missing — they never skip.
 
-## Setting Up the Test Repository
+For local development, copy `.env.example` to `.env` and fill in your values.
+The vitest config loads `.env` automatically (CI env vars take precedence).
 
-The E2E suite needs a real GitHub repository to run `quarantine init` against.
-This repository must exist and have at least one commit on its default branch
-so that the API can return a SHA for branch creation.
-
-### 1. Create the repository
+## Running
 
 ```bash
-gh repo create <your-org>/quarantine-test-fixture --public --add-readme
-```
-
-A public repo with a README is sufficient. The E2E test creates and deletes the
-`quarantine/state` branch on every run, so the repo never accumulates state.
-
-### 2. Create a Personal Access Token
-
-The token needs write access to repository contents so it can create branches
-and files. Two options:
-
-**Classic PAT** (simpler):
-- Go to: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
-- Scopes required: `repo` (full control of private repositories — also covers public)
-
-**Fine-grained token** (more restrictive):
-- Go to: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens
-- Resource owner: the org or user that owns the test repo
-- Repository access: only `quarantine-test-fixture`
-- Permissions required: **Contents** (read and write)
-
-### 3. Configure CI secrets and variables
-
-In the quarantine repository (the one that runs CI, not the test fixture),
-add the following under **Settings → Secrets and variables → Actions**:
-
-| Type | Name | Value |
-|---|---|---|
-| Secret | `QUARANTINE_GITHUB_TOKEN` | The PAT from step 2 |
-| Variable | `QUARANTINE_TEST_OWNER` | Your GitHub org or username |
-| Variable | `QUARANTINE_TEST_REPO` | `quarantine-test-fixture` |
-
-Owner and repo are stored as **variables** (not secrets) because they are
-non-sensitive and visible in CI logs.
-
-## Running Locally
-
-```bash
-# Build the CLI binary first
-make cli-build
-
-# Set credentials
-export QUARANTINE_GITHUB_TOKEN=ghp_your_token_here
-export QUARANTINE_TEST_OWNER=your-org
-export QUARANTINE_TEST_REPO=quarantine-test-fixture
-
-# Install deps and run
 cd test
 pnpm install
 pnpm run test:e2e
 ```
 
-## Adding New E2E Tests
+Or from the repo root: `make e2e-test`
 
-Each milestone that exercises real GitHub API flows should have a corresponding
-test file here. Name files after the command or feature being tested:
+## Test files
 
 ```
 test/e2e/
-  init.test.js       # quarantine init (M1)
-  run.test.js        # quarantine run full flow (M4/M5)
-  ...
+  quarantine-observe.test.js     # Observes fixture CI output (state, issues, artifacts, PR comment)
+  github-artifacts.test.js       # Artifact list API shape (ETag, response fields)
+  github-branch-not-found.test.js  # Contents API 404 error message fidelity
+  dashboard-sync.test.js         # Dashboard HTTP server syncs real artifacts
 ```
+
+## Adding new E2E tests
+
+New E2E tests must follow the observe pattern:
+
+1. Identify what the fixture CI already produces that you want to verify
+2. If the fixture CI doesn't produce it, update the fixture repo's workflow
+   to exercise the new behavior (e.g., add `--pr` flag to exercise PR comments)
+3. Write a test that reads the output via GitHub API and asserts on it
+4. Never import `child_process` or run the quarantine binary — that's an
+   Interface test, not E2E

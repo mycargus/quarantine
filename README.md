@@ -54,8 +54,8 @@ framework: jest  # or rspec or vitest
   if: always()
   uses: actions/upload-artifact@v4
   with:
-    name: quarantine-results-${{ github.run_id }}
-    path: .quarantine/results.json
+    name: quarantine-results-<suite-name>-${{ github.run_id }}
+    path: .quarantine/<suite-name>/results.json
 ```
 
 **RSpec** (install `rspec_junit_formatter` first: `gem 'rspec_junit_formatter'`):
@@ -69,8 +69,8 @@ framework: jest  # or rspec or vitest
   if: always()
   uses: actions/upload-artifact@v4
   with:
-    name: quarantine-results-${{ github.run_id }}
-    path: .quarantine/results.json
+    name: quarantine-results-<suite-name>-${{ github.run_id }}
+    path: .quarantine/<suite-name>/results.json
 ```
 
 **Vitest** (built-in JUnit support — no extra dependencies):
@@ -84,8 +84,8 @@ framework: jest  # or rspec or vitest
   if: always()
   uses: actions/upload-artifact@v4
   with:
-    name: quarantine-results-${{ github.run_id }}
-    path: .quarantine/results.json
+    name: quarantine-results-<suite-name>-${{ github.run_id }}
+    path: .quarantine/<suite-name>/results.json
 ```
 
 That's it. Quarantine handles detection, quarantine state, GitHub Issues, and PR comments automatically.

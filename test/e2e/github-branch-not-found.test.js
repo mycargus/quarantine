@@ -17,7 +17,7 @@
 import { assert } from "riteway/vitest"
 import { afterAll, beforeAll, describe, test } from "vitest"
 
-const BRANCH = "quarantine/state"
+const BRANCH = "quarantine/e2e-branch-not-found"
 
 const token = process.env.QUARANTINE_GITHUB_TOKEN
 const owner = process.env.QUARANTINE_TEST_OWNER
@@ -73,10 +73,10 @@ describe("GitHub contents API — branch-not-found error message fidelity", () =
   })
 
   test("returns 404 when the ref branch does not exist", async () => {
-    const res = await ghRequest("GET", `/contents/.quarantine/unit/state.json?ref=${BRANCH}`)
+    const res = await ghRequest("GET", `/contents/.quarantine/jest-tests/state.json?ref=${BRANCH}`)
 
     assert({
-      given: `GET /contents/.quarantine/unit/state.json?ref=${BRANCH} when branch does not exist`,
+      given: `GET /contents/.quarantine/jest-tests/state.json?ref=${BRANCH} when branch does not exist`,
       should: "return HTTP 404",
       actual: res.status,
       expected: 404,
@@ -84,11 +84,11 @@ describe("GitHub contents API — branch-not-found error message fidelity", () =
   })
 
   test('404 response body contains "No commit found for the ref"', async () => {
-    const res = await ghRequest("GET", `/contents/.quarantine/unit/state.json?ref=${BRANCH}`)
+    const res = await ghRequest("GET", `/contents/.quarantine/jest-tests/state.json?ref=${BRANCH}`)
     const body = await res.json()
 
     assert({
-      given: `GET /contents/.quarantine/unit/state.json?ref=${BRANCH} when branch does not exist`,
+      given: `GET /contents/.quarantine/jest-tests/state.json?ref=${BRANCH} when branch does not exist`,
       should: 'include "No commit found for the ref" in the error message field',
       actual:
         typeof body.message === "string" && body.message.includes("No commit found for the ref"),
