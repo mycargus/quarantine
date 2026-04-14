@@ -145,6 +145,20 @@ Mutants that cannot be killed by any realistic test input:
 
 Mutation testing validates that existing tests are meaningful. It does not replace the scenario-driven process for deciding *which* behaviors need tests in the first place. Use `/mikey:tdd` to add new behaviors, then use mutation results to verify the tests you wrote actually catch regressions.
 
+## New Feature Checklist
+
+When adding a new feature or fixing a bug:
+
+1. **Unit:** Pure logic has unit tests. No mocks needed.
+2. **Interface:** If the feature has user-facing behavior, test through the
+   public interface (CLI binary or HTTP routes).
+3. **Contract:** If the feature changes a data format exchanged between
+   components, update contract tests.
+4. **E2E:** If the feature changes interaction with real external services,
+   verify in E2E.
+5. **Bug replication (Principle 9):** If a bug was found at a higher layer,
+   write a lower-layer test first.
+
 ## What We Deliberately Skip
 
 - **Browser-level testing:** Interface and E2E tests exercise the dashboard via HTTP requests to route endpoints, not through a browser. API-level testing provides sufficient confidence for a read-only dashboard at current scale. Revisit if interactive UI features are added.

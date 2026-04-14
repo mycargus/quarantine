@@ -1,6 +1,6 @@
 # Plan: MTP Adherence — Full Test Pyramid Coverage
 
-> **Status:** Active
+> **Status:** Complete
 >
 > **Trigger:** Gap analysis against Mikey's Test Pyramid (MTP).
 > test-strategy.md terminology already aligned (committed separately).
