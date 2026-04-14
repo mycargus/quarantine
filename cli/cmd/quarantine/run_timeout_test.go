@@ -71,7 +71,6 @@ func TestRunCommandTimeoutPartialXML(t *testing.T) {
 	if err := os.MkdirAll(suiteConfigDir, 0755); err != nil {
 		t.Fatalf("mkdir .quarantine: %v", err)
 	}
-	configPath := filepath.Join(suiteConfigDir, "config.yml")
 	configContent := fmt.Sprintf(`version: 1
 github:
   owner: testowner
@@ -83,7 +82,7 @@ test_suites:
     rerun_command: ["bundle", "exec", "rspec", "-e", "{name}"]
     timeout: "2s"
 `, fakeBin, xmlPath)
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(suiteConfigDir, "config.yml"), []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config.yml: %v", err)
 	}
 	chdirTest(t, dir)
@@ -118,6 +117,75 @@ test_suites:
 		Given:    "partial XML with 80 tests exists when the timeout fires",
 		Should:   "print partial results message with matching count from XML",
 		Actual:   strings.Contains(output, fmt.Sprintf("Partial results processed: %d tests", partialTestCount)),
+		Expected: true,
+	})
+}
+
+// --- Scenario 132: timeout kills hanging process, no XML produced, exits 2 with specific message ---
+
+func TestRunCommandTimeoutNoXML(t *testing.T) {
+	dir := t.TempDir()
+
+	// Fake binary: hangs indefinitely. Does NOT write any XML.
+	fakeBin := filepath.Join(dir, "fake-rspec")
+	script := "#!/bin/sh\nexec sleep 9999\n"
+	if err := os.WriteFile(fakeBin, []byte(script), 0755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	xmlPath := filepath.Join(dir, "rspec.xml")
+
+	// Write config with a very short timeout (2s) so the test stays fast.
+	suiteConfigDir := filepath.Join(dir, ".quarantine")
+	if err := os.MkdirAll(suiteConfigDir, 0755); err != nil {
+		t.Fatalf("mkdir .quarantine: %v", err)
+	}
+	configContent := fmt.Sprintf(`version: 1
+github:
+  owner: testowner
+  repo: testrepo
+test_suites:
+  - name: backend
+    command: ["%s"]
+    junitxml: "%s"
+    rerun_command: ["bundle", "exec", "rspec", "-e", "{name}"]
+    timeout: "2s"
+`, fakeBin, xmlPath)
+	if err := os.WriteFile(filepath.Join(suiteConfigDir, "config.yml"), []byte(configContent), 0644); err != nil {
+		t.Fatalf("write config.yml: %v", err)
+	}
+	chdirTest(t, dir)
+
+	server := fakeTimeoutAPI(t)
+	defer server.Close()
+
+	output, exitErr := executeRunCmd(t, []string{
+		"backend",
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	exitCode := extractExitCode(t, exitErr)
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a backend suite whose command hangs past the 2s timeout and produces no JUnit XML",
+		Should:   "exit with code 2 (quarantine infrastructure error)",
+		Actual:   exitCode,
+		Expected: 2,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a backend suite whose command hangs past the 2s timeout and produces no JUnit XML",
+		Should:   "print no-XML timeout error message with duration and XML path",
+		Actual:   strings.Contains(output, "Error [timeout]: test command timed out after 2s and produced no JUnit XML at"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a backend suite whose command hangs past the 2s timeout and produces no JUnit XML",
+		Should:   "print check-runner suggestion",
+		Actual:   strings.Contains(output, "Check that your test runner can start successfully outside of quarantine."),
 		Expected: true,
 	})
 }

@@ -166,6 +166,10 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 
 	// Timeout detection: command was killed by the timeout.
 	if timedOut {
+		if !xmlFileExists(suite.JUnitXML) {
+			cmd.PrintErrf("Error [timeout]: test command timed out after %s and produced no JUnit XML at '%s'.\nCheck that your test runner can start successfully outside of quarantine.\n", suite.Timeout, suite.JUnitXML)
+			return exitCodeError(2)
+		}
 		cmd.PrintErrf("Error [timeout]: test command timed out after %s.\n", suite.Timeout)
 	}
 
