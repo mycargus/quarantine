@@ -150,11 +150,16 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 	}
 
 	// Write quarantined-files.txt before executing the test command so the
-	// test runner can use it to skip quarantined files.
-	if qState != nil {
+	// test runner can use it to skip quarantined files. Always write the file
+	// (empty in degraded mode or when no tests are quarantined) so CI scripts
+	// that reference it with `cat` never fail with "file not found".
+	{
 		outDir := fmt.Sprintf(".quarantine/%s", suiteName)
 		_ = os.MkdirAll(outDir, 0755)
-		filePaths := quarantinedFilePaths(qState)
+		var filePaths []string
+		if qState != nil {
+			filePaths = quarantinedFilePaths(qState)
+		}
 		quarantinedFilesPath := filepath.Join(outDir, "quarantined-files.txt")
 		_ = os.WriteFile(quarantinedFilesPath, []byte(strings.Join(filePaths, "\n")), 0644)
 	}
