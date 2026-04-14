@@ -3,6 +3,27 @@ import { makeZipBuffer, toArrayBuffer } from "../test-helpers.js"
 import { initDb } from "./db.server.js"
 import { syncRepo } from "./sync.server.js"
 
+// Minimal QuarantineState fixture for state enumeration tests
+const makeStateJson = (suiteName: string, testCount: number): string => {
+  const tests: Record<string, object> = {}
+  for (let i = 0; i < testCount; i++) {
+    const id = `test/file${i}.test.ts::Suite::test ${i}`
+    tests[id] = {
+      test_id: id,
+      file_path: `test/file${i}.test.ts`,
+      classname: "Suite",
+      name: `test ${i}`,
+      suite: suiteName,
+      first_flaky_at: "2026-04-01T00:00:00Z",
+      last_failure_at: "2026-04-13T00:00:00Z",
+      flaky_count: 1,
+      quarantined_at: "2026-04-01T00:00:00Z",
+      quarantined_by: "cli-auto",
+    }
+  }
+  return JSON.stringify({ version: 1, updated_at: "2026-04-14T10:00:00Z", tests })
+}
+
 type FetchFn = typeof fetch
 
 const makeArtifactJson = (runId: string) =>
@@ -31,7 +52,8 @@ function makeArtifact(id: number, name: string) {
   }
 }
 
-// Creates a fake fetchFn serving a 3-artifact list and ZIP downloads.
+// Creates a fake fetchFn serving a 3-artifact list, ZIP downloads, and a 404
+// for the state branch .quarantine/ directory (no state enumeration needed).
 function makeFakeFetch(artifacts: ReturnType<typeof makeArtifact>[]): FetchFn {
   return (async (url: string | URL | Request, _init?: RequestInit) => {
     const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url
@@ -42,6 +64,15 @@ function makeFakeFetch(artifacts: ReturnType<typeof makeArtifact>[]): FetchFn {
         status: 200,
         headers: { get: (k: string) => (k === "etag" ? '"etag-v1"' : null) },
         json: async () => ({ artifacts }),
+      }
+    }
+
+    // State branch directory listing — return 404 so state enumeration is a no-op
+    if (urlStr.includes("contents/.quarantine?")) {
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ message: "Not Found" }),
       }
     }
 
@@ -267,5 +298,88 @@ describe("syncRepo() — partial download failure aborts remaining artifacts", a
     should: "NOT update last_pulled_at (sync did not complete)",
     actual: projectRow.last_pulled_at,
     expected: null,
+  })
+})
+
+describe("syncRepo() — state enumeration: backend (3 tests) + frontend (1 test)", async (assert) => {
+  const handle = initDb(":memory:")
+  const owner = "mycargus"
+  const repo = "my-app"
+  const now = new Date("2026-04-14T12:00:00Z")
+
+  const directoryListing = [
+    { name: "backend", path: ".quarantine/backend", type: "dir", sha: "sha-backend" },
+    { name: "frontend", path: ".quarantine/frontend", type: "dir", sha: "sha-frontend" },
+  ]
+
+  const stateByUrl: Record<string, string> = {
+    ".quarantine/backend/state.json": makeStateJson("backend", 3),
+    ".quarantine/frontend/state.json": makeStateJson("frontend", 1),
+  }
+
+  const fetchFn: FetchFn = (async (url: string | URL | Request) => {
+    const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url
+
+    // Artifact list — return empty so artifact loop does nothing
+    if (urlStr.includes("/actions/artifacts?")) {
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => ({ artifacts: [] }),
+      }
+    }
+
+    // Directory listing for .quarantine/
+    if (urlStr.includes("contents/.quarantine?")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => directoryListing,
+      }
+    }
+
+    // State file reads
+    for (const [pathFragment, stateJson] of Object.entries(stateByUrl)) {
+      if (urlStr.includes(pathFragment)) {
+        const encoded = Buffer.from(stateJson).toString("base64")
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ content: encoded, sha: "state-sha" }),
+        }
+      }
+    }
+
+    throw new Error(`Unexpected fetch call in state enum test: ${urlStr}`)
+  }) as unknown as FetchFn
+
+  await syncRepo(owner, repo, "fake-token", handle, now, fetchFn)
+
+  const rows = handle.raw
+    .prepare(
+      "SELECT suite_name, quarantined_count FROM quarantine_state WHERE project_id = (SELECT id FROM projects WHERE owner = ? AND repo = ?) ORDER BY suite_name",
+    )
+    .all(owner, repo) as { suite_name: string; quarantined_count: number }[]
+
+  assert({
+    given: "a sync with backend (3 tests) and frontend (1 test) suites on the state branch",
+    should: "store 2 quarantine_state rows (one per suite)",
+    actual: rows.length,
+    expected: 2,
+  })
+
+  assert({
+    given: "a sync with backend (3 tests) and frontend (1 test) suites on the state branch",
+    should: "record 3 quarantined tests for backend suite",
+    actual: rows.find((r) => r.suite_name === "backend")?.quarantined_count,
+    expected: 3,
+  })
+
+  assert({
+    given: "a sync with backend (3 tests) and frontend (1 test) suites on the state branch",
+    should: "record 1 quarantined test for frontend suite",
+    actual: rows.find((r) => r.suite_name === "frontend")?.quarantined_count,
+    expected: 1,
   })
 })

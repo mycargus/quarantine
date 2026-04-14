@@ -6,7 +6,13 @@
  * error it logs a warning and returns so the caller can still render.
  */
 
-import { type DbHandle, getLastPulledAt, updateLastPulledAt, upsertProject } from "./db.server.js"
+import {
+  type DbHandle,
+  getLastPulledAt,
+  updateLastPulledAt,
+  upsertProject,
+  upsertSuiteState,
+} from "./db.server.js"
 import { DEBOUNCE_MS, shouldPull } from "./debounce.server.js"
 import { downloadAndExtractJson, listArtifacts } from "./github.server.js"
 import {
@@ -15,6 +21,7 @@ import {
   ingestArtifact,
   sortArtifactsChronologically,
 } from "./ingest.server.js"
+import { listStateSuites, readSuiteState } from "./state-sync.server.js"
 
 /**
  * Orchestrator: syncs a single repo from GitHub Artifacts into SQLite.
@@ -54,6 +61,21 @@ export async function syncRepo(
         projectId,
         warn,
       )
+    }
+
+    const suites = await listStateSuites(owner, repo, token, "quarantine/state", fetchFn)
+    for (const suite of suites) {
+      const state = await readSuiteState(owner, repo, token, "quarantine/state", suite, fetchFn)
+      if (state !== null) {
+        upsertSuiteState(
+          handle.raw,
+          projectId,
+          suite,
+          Object.keys(state.tests).length,
+          JSON.stringify(state),
+          now.toISOString(),
+        )
+      }
     }
 
     await updateLastPulledAt(handle.db, projectId, now.toISOString())

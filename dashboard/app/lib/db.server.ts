@@ -156,6 +156,18 @@ function runMigrations(raw: RawDatabase): void {
   } catch {
     // Column already exists — ignore
   }
+
+  raw.exec(`
+    CREATE TABLE IF NOT EXISTS quarantine_state (
+      id INTEGER PRIMARY KEY,
+      project_id INTEGER NOT NULL REFERENCES projects(id),
+      suite_name TEXT NOT NULL,
+      quarantined_count INTEGER NOT NULL DEFAULT 0,
+      state_json TEXT,
+      synced_at TEXT NOT NULL,
+      UNIQUE(project_id, suite_name)
+    );
+  `)
 }
 
 /**
@@ -419,4 +431,28 @@ export async function getProjectTrend(
     date: row.date,
     flakyCount: row.flaky_count,
   }))
+}
+
+/**
+ * I/O: inserts or replaces a quarantine_state row for the given project + suite.
+ * Uses INSERT OR REPLACE to atomically upsert.
+ */
+export function upsertSuiteState(
+  raw: RawDatabase,
+  projectId: number,
+  suiteName: string,
+  quarantinedCount: number,
+  stateJson: string,
+  syncedAt: string,
+): void {
+  raw
+    .prepare(
+      `INSERT INTO quarantine_state (project_id, suite_name, quarantined_count, state_json, synced_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(project_id, suite_name) DO UPDATE SET
+         quarantined_count = excluded.quarantined_count,
+         state_json = excluded.state_json,
+         synced_at = excluded.synced_at`,
+    )
+    .run(projectId, suiteName, quarantinedCount, stateJson, syncedAt)
 }
