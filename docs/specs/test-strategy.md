@@ -1,11 +1,15 @@
 # Test Strategy
 
-> Last updated: 2026-03-30
+> Last updated: 2026-04-13
 >
 > Guiding principles for how we test. The goal is confidence in correctness
 > without over-engineering. Specific test cases live in scenario files
 > (`docs/scenarios/`) and in the tests themselves — this document covers
 > *why* and *how*, not *what*.
+>
+> Layer definitions and terminology follow Mikey's Test Pyramid (MTP).
+> The MTP defines four layers — Unit, Interface, Contract, E2E — each
+> with distinct scope, allowed dependencies, and role in the pyramid.
 
 ## Assertion Style
 
@@ -20,7 +24,7 @@ This makes test intent immediately clear and failure messages self-documenting. 
 
 ### 1. Functional Core, Imperative Shell
 
-Separate pure logic from I/O. Pure functions (parsing, merging, decision-making) are unit tested exhaustively. I/O boundaries (API calls, file system, process execution) are thin and tested at the integration level.
+Separate pure logic from I/O. Pure functions (parsing, merging, decision-making) are unit tested exhaustively. I/O boundaries (API calls, file system, process execution) are thin and tested at the interface level.
 
 **Validation:** After implementing scenarios, use `/mikey:testify` to audit code design and verify adherence to this principle. The testify agent identifies mixed logic/I/O, excessive mocking, and missing error-path tests.
 
@@ -32,9 +36,9 @@ Tests assert on inputs and outputs of public interfaces. Internal data structure
 
 Unit tests operate on pure functions that don't need mocks. If a unit test requires a mock, that's a design smell — the code under test is mixing logic with I/O. Extract the logic into a pure function.
 
-### 4. Real Dependencies at Integration Boundaries
+### 4. Real Dependencies at Interface Boundaries
 
-Integration tests use real instances of internal dependencies (real SQLite, real file system) and mock only external services (GitHub API). This catches the integration bugs that mocks hide.
+Interface tests use real instances of internal dependencies (real SQLite, real file system) and mock only external services (GitHub API). This catches the bugs that mocks hide at the boundaries where components meet real infrastructure.
 
 ### 5. Contract Tests Bridge Components
 
@@ -56,22 +60,30 @@ Tests should fail immediately on the first broken assertion with a message that 
 
 Our own test suite must have zero flaky tests. Any test that fails intermittently is either fixed immediately or deleted. Non-determinism in tests comes from shared state, time, randomness, or network — eliminate or control all four.
 
+### 9. Replicate Bugs at the Lowest Layer
+
+When a bug surfaces at a higher layer (E2E or Interface), replicate it with a lower-layer test before fixing. The lower-layer test ensures the bug stays dead through future refactors, runs faster, and pinpoints the root cause. A high-layer failure signals both a bug in the code and a gap in the lower-layer tests.
+
 ## Test Layers
 
 | Layer | Scope | External I/O | Runs on |
 |-------|-------|-------------|---------|
 | **Unit** | Pure functions in isolation | None | Every commit |
-| **Integration** | Full component flows against mock external APIs | Mock HTTP server | Every commit |
-| **E2E** | Full system flows against real external dependencies | Real GitHub API, real binary | Main branch / manual |
+| **Interface** | Single-component flows through the public interface (CLI binary or HTTP routes) | Mock HTTP server | Every commit |
 | **Contract** | Schema validation of shared data formats | None | Every commit |
+| **E2E** | Full system flows against real external dependencies | Real GitHub API, real binary | Main branch / manual |
 
 ### Unit Tests
 
 Cover all pure logic: parsing, validation, merging, decision-making, command construction. No network, no disk I/O beyond temp files. These are fast, deterministic, and form the bulk of the test suite.
 
-### Integration Tests
+### Interface Tests
 
-Exercise full component flows end-to-end within the component boundary. A mock HTTP server stands in for external APIs, returning canned responses. These validate that the I/O shell correctly orchestrates the functional core.
+Exercise a single component through its public interface — the CLI binary or HTTP API routes — within the component boundary. External APIs are replaced by a mock HTTP server returning canned responses. These validate that the I/O shell correctly orchestrates the functional core through the same entry points a real user would exercise.
+
+**CLI:** Tests invoke the compiled `quarantine` binary via `exec.Command` with mock HTTP servers standing in for GitHub.
+
+**Dashboard:** Tests make HTTP requests to Remix route endpoints with the GitHub Artifacts API stubbed, exercising the full framework stack (routing, loaders, rendering) with real SQLite.
 
 ### E2E Tests
 
@@ -89,8 +101,8 @@ Validate that shared data formats are respected by both producers and consumers.
 
 ## Test Organization Conventions
 
-- **Go:** `make cli-test` runs all CLI tests (unit and integration).
-- **TypeScript (Dashboard):** Unit tests are colocated with source files (`dashboard/app/**/*.test.ts`). Integration tests live in `dashboard/test/*.integration.test.ts` — these test the interaction of multiple dashboard components (TypeScript, SQLite, etc.) with external systems (GitHub, Jenkins, Jira) mocked. See `dashboard/test/README.md` for scope.
+- **Go:** `make cli-test` runs all CLI tests (unit and interface).
+- **TypeScript (Dashboard):** Unit tests are colocated with source files (`dashboard/app/**/*.test.ts`). Interface tests live in `dashboard/test/*.interface.test.ts` — these make HTTP requests to Remix routes with external APIs (GitHub, etc.) stubbed, exercising the full framework stack with real SQLite. See `dashboard/test/README.md` for scope.
 - **JavaScript (E2E):** Vitest in `test/e2e/`. Uses RITEway-style `assert` helper. Run with `make e2e-test`.
 - **Test data:** Fixtures live in `testdata/` directories adjacent to the code they test.
 - **Coverage:** Measure but don't enforce thresholds. Code coverage ≠ requirements coverage — 100% line coverage can still hide bugs if the wrong behaviors are tested. The value of coverage data is knowing which files and lines *aren't* tested, which is especially useful in non-compiled languages where untested code paths can harbor undetected errors. Use coverage reports as a diagnostic tool, not a gate.
@@ -135,7 +147,7 @@ Mutation testing validates that existing tests are meaningful. It does not repla
 
 ## What We Deliberately Skip
 
-- **Browser-level E2E tests:** Integration tests cover loader-to-render. Full browser tests add cost without proportional confidence at current scale.
+- **Browser-level testing:** Interface and E2E tests exercise the dashboard via HTTP requests to route endpoints, not through a browser. API-level testing provides sufficient confidence for a read-only dashboard at current scale. Revisit if interactive UI features are added.
 - **Performance benchmarks:** Not needed at v1 scale. Revisit when data volumes warrant it.
 - **Exhaustive negative testing of external APIs:** We trust external API contracts and test our error handling, not their failure modes.
 
