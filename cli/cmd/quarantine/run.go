@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -146,6 +147,16 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		cmd.PrintErrf("  Failures in XML (non-quarantined): %d\n", nonQuarantinedFailures)
 		cmd.PrintErrf("  Failures in XML (quarantined): %d\n", quarantinedFailures)
 		return nil
+	}
+
+	// Write quarantined-files.txt before executing the test command so the
+	// test runner can use it to skip quarantined files.
+	if qState != nil {
+		outDir := fmt.Sprintf(".quarantine/%s", suiteName)
+		_ = os.MkdirAll(outDir, 0755)
+		filePaths := quarantinedFilePaths(qState)
+		quarantinedFilesPath := filepath.Join(outDir, "quarantined-files.txt")
+		_ = os.WriteFile(quarantinedFilesPath, []byte(strings.Join(filePaths, "\n")), 0644)
 	}
 
 	// Execute suite command unmodified via exec.Command.
@@ -338,6 +349,24 @@ func assembleSuiteMetadata(cfg *config.Config, suiteName string, retries int) re
 		runID = fmt.Sprintf("local-%d", time.Now().UnixNano())
 	}
 	return assembleMetadata(owner, repo, branch, commitSHA, runID, suiteName, retries)
+}
+
+// quarantinedFilePaths returns sorted, deduplicated file_path values from the
+// quarantine state. This is a pure function — no I/O.
+func quarantinedFilePaths(state *qstate.State) []string {
+	seen := make(map[string]struct{})
+	for _, entry := range state.Tests {
+		if entry.FilePath == "" {
+			continue
+		}
+		seen[entry.FilePath] = struct{}{}
+	}
+	paths := make([]string, 0, len(seen))
+	for p := range seen {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths)
+	return paths
 }
 
 // loadQuarantineState reads the state file at statePath from the quarantine/state branch.
