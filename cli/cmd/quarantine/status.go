@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/mycargus/quarantine/cli/internal/config"
@@ -24,6 +25,29 @@ type statusEntry struct {
 	QuarantinedAt string
 	LastFailureAt string
 	IssueNumber   *int
+}
+
+// suiteCount holds the name and count of quarantined tests for one suite.
+type suiteCount struct {
+	Name             string
+	QuarantinedCount int
+}
+
+// computeAllSuitesSummary formats the tabular all-suites summary.
+// Pure function — no I/O, deterministic.
+func computeAllSuitesSummary(counts []suiteCount) string {
+	var buf bytes.Buffer
+	tw := tabwriter.NewWriter(&buf, 0, 0, 4, ' ', 0)
+	fmt.Fprintln(tw, "SUITE\tQUARANTINED")
+	total := 0
+	for _, c := range counts {
+		fmt.Fprintf(tw, "%s\t%d\n", c.Name, c.QuarantinedCount)
+		total += c.QuarantinedCount
+	}
+	fmt.Fprintf(tw, "Total\t%d\n", total)
+	_ = tw.Flush()
+	buf.WriteString("\nRun `quarantine status <suite-name>` for details including duration estimates\nand oldest quarantined tests.\n")
+	return buf.String()
 }
 
 // averageDurationMs computes the average of a slice of millisecond durations.
@@ -147,7 +171,7 @@ func newStatusCmd() *cobra.Command {
 		Short: "Show quarantine status for a suite",
 		Long: `Show quarantine status for a suite. Reads quarantined tests from the
 quarantine/state branch and artifact data for duration estimates.`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: runStatus,
 	}
 }
@@ -155,8 +179,6 @@ quarantine/state branch and artifact data for duration estimates.`,
 // runStatus is the I/O shell for "status [suite-name]". Reads state from GitHub
 // and artifact data, then prints formatted status output.
 func runStatus(cmd *cobra.Command, args []string) error {
-	suiteName := args[0]
-
 	cfg, err := config.Load(".quarantine/config.yml")
 	if err != nil {
 		return err
@@ -170,6 +192,26 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := context.Background()
+
+	// All-suites summary path (no suite name argument).
+	if len(args) == 0 {
+		counts := make([]suiteCount, 0, len(cfg.TestSuites))
+		for _, suite := range cfg.TestSuites {
+			stateBytes, _, stateErr := gh.GetContents(ctx, fmt.Sprintf(".quarantine/%s/state.json", suite.Name), "quarantine/state")
+			count := 0
+			if stateErr == nil {
+				var state quarantine.State
+				if json.Unmarshal(stateBytes, &state) == nil {
+					count = len(state.Tests)
+				}
+			}
+			counts = append(counts, suiteCount{Name: suite.Name, QuarantinedCount: count})
+		}
+		cmd.Print(computeAllSuitesSummary(counts))
+		return nil
+	}
+
+	suiteName := args[0]
 
 	// Read state file from quarantine/state branch.
 	stateBytes, _, err := gh.GetContents(ctx, fmt.Sprintf(".quarantine/%s/state.json", suiteName), "quarantine/state")

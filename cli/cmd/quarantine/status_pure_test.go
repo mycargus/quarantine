@@ -382,3 +382,120 @@ func TestExtractResultsFromZipHappyPath(t *testing.T) {
 		Expected: true,
 	})
 }
+
+// --- computeAllSuitesSummary ---
+
+func TestComputeAllSuitesSummaryEmptySlice(t *testing.T) {
+	result := computeAllSuitesSummary(nil)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "nil suiteCount slice (no suites configured)",
+		Should:   "contain SUITE header",
+		Actual:   strings.Contains(result, "SUITE"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "nil suiteCount slice (no suites configured)",
+		Should:   "contain 'Total'",
+		Actual:   strings.Contains(result, "Total"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "nil suiteCount slice (no suites configured)",
+		Should:   "show total of 0",
+		Actual:   strings.Contains(result, "0"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "nil suiteCount slice (no suites configured)",
+		Should:   "contain the hint about suite-name",
+		Actual:   strings.Contains(result, "quarantine status <suite-name>"),
+		Expected: true,
+	})
+}
+
+func TestComputeAllSuitesSummarySingleSuite(t *testing.T) {
+	result := computeAllSuitesSummary([]suiteCount{{Name: "backend", QuarantinedCount: 3}})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "single suite 'backend' with 3 quarantined tests",
+		Should:   "contain 'backend'",
+		Actual:   strings.Contains(result, "backend"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "single suite 'backend' with 3 quarantined tests",
+		Should:   "contain '3'",
+		Actual:   strings.Contains(result, "3"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "single suite with 3 quarantined tests",
+		Should:   "contain 'Total'",
+		Actual:   strings.Contains(result, "Total"),
+		Expected: true,
+	})
+}
+
+func TestComputeAllSuitesSummary(t *testing.T) {
+	counts := []suiteCount{
+		{Name: "backend", QuarantinedCount: 5},
+		{Name: "frontend", QuarantinedCount: 2},
+	}
+
+	result := computeAllSuitesSummary(counts)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "backend (5) and frontend (2) suite counts",
+		Should:   "contain 'backend'",
+		Actual:   strings.Contains(result, "backend"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "backend suite with 5 quarantined tests",
+		Should:   "contain '5'",
+		Actual:   strings.Contains(result, "5"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "backend (5) and frontend (2) suite counts",
+		Should:   "contain 'frontend'",
+		Actual:   strings.Contains(result, "frontend"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "frontend suite with 2 quarantined tests",
+		Should:   "contain '2'",
+		Actual:   strings.Contains(result, "2"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "backend (5) and frontend (2) suite counts",
+		Should:   "contain 'Total'",
+		Actual:   strings.Contains(result, "Total"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "backend (5) and frontend (2) summing to 7",
+		Should:   "contain '7'",
+		Actual:   strings.Contains(result, "7"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "all-suites summary output",
+		Should:   "contain hint about suite-name for details",
+		Actual:   strings.Contains(result, "quarantine status <suite-name>"),
+		Expected: true,
+	})
+}
