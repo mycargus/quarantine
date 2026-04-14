@@ -11,6 +11,14 @@ allowed-tools: Read, Grep, Glob, Bash, Edit, Write, Agent, Skill
 
 Implement milestone $1.
 
+## Anti-stall protocol
+
+**CRITICAL — read this before every step.**
+
+This workflow runs autonomously through multiple steps per scenario. After EVERY tool result — especially Agent tool results from tdd-agent — you MUST continue to the next step in the same response. Your turn is NOT over when an agent completes. The per-scenario loop is: TDD → testify → commit → contract tests → loop. Completing TDD means you are 25% done with the scenario, not finished.
+
+If you find yourself about to end your turn after receiving an agent result without having run testify and committed, STOP — you are stalling. Continue immediately.
+
 ## Phase 1: Orientation
 
 ### Read the manifest
@@ -61,28 +69,34 @@ This skill invokes two external plugin skills. Here is what to expect:
 
 Work through remaining scenarios ONE AT A TIME. For each scenario, execute these steps in strict order. Do NOT reorder or skip steps.
 
-### Step 1 — TDD
+### Step 1 — TDD → Validate → Commit (all three in one turn)
+
+**These three sub-steps run sequentially in a SINGLE turn. Do NOT end your turn between them.**
+
+#### 1a. TDD
 
 Invoke `/mikey:tdd --validate <scenario-file>#<scenario-number>`.
 
-**CRITICAL:** When the `/mikey:tdd` skill expands, it will instruct you to spawn a `tdd-agent` using the Agent tool (`subagent_type: "mikey:tdd-agent"`). You MUST do this. Do NOT write tests, write implementation code, or run test commands yourself. All Red-Green-Refactor work MUST be delegated to the `tdd-agent`. If you find yourself reading source files, editing test files, or running `go test` directly, STOP — you are bypassing the agent.
+When the `/mikey:tdd` skill expands, it will instruct you to spawn a `tdd-agent` using the Agent tool (`subagent_type: "mikey:tdd-agent"`). You MUST do this. Do NOT write tests, write implementation code, or run test commands yourself. All Red-Green-Refactor work MUST be delegated to the `tdd-agent`.
 
 Rules:
 - ONE scenario per `/mikey:tdd` invocation. Do NOT batch.
 - Start with integration or e2e tests — they catch real issues faster than unit tests and drive better design.
 - Add unit tests for pure functions extracted during the Refactor step.
 
-### Step 2 — Validate
+**When the tdd-agent returns, IMMEDIATELY proceed to 1b. Do NOT stop.**
+
+#### 1b. Validate
 
 Invoke `/mikey:testify <test-file-path> --with-design`.
 
 **Note:** `/mikey:tdd --validate` causes the tdd-agent to run testify internally, but that is its own internal check. You MUST still invoke `/mikey:testify` here as an independent gate — the tdd-agent's internal run may have missed issues or used a narrower scope.
 
-GATE: You MUST fix ALL issues (HIGH, MEDIUM, and LOW) before proceeding to step 3. If testify reports issues, fix them and re-run testify until the report is clean. Do NOT commit with open issues.
+GATE: Fix ALL issues (HIGH, MEDIUM, and LOW) before proceeding. If testify reports issues, fix them and re-run testify until the report is clean.
 
-### Step 3 — Commit
+**When testify is clean, IMMEDIATELY proceed to 1c. Do NOT stop.**
 
-GATE: Do NOT commit until step 2 reports zero open issues.
+#### 1c. Commit
 
 1. Run the build gate. Read the manifest's Verification section for the exact build commands. If none are specified, infer from the milestone's scope:
    - CLI milestones: `make cli-build && make cli-test && make cli-lint`
@@ -91,13 +105,13 @@ GATE: Do NOT commit until step 2 reports zero open issues.
 3. Stage and commit with message: `milestone $1: <description of what changed>`
 4. Each commit is a safe rollback point. Never accumulate uncommitted work across scenarios.
 
-### Step 4 — Contract tests (conditional)
+### Step 2 — Contract tests (conditional)
 
 Contract tests verify that production code sends correctly-shaped requests and handles response shapes from vendored OpenAPI specs — without network access or credentials. They use Prism as a local mock server (ADR-024).
 
 After completing each scenario's commit, determine whether it needs contract test coverage.
 
-#### 4a. Inventory the scenario's external API interactions
+#### 2a. Inventory the scenario's external API interactions
 
 List every external API call the **production code path** exercises — not just what the test calls. If a function accepts an injected dependency (e.g., `fetchFn`) for testing but uses real HTTP in production, the production path IS an external API interaction and MUST be evaluated. Dependency injection makes unit testing possible; it does not eliminate mock-fidelity risk.
 
@@ -106,7 +120,7 @@ For each call, note:
 - What response shape the code assumes (fields it destructures, headers it reads, status codes it checks)
 - What request shape the code sends (method, headers, body)
 
-#### 4b. Classify each interaction
+#### 2b. Classify each interaction
 
 **Needs contract test** (shape conformance, testable offline):
 - Response shapes the code destructures (e.g., `data.artifacts`, `issue.number`)
@@ -125,7 +139,7 @@ For each call, note:
 - Status code checks (`if (response.status === 401)`) — no shape to drift
 - Pure client-side logic (e.g., PR number detection from `GITHUB_EVENT_PATH`) — no external API involved
 
-#### 4c. Check existing coverage
+#### 2c. Check existing coverage
 
 Read existing test files:
 - Contract tests: `test/contract/*.test.js`
@@ -133,7 +147,7 @@ Read existing test files:
 
 A scenario does NOT need a new test if every interaction is already covered.
 
-#### 4d. Add tests
+#### 2d. Add tests
 
 Contract tests are split by consumer:
 
@@ -155,7 +169,7 @@ Run `make contract-test` and/or `make e2e-test` as appropriate. Do NOT wait unti
 
 ### Loop
 
-Return to Step 1 for the next remaining scenario. Continue until all scenarios are implemented and committed.
+Return to Step 1 for the next remaining scenario. Continue until all scenarios are implemented and committed. **Do NOT stop between scenarios.** Each scenario's TDD → testify → commit cycle runs in a single turn.
 
 ## Phase 3: Verification
 
