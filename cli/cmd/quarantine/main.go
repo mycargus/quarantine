@@ -69,6 +69,7 @@ parses JUnit XML output, retries failures, and manages quarantine state on GitHu
 	cmd.Flags().Bool("strict", false, "Exit 2 on infrastructure errors")
 	cmd.Flags().Bool("dry-run", false, "Show what would happen without making changes")
 	cmd.Flags().Int("pr", 0, "Override PR number for comments")
+	cmd.Flags().String("timeout", "", "Override the suite's timeout for this invocation (e.g. 30m, 1h). Applies only to this run.")
 
 	return cmd
 }

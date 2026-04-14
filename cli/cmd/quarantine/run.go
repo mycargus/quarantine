@@ -157,6 +157,15 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 	// Resolve timeout: suite-level overrides, zero means no timeout.
 	const gracePeriod = 5 * time.Second
 	timeoutDuration, _ := suite.TimeoutDuration()
+	timeoutStr := suite.Timeout
+
+	// --timeout flag overrides the suite config timeout for this invocation only.
+	if flagTimeout, _ := cmd.Flags().GetString("timeout"); flagTimeout != "" {
+		if override, err := time.ParseDuration(flagTimeout); err == nil {
+			timeoutDuration = override
+			timeoutStr = flagTimeout
+		}
+	}
 
 	exitCode, timedOut, runErr := runner.RunWithTimeout(ctx, timeoutDuration, gracePeriod, suiteCmd[0], suiteCmd[1:], os.Stdout, os.Stderr)
 	if runErr != nil {
@@ -167,10 +176,10 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 	// Timeout detection: command was killed by the timeout.
 	if timedOut {
 		if !xmlFileExists(suite.JUnitXML) {
-			cmd.PrintErrf("Error [timeout]: test command timed out after %s and produced no JUnit XML at '%s'.\nCheck that your test runner can start successfully outside of quarantine.\n", suite.Timeout, suite.JUnitXML)
+			cmd.PrintErrf("Error [timeout]: test command timed out after %s and produced no JUnit XML at '%s'.\nCheck that your test runner can start successfully outside of quarantine.\n", timeoutStr, suite.JUnitXML)
 			return exitCodeError(2)
 		}
-		cmd.PrintErrf("Error [timeout]: test command timed out after %s.\n", suite.Timeout)
+		cmd.PrintErrf("Error [timeout]: test command timed out after %s.\n", timeoutStr)
 	}
 
 	// Crash detection: if the command exited non-zero and no JUnit XML file was

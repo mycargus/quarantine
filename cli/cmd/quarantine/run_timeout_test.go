@@ -305,6 +305,71 @@ test_suites:
 	})
 }
 
+// --- Scenario 134: --timeout flag overrides config timeout for this invocation ---
+
+func TestRunTimeoutFlagOverridesConfigTimeout(t *testing.T) {
+	dir := t.TempDir()
+
+	// Fake binary: hangs indefinitely. Does NOT write any XML.
+	// Config timeout: 10m (would never fire in a test).
+	// Flag timeout: 2s (fires quickly).
+	// If the flag is honoured, the command times out in ~2s and exits 2.
+	// If the flag is ignored, the test would hang for 10 minutes.
+	fakeBin := filepath.Join(dir, "fake-rspec")
+	script := "#!/bin/sh\nexec sleep 9999\n"
+	if err := os.WriteFile(fakeBin, []byte(script), 0755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	xmlPath := filepath.Join(dir, "rspec.xml")
+
+	suiteConfigDir := filepath.Join(dir, ".quarantine")
+	if err := os.MkdirAll(suiteConfigDir, 0755); err != nil {
+		t.Fatalf("mkdir .quarantine: %v", err)
+	}
+	configContent := fmt.Sprintf(`version: 1
+github:
+  owner: testowner
+  repo: testrepo
+test_suites:
+  - name: backend
+    command: ["%s"]
+    junitxml: "%s"
+    rerun_command: ["bundle", "exec", "rspec", "-e", "{name}"]
+    timeout: "10m"
+`, fakeBin, xmlPath)
+	if err := os.WriteFile(filepath.Join(suiteConfigDir, "config.yml"), []byte(configContent), 0644); err != nil {
+		t.Fatalf("write config.yml: %v", err)
+	}
+	chdirTest(t, dir)
+
+	server := fakeTimeoutAPI(t)
+	defer server.Close()
+
+	output, exitErr := executeRunCmd(t, []string{
+		"backend", "--timeout", "2s",
+	}, map[string]string{
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
+	})
+
+	exitCode := extractExitCode(t, exitErr)
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "backend suite with config timeout 10m and --timeout 2s flag",
+		Should:   "exit with code 2 (timeout fired from the flag, not config)",
+		Actual:   exitCode,
+		Expected: 2,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "backend suite with config timeout 10m and --timeout 2s flag",
+		Should:   "print no-XML timeout error message referencing 2s (the flag value)",
+		Actual:   strings.Contains(output, "Error [timeout]: test command timed out after 2s and produced no JUnit XML at"),
+		Expected: true,
+	})
+}
+
 // buildPartialRspecXML generates a JUnit XML string with n passing test cases.
 func buildPartialRspecXML(n int) string {
 	var sb strings.Builder
