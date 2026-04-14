@@ -37,6 +37,7 @@ quarantine state on GitHub.`,
 	rootCmd.AddCommand(newRunCmd())
 	rootCmd.AddCommand(newDoctorCmd())
 	rootCmd.AddCommand(newVersionCmd())
+	rootCmd.AddCommand(newSuiteCmd())
 
 	return rootCmd
 }
