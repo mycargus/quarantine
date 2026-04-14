@@ -10,6 +10,7 @@ import { type DbHandle, getLastPulledAt, updateLastPulledAt, upsertProject } fro
 import { DEBOUNCE_MS, shouldPull } from "./debounce.server.js"
 import { downloadAndExtractJson, listArtifacts } from "./github.server.js"
 import {
+  ARTIFACT_PREFIX,
   filterArtifactsByPrefix,
   ingestArtifact,
   sortArtifactsChronologically,
@@ -38,7 +39,7 @@ export async function syncRepo(
     }
 
     const { artifacts } = await listArtifacts(owner, repo, token, null, fetchFn)
-    const filtered = filterArtifactsByPrefix(artifacts, "quarantine-results")
+    const filtered = filterArtifactsByPrefix(artifacts, ARTIFACT_PREFIX)
     const sorted = sortArtifactsChronologically(filtered)
 
     for (const artifact of sorted) {

@@ -76,6 +76,13 @@ export interface TestRunRecord {
   flakyTests: number
 }
 
+/**
+ * The required prefix for GitHub Artifacts that contain quarantine results.
+ * CI workflows must name artifacts `quarantine-results-{suite-name}-{run_id}`.
+ * See contracts.md §16 (Artifact naming convention).
+ */
+export const ARTIFACT_PREFIX = "quarantine-results"
+
 const ajv = new Ajv2020()
 addFormats(ajv)
 const validate = ajv.compile(schema)

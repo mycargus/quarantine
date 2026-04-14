@@ -42,7 +42,7 @@ sections below for full context on each contract.
 | [Issue creation](#13-issue-creation) | Implicit | GitHub Issues API | Markdown body + label array | CLI | Humans, CLI (dedup search) | Content convention for flaky test issues (built on [Issues API](#6-issues-api)) | `IssueTitlePrefix` constant in `run_notifications.go`; `TestContractIssueTitleFormat` in `contract_test.go` |
 | [Issue dedup labels](#14-issue-dedup-labels) | Implicit | GitHub Issues + Search API | `["quarantine", "quarantine:<suite-name>:<hash>"]` | CLI | CLI (search) | Suite-scoped label convention for deduplication (built on [Search API](#7-search-api)) | `IssueLabelBase`, `IssueLabelForSuite` functions in `run_notifications.go`; `TestContractIssueLabelArrayStructure`, `TestContractDedupHash*` in `contract_test.go` |
 | [Test ID format](#15-test-id-format) | Implicit | `parser.go` | `file_path::classname::name` string | CLI parser | State (map key), issues (hash input), results (display) | Stable test identity across runs for quarantine lookup and issue dedup | Parser tests assert construction; no cross-component test |
-| [Artifact naming](#16-artifact-naming-convention) | Implicit | CI workflow YAML, `github.server.ts` | `quarantine-results-{run_id}` name prefix | CI workflow (`actions/upload-artifact`) | Dashboard (`filterArtifactsByPrefix()`) | Dashboard identifies which artifacts contain quarantine results | Not tested |
+| [Artifact naming](#16-artifact-naming-convention) | Implicit | CI workflow YAML, `ingest.server.ts` | `quarantine-results-{suite-name}-{run_id}` name prefix | CI workflow (`actions/upload-artifact`) | Dashboard (`filterArtifactsByPrefix()`) | Dashboard identifies which artifacts contain quarantine results | `ARTIFACT_PREFIX` constant in `ingest.server.ts`; unit test asserts value matches convention |
 | [CLI exit codes](#17-cli-exit-codes) | Implicit | `run.go` | Integer: 0=pass, 1=failures, 2=infra error | CLI | CI pipeline, scripts, users | CI determines build pass/fail from exit code | Extensively tested (`run_*_test.go`) |
 | [Rate limit headers](#18-rate-limit-headers) | Implicit | `init_ops.go` | `X-RateLimit-Remaining` / `X-RateLimit-Limit` response headers | GitHub API | CLI | Warn before rate limit exhaustion | 9 tests in `ratelimit_test.go` covering: below/above/exact threshold, missing headers, one header missing, limit=0, reset time formatting |
 | [v2+] [App token exchange](#19-app-token-exchange) | Explicit | GitHub API | REST / JSON | Dashboard | GitHub | Dashboard generates installation tokens for artifact polling and installation discovery | JS Prism contract tests (planned: `test/contract/github-app.test.js`) |
@@ -57,7 +57,7 @@ and consumers — they define the expected shape that both sides agree on.
 
 | Schema | Location | Protocol | Validates | Used at | Tested |
 |--------|----------|----------|-----------|---------|--------|
-| `test-result.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `results.json` | Dashboard runtime (ajv); Go marshal test (planned, ADR-025); negative regression test (planned, ADR-025) | Dashboard validates at runtime; Go marshal validation planned |
+| `test-result.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `results.json` | Dashboard runtime (ajv); Go marshal validation (ADR-025) | Dashboard validates at runtime; Go marshal validation done (`result_schema_test.go`, 7 test cases: positive, negative, flaky, quarantined, error-mapped-to-failed, all-retries-fail, missing-field) |
 | `quarantine-state.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `quarantine.json` | Negative regression test (planned, ADR-025) | Single-component; `issue_number`/`issue_url` to be made optional (ADR-025) |
 | `quarantine-config.schema.json` | `schemas/` | JSON Schema (draft 2020-12) | `.quarantine/config.yml` | Negative regression test (planned, ADR-025) | Documentation artifact; CLI validates via Go code, not schema. To be updated for `test_suites` array, removed `framework`/`exclude` fields. |
 | `github-api.json` | `schemas/` | OpenAPI 3.x | All GitHub API endpoints used by CLI and dashboard (Contents, Issues, Search, Comments, Refs, Repository, Artifacts; [v2+] App installations, installation token exchange, installation repositories) | Prism contract tests (`make contract-test`) | Go: `*_contract_test.go` in `cli/internal/github/`; JS: `test/contract/github-artifacts.test.js`, [v2+] `test/contract/github-app.test.js` |
@@ -163,7 +163,10 @@ consumes it during artifact polling.
 
 **Current validation:**
 - Dashboard validates incoming JSON against the schema at runtime via ajv.
-- CLI does not validate its own output against the schema.
+- CLI validates its own marshal output against the schema via
+  `cli/internal/result/result_schema_test.go` (7 test cases: positive,
+  negative, flaky, quarantined, error-mapped-to-failed, all-retries-fail,
+  missing-field).
 - Fixtures in `testdata/expected/` represent expected output but are not
   validated against the schema.
 - Scenario 72 in `docs/scenarios/v1/09-test-runner-edge-cases.md` covers a
@@ -606,9 +609,9 @@ and display identifier in results and PR comments.
 in a repository. The naming convention is how it identifies which artifacts
 contain quarantine results.
 
-**Where:** CLI writes to `.quarantine/results.json`. The CI workflow
+**Where:** CLI writes to `.quarantine/<suite-name>/results.json`. The CI workflow
 (`actions/upload-artifact@v4`) uploads it with a name like
-`quarantine-results-{run_id}`. Dashboard filters artifacts by name prefix.
+`quarantine-results-{suite-name}-{run_id}`. Dashboard filters artifacts by name prefix.
 
 **When:** CLI produces the file; CI uploads it; dashboard polls for it.
 
@@ -617,11 +620,17 @@ contain quarantine results.
 - Consumer: Dashboard (`ingest.server.ts:filterArtifactsByPrefix()`)
 
 **Contract details:**
-- Name prefix: `quarantine-results-` (implied by README and dashboard code)
-- Not enforced by schema or configuration — purely conventional
+- Name format: `quarantine-results-{suite-name}-{run_id}` where `suite-name`
+  is the name from `.quarantine/config.yml` and `run_id` is the GitHub Actions
+  run ID
+- Name prefix: `quarantine-results` (the shared prefix the dashboard filters on)
+- Not enforced by schema — purely conventional; producer is CI workflow YAML
 - Dashboard currently fetches first 100 artifacts only (no pagination)
 
-**Current validation:** None.
+**Current validation:** `ARTIFACT_PREFIX` constant (`"quarantine-results"`) in
+`dashboard/app/lib/ingest.server.ts`. A unit test in `ingest.server.test.ts`
+asserts the constant's value matches this documented convention. If the prefix
+changes in code, the test fails immediately.
 
 ---
 

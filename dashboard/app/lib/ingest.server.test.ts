@@ -2,6 +2,7 @@ import { describe } from "riteway"
 import { initDb } from "./db.server.js"
 import type { Artifact, TestResult } from "./ingest.server.js"
 import {
+  ARTIFACT_PREFIX,
   buildIssueUrl,
   buildTestRunRecord,
   filterArtifactsByPrefix,
@@ -49,6 +50,15 @@ const validFixture: TestResult = {
   ],
 }
 
+describe("ARTIFACT_PREFIX", async (assert) => {
+  assert({
+    given: "the ARTIFACT_PREFIX constant",
+    should: 'equal "quarantine-results" to match the CI artifact naming convention',
+    actual: ARTIFACT_PREFIX,
+    expected: "quarantine-results",
+  })
+})
+
 describe("filterArtifactsByPrefix()", async (assert) => {
   const artifacts: Artifact[] = [
     {
@@ -77,7 +87,7 @@ describe("filterArtifactsByPrefix()", async (assert) => {
   assert({
     given: "a list of artifacts with mixed names",
     should: "return only artifacts matching the prefix",
-    actual: filterArtifactsByPrefix(artifacts, "quarantine-results").map((a) => a.id),
+    actual: filterArtifactsByPrefix(artifacts, ARTIFACT_PREFIX).map((a) => a.id),
     expected: [1, 3],
   })
 
@@ -94,7 +104,7 @@ describe("filterArtifactsByPrefix()", async (assert) => {
           expires_at: "t",
         },
       ],
-      "quarantine-results",
+      ARTIFACT_PREFIX,
     ),
     expected: [],
   })
@@ -102,7 +112,7 @@ describe("filterArtifactsByPrefix()", async (assert) => {
   assert({
     given: "an empty artifact array",
     should: "return an empty array",
-    actual: filterArtifactsByPrefix([], "quarantine-results"),
+    actual: filterArtifactsByPrefix([], ARTIFACT_PREFIX),
     expected: [],
   })
 

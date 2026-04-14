@@ -14,6 +14,7 @@ import { loadConfig } from "../app/lib/config.server.js"
 import { initDb, updateLastPulledAt, upsertProject } from "../app/lib/db.server.js"
 import { downloadAndExtractJson, listArtifacts } from "../app/lib/github.server.js"
 import {
+  ARTIFACT_PREFIX,
   filterArtifactsByPrefix,
   ingestArtifact,
   sortArtifactsChronologically,
@@ -39,7 +40,7 @@ for (const { owner, repo } of config.repos) {
 
   const projectId = await upsertProject(handle.db, owner, repo)
   const { artifacts } = await listArtifacts(owner, repo, token, null)
-  const filtered = filterArtifactsByPrefix(artifacts, "quarantine-results")
+  const filtered = filterArtifactsByPrefix(artifacts, ARTIFACT_PREFIX)
   const sorted = sortArtifactsChronologically(filtered)
 
   console.log(`  ${sorted.length} artifact(s) found`)
