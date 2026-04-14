@@ -77,10 +77,9 @@ let result // spawnSync result
 
 describe("quarantine init — E2E against real GitHub", () => {
   beforeAll(async () => {
-    // Clean up any leftover branch from a prior run.
-    if (await branchExists()) {
-      await deleteBranch()
-    }
+    // Do NOT delete the quarantine/state branch — quarantine-observe.test.js
+    // depends on it to verify real CI output. The init command is idempotent:
+    // it skips branch creation if the branch already exists.
 
     // Create a temp directory with a git repo whose origin points to the
     // test repository. The init command reads the remote via `git remote get-url`.
@@ -94,6 +93,7 @@ describe("quarantine init — E2E against real GitHub", () => {
     })
 
     // Run `quarantine init` — non-interactive, detects framework automatically.
+    // If the state branch already exists, init skips branch creation.
     result = spawnSync(binPath, ["init"], {
       cwd: dir,
       encoding: "utf8",
@@ -103,9 +103,9 @@ describe("quarantine init — E2E against real GitHub", () => {
   })
 
   afterAll(async () => {
-    if (await branchExists()) {
-      await deleteBranch()
-    }
+    // Do NOT delete the quarantine/state branch — quarantine-observe.test.js
+    // depends on it to verify real CI output. The branch is shared state
+    // between the fixture CI and the E2E observation tests.
     if (dir) {
       rmSync(dir, { recursive: true, force: true })
     }

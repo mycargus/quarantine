@@ -17,7 +17,12 @@
 import { assert } from "riteway/vitest"
 import { afterAll, beforeAll, describe, test } from "vitest"
 
-const BRANCH = "quarantine/e2e-branch-not-found"
+// Use a branch name that cannot collide with any real quarantine branch.
+// Previously this used "quarantine/e2e-branch-not-found" which shared the
+// "quarantine/" prefix with "quarantine/state". GitHub's /git/ref/ (singular)
+// endpoint does prefix matching, causing beforeAll/afterAll cleanup to
+// accidentally delete the real quarantine/state branch.
+const BRANCH = "e2e-nonexistent-branch-for-404-test"
 
 const token = process.env.QUARANTINE_GITHUB_TOKEN
 const owner = process.env.QUARANTINE_TEST_OWNER
@@ -25,30 +30,15 @@ const repo = process.env.QUARANTINE_TEST_REPO
 
 // --- GitHub API helpers ---
 
-async function ghRequest(method, path, body) {
+async function ghRequest(method, path) {
   return fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
-      "Content-Type": "application/json",
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
   })
-}
-
-async function branchExists() {
-  const res = await ghRequest("GET", `/git/ref/heads/${BRANCH}`)
-  return res.status === 200
-}
-
-async function deleteBranch() {
-  const res = await ghRequest("DELETE", `/git/refs/heads/${BRANCH}`)
-  if (res.status !== 204) {
-    const text = await res.text()
-    throw new Error(`deleteBranch: unexpected ${res.status}: ${text}`)
-  }
 }
 
 // --- Credential guard ---
@@ -58,20 +48,10 @@ if (!owner) throw new Error("QUARANTINE_TEST_OWNER is required")
 if (!repo) throw new Error("QUARANTINE_TEST_REPO is required")
 
 // --- Test suite ---
+// No beforeAll/afterAll cleanup needed — the branch never exists.
+// The test only observes 404 responses for a nonexistent ref.
 
 describe("GitHub contents API — branch-not-found error message fidelity", () => {
-  beforeAll(async () => {
-    if (await branchExists()) {
-      await deleteBranch()
-    }
-  })
-
-  afterAll(async () => {
-    if (await branchExists()) {
-      await deleteBranch()
-    }
-  })
-
   test("returns 404 when the ref branch does not exist", async () => {
     const res = await ghRequest("GET", `/contents/.quarantine/jest-tests/state.json?ref=${BRANCH}`)
 
