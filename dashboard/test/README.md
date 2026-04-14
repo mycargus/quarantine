@@ -1,16 +1,24 @@
-# Dashboard Integration Tests
+# Dashboard Interface Tests
 
-Integration tests that verify the interaction of multiple dashboard components (TypeScript modules, SQLite database, etc.) working together. External systems (GitHub, Jenkins, Jira, etc.) are mocked.
+Interface tests that exercise the dashboard through its public HTTP interface
+(`router.fetch()`), with external APIs (GitHub) stubbed. This is the MTP
+Interface layer: tests that exercise a single component through its public
+interface without crossing external service boundaries.
 
 ## Scope
 
-These tests exercise full component flows within the dashboard boundary. They differ from unit tests (colocated in `dashboard/app/`) which test pure functions in isolation.
+These tests call `router.fetch(new Request(...))` via `createApp()`, exercising
+route matching, parameter extraction, controller invocation, and response
+rendering. External GitHub API calls are prevented by passing `token: ""` in
+the `AppOptions` (an empty string is falsy, so the `if (token)` sync guard
+never fires).
 
 What belongs here:
 
-- Tests that require a real SQLite database
-- Tests that exercise multiple modules working together
-- Tests that mock external HTTP APIs (GitHub, Jenkins, Jira)
+- Tests that exercise routing and route parameter extraction
+- Tests that verify correct HTTP status codes and response shapes
+- Tests that require a real SQLite database (temp file, isolated per test)
+- Tests that verify the full request → response path
 
 What does NOT belong here:
 
@@ -20,11 +28,11 @@ What does NOT belong here:
 ## File naming
 
 ```
-<descriptive-name>.integration.test.ts
+<descriptive-name>.interface.test.ts
 ```
 
 ## Running
 
 ```bash
-make dash-test   # runs both unit and integration tests
+make dash-test   # runs unit and interface tests together
 ```

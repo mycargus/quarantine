@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "node --import tsx/esm app/server.ts",
     "start": "node --import tsx/esm app/server.ts",
-    "test": "node --test --import tsx/esm 'app/**/*.test.{ts,tsx}'",
+    "test": "node --test --import tsx/esm 'app/**/*.test.{ts,tsx}' 'test/*.interface.test.ts'",
     "lint": "biome check",
     "lint:ci": "biome ci --error-on-warnings",
     "lint:fix": "biome check --write",
