@@ -14,15 +14,17 @@ Dashboard has only Unit tests (sociable — controllers and lib functions called
 directly with real SQLite). It has no Interface tests (HTTP requests to Remix
 routes) and no E2E tests (real GitHub Artifacts).
 
-`contracts.md` is stale regarding completed ADR-025 work, and one convention
-contract is unvalidated.
+`contracts.md` is stale regarding completed ADR-025 work and the M9 artifact
+naming change, and one convention contract is unvalidated.
 
 ## Remaining Gaps
 
 | Gap | MTP Layer | Severity | Effort |
 |-----|-----------|----------|--------|
 | contracts.md stale on ADR-025 status | Contract | Low | Trivial |
+| contracts.md stale on M9 artifact naming (`{run_id}` → `{suite-name}-{run_id}`) | Contract | Low | Trivial |
 | Artifact naming prefix convention unvalidated | Contract | Medium | Small |
+| `dashboard/test/README.md` uses "Integration" terminology instead of MTP "Interface" | Interface | Low | Trivial |
 | Dashboard Interface tests don't exist | Interface | High | Medium |
 | Dashboard E2E tests don't exist | E2E | High | Medium |
 
@@ -47,6 +49,20 @@ quarantined, error-mapped-to-failed, all-retries-fail, missing-field).
 **Action:** Update the "Tested" column for `test-result.schema.json` in the
 schema table and the `results.json` contract detail section.
 
+### 1.1b Update contracts.md — reflect M9 artifact naming change
+
+M9 changed the artifact naming convention from `quarantine-results-{run_id}` to
+`quarantine-results-{suite-name}-{run_id}`. Two locations in contracts.md are
+stale:
+
+- Summary table row for [Artifact naming](#16-artifact-naming-convention):
+  Protocol column says `quarantine-results-{run_id}` — update to
+  `quarantine-results-{suite-name}-{run_id}`.
+- Section 16 detail: update the naming convention description to include the
+  suite name component.
+
+Note: Section 3 (results.json) already has the correct format.
+
 ### 1.2 Artifact naming prefix validation
 
 **Contract:** CI workflow uploads artifacts named
@@ -68,11 +84,13 @@ data schema.
    (e.g., `ARTIFACT_PREFIX = "quarantine-results"` in a shared constants
    module).
 2. Update `sync.server.ts` to use the constant.
-3. Add a unit test asserting the constant's value matches the documented
+3. Update `scripts/seed.ts` to use the constant (also hardcodes
+   `"quarantine-results"` on line 42).
+4. Add a unit test asserting the constant's value matches the documented
    convention.
-4. Update unit tests for `filterArtifactsByPrefix()` to reference the constant
+5. Update unit tests for `filterArtifactsByPrefix()` to reference the constant
    instead of hardcoded strings.
-5. Update `contracts.md` "Tested" column to note the validation.
+6. Update `contracts.md` "Tested" column to note the validation.
 
 **Location:** Dashboard code + unit tests (not `test/contract/`).
 
@@ -95,8 +113,11 @@ existing pattern in `home.test.ts`. No shared state between tests.
 
 **No sync during Interface tests.** Interface tests exercise the request →
 response path with pre-seeded SQLite data. GitHub API calls are not triggered.
-The `token` option in `HomeOptions` controls whether sync is attempted — omit
-it to prevent network calls.
+The `home()` controller syncs when it resolves a truthy token: it checks
+`options.token`, then `QUARANTINE_GITHUB_TOKEN`, then `GITHUB_TOKEN`. To
+guarantee no sync, pass an explicit empty string (`token: ""`) in the
+`AppOptions` — this prevents env var fallback and is falsy in the `if (token)`
+guard. The `createTestApp` helper must do this automatically.
 
 ### 2.1 Extract `createApp()` factory from server.ts
 
@@ -161,8 +182,16 @@ layer). Interface tests use `createApp()` (interface layer).
 
 ### 2.2 Create dashboard/test/ directory and infrastructure
 
+**Update `dashboard/test/README.md`:** The existing README uses pre-MTP
+terminology ("Integration Tests", `.integration.test.ts`). Update it to use
+MTP terminology ("Interface Tests", `.interface.test.ts`) and revise the scope
+description to match the MTP Interface layer definition: tests that exercise
+the dashboard through its public HTTP interface (`router.fetch()`), with
+external APIs stubbed.
+
 ```
 dashboard/test/
+  README.md                    — Updated to MTP Interface terminology
   helpers.ts                   — createTestApp(), seedTestDb(), bodyText()
   home.interface.test.ts       — GET / scenarios
   project.interface.test.ts    — GET /projects/:owner/:repo scenarios
@@ -176,7 +205,7 @@ export function createTestApp(opts) {
   const configPath = writeTempConfig(opts.repos ?? [])
   const dbPath = createTempDb()
   return {
-    router: createApp({ configPath, dbPath }),
+    router: createApp({ configPath, dbPath, token: "" }),
     dbPath,
     configPath,
     cleanup: () => { unlinkSync(configPath); unlinkSync(dbPath) },
@@ -253,8 +282,10 @@ involves real network I/O.
    ingests into SQLite. GET / shows the project with correct quarantine counts.
    GET /projects/:owner/:repo shows individual test results.
 
-2. **Incremental sync:** First sync ingests all artifacts. Second sync only
-   ingests new artifacts (since-based filtering). Verify no duplicate rows.
+2. **Idempotent re-sync:** First sync ingests all artifacts. Second sync
+   re-fetches the same artifacts but `ingestArtifact()` upserts by `run_id`,
+   so no duplicate rows are created. Verify row counts are stable after the
+   second sync.
 
 3. **Empty state → populated:** New Dashboard with no prior sync. GET / shows
    empty. Trigger sync. GET / shows populated.
