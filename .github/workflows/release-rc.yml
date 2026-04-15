@@ -1,0 +1,273 @@
+name: Release Candidate
+
+on:
+  push:
+    tags:
+      - 'v*-*'
+
+permissions:
+  contents: write
+
+jobs:
+  cli:
+    name: CLI
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - id: go-version
+        run: echo "version=$(grep golang .tool-versions | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache-dependency-path: go.sum
+
+      - name: Build
+        run: make cli-build
+
+      - name: Test
+        run: make cli-test
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          args: ./cli/...
+
+  dashboard:
+    name: Dashboard
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - id: node-version
+        run: echo "version=$(grep nodejs .tool-versions | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ steps.node-version.outputs.version }}
+
+      - uses: pnpm/action-setup@v5
+        with:
+          package_json_file: dashboard/package.json
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: dashboard
+
+      - name: Lint
+        run: make dash-lint-ci
+
+      - name: Typecheck
+        run: make dash-typecheck
+
+      - name: Test
+        run: make dash-test
+
+  contract:
+    name: Contract Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - id: node-version
+        run: echo "version=$(grep nodejs .tool-versions | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ steps.node-version.outputs.version }}
+
+      - uses: pnpm/action-setup@v5
+        with:
+          package_json_file: test/package.json
+
+      - name: Install test dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: test
+
+      - name: Lint
+        run: make contract-lint-ci
+
+      - name: Contract Tests
+        run: make contract-test
+
+  release:
+    name: Publish Prerelease
+    needs: [cli, dashboard, contract]
+    runs-on: ubuntu-latest
+    environment: release
+
+    outputs:
+      version: ${{ steps.version.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - id: version
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - id: go-version
+        run: echo "version=$(grep golang .tool-versions | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache-dependency-path: go.sum
+
+      - name: Verify CHANGELOG entry
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          VERSION_NUM="${VERSION#v}"
+          BASE_VERSION="${VERSION_NUM%%-*}"
+          if ! grep -q "^## \[${BASE_VERSION}\]" CHANGELOG.md; then
+            echo "Error: CHANGELOG.md has no entry for [${BASE_VERSION}]"
+            exit 1
+          fi
+
+      - name: Extract release notes
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          VERSION_NUM="${VERSION#v}"
+          BASE_VERSION="${VERSION_NUM%%-*}"
+          awk "/^## \[${BASE_VERSION}\]/{found=1; next} found && /^## \[/{exit} found && /^\[.*\]: /{exit} found{print}" CHANGELOG.md \
+            > /tmp/release-notes.md
+
+      - name: GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: '~> v2'
+          args: release --clean --release-notes /tmp/release-notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  pre-release-e2e:
+    name: Pre-release E2E
+    needs: [release]
+    runs-on: ubuntu-latest
+    environment: CI
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install quarantine via install.sh
+        run: curl -sSL https://raw.githubusercontent.com/mycargus/quarantine/main/scripts/install.sh | VERSION=${{ needs.release.outputs.version }} INSTALL_DIR=${{ github.workspace }}/bin bash
+
+      - id: node-version
+        run: echo "version=$(grep nodejs .tool-versions | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ steps.node-version.outputs.version }}
+
+      - uses: pnpm/action-setup@v5
+        with:
+          package_json_file: dashboard/package.json
+
+      - name: Install dashboard dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: dashboard
+
+      - name: Install test dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: test
+
+      - name: Lint
+        run: make e2e-lint-ci
+
+      - name: E2E Tests (pre-release)
+        run: make e2e-test
+        env:
+          QUARANTINE_GITHUB_TOKEN: ${{ secrets.QUARANTINE_GITHUB_TOKEN }}
+          QUARANTINE_TEST_OWNER: ${{ vars.QUARANTINE_TEST_OWNER }}
+          QUARANTINE_TEST_REPO: ${{ vars.QUARANTINE_TEST_REPO }}
+          QUARANTINE_BIN: ${{ github.workspace }}/bin/quarantine
+
+  trigger-fixture:
+    name: Trigger Fixture CI
+    needs: [release, pre-release-e2e]
+    runs-on: ubuntu-latest
+    environment: CI
+
+    steps:
+      - name: Trigger fixture repo and wait for completion
+        run: |
+          OWNER="${{ vars.QUARANTINE_TEST_OWNER }}"
+          REPO="${{ vars.QUARANTINE_TEST_REPO }}"
+
+          # Record timestamp BEFORE dispatching to avoid missing our run
+          DISPATCH_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          gh workflow run upload-test-artifact.yml \
+            --repo "$OWNER/$REPO" \
+            --field version="${{ needs.release.outputs.version }}"
+
+          # Wait for a workflow_dispatch run created after our timestamp
+          echo "Waiting for fixture CI run to start..."
+          RUN_ID=""
+          for i in $(seq 1 30); do
+            RUN_ID=$(gh run list --repo "$OWNER/$REPO" --workflow upload-test-artifact.yml \
+              --limit 5 --json databaseId,createdAt,event \
+              --jq "[.[] | select(.event == \"workflow_dispatch\" and .createdAt >= \"$DISPATCH_TIME\")] | .[0].databaseId")
+            if [[ -n "$RUN_ID" && "$RUN_ID" != "null" ]]; then
+              break
+            fi
+            RUN_ID=""
+            sleep 2
+          done
+
+          if [[ -z "$RUN_ID" ]]; then
+            echo "Error: fixture CI run did not start within 60 seconds"
+            exit 1
+          fi
+
+          echo "Waiting for run $RUN_ID to complete..."
+          gh run watch "$RUN_ID" --repo "$OWNER/$REPO" --exit-status
+        env:
+          GH_TOKEN: ${{ secrets.QUARANTINE_GITHUB_TOKEN }}
+
+  post-release-e2e:
+    name: Post-release E2E
+    needs: [release, trigger-fixture]
+    runs-on: ubuntu-latest
+    environment: CI
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install quarantine via install.sh
+        run: curl -sSL https://raw.githubusercontent.com/mycargus/quarantine/main/scripts/install.sh | VERSION=${{ needs.release.outputs.version }} INSTALL_DIR=${{ github.workspace }}/bin bash
+
+      - id: node-version
+        run: echo "version=$(grep nodejs .tool-versions | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ steps.node-version.outputs.version }}
+
+      - uses: pnpm/action-setup@v5
+        with:
+          package_json_file: dashboard/package.json
+
+      - name: Install dashboard dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: dashboard
+
+      - name: Install test dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: test
+
+      - name: Lint
+        run: make e2e-lint-ci
+
+      - name: E2E Tests (post-release)
+        run: make e2e-test
+        env:
+          QUARANTINE_GITHUB_TOKEN: ${{ secrets.QUARANTINE_GITHUB_TOKEN }}
+          QUARANTINE_TEST_OWNER: ${{ vars.QUARANTINE_TEST_OWNER }}
+          QUARANTINE_TEST_REPO: ${{ vars.QUARANTINE_TEST_REPO }}
+          QUARANTINE_BIN: ${{ github.workspace }}/bin/quarantine
