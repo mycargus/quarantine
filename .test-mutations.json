@@ -617,6 +617,29 @@
       },
       "mutation_score": 100.0,
       "insights": ["Perfect score — all 20 mutations killed", "6 test files provide comprehensive coverage", "Pure functions, I/O, and orchestration all well-tested"]
+    },
+    "dashboard/app/lib/sync.server.ts": {
+      "status": "completed",
+      "covering_tests": ["dashboard/app/lib/sync.server.test.ts", "dashboard/app/lib/sync.server.state.test.ts"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "logical": {"total": 1, "killed": 1, "survived": 0, "examples": [
+          {"line": 44, "original": "!shouldPull(...)", "mutated": "shouldPull(...)", "result": "killed", "test_that_caught_it": "second call within 5 min test"}
+        ]},
+        "relational": {"total": 1, "killed": 1, "survived": 0, "examples": [
+          {"line": 69, "original": "state !== null", "mutated": "=== null", "result": "killed", "test_that_caught_it": "state enumeration test"}
+        ]},
+        "constants": {"total": 3, "killed": 3, "survived": 0, "examples": [
+          {"line": 48, "original": "null (etag)", "mutated": "\"fake-etag\"", "result": "killed", "test_that_caught_it": "If-None-Match header capture (new test)"},
+          {"line": 49, "original": "ARTIFACT_PREFIX", "mutated": "\"\"", "result": "killed", "test_that_caught_it": "no matching artifacts test"}
+        ]},
+        "statement": {"total": 3, "killed": 3, "survived": 0, "examples": [
+          {"line": 81, "original": "updateLastPulledAt(...)", "mutated": "removed", "result": "killed", "test_that_caught_it": "last_pulled_at update test"},
+          {"line": "66-79", "original": "state sync loop", "mutated": "removed", "result": "killed", "test_that_caught_it": "state enumeration test"}
+        ]}
+      },
+      "mutation_score": 100.0,
+      "insights": ["All 8 mutations killed — perfect score after adding etag header verification", "Debounce, artifact processing, state sync, error handling all well-tested"]
     }
   }
 }
