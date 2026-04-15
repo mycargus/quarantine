@@ -11,8 +11,8 @@ VERSION="${VERSION:-latest}"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
 cleanup() {
-  if [[ -n "${TMPDIR:-}" ]]; then
-    rm -rf "$TMPDIR"
+  if [[ -n "${WORK_DIR:-}" ]]; then
+    rm -rf "$WORK_DIR"
   fi
 }
 trap cleanup EXIT
@@ -58,19 +58,19 @@ BINARY_NAME="quarantine_${VERSION_NUM}_${OS}_${ARCH}"
 BASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"
 
 # Create temp directory
-TMPDIR=$(mktemp -d)
+WORK_DIR=$(mktemp -d)
 
 echo "Downloading quarantine ${VERSION} for ${OS}/${ARCH}..."
 
 # Download binary and checksums
-curl -sSL "${BASE_URL}/${BINARY_NAME}" -o "${TMPDIR}/${BINARY_NAME}" \
+curl -sSL "${BASE_URL}/${BINARY_NAME}" -o "${WORK_DIR}/${BINARY_NAME}" \
   || die "Failed to download binary. Check that ${VERSION} exists at https://github.com/${REPO}/releases"
-curl -sSL "${BASE_URL}/checksums.txt" -o "${TMPDIR}/checksums.txt" \
+curl -sSL "${BASE_URL}/checksums.txt" -o "${WORK_DIR}/checksums.txt" \
   || die "Failed to download checksums."
 
 # Verify checksum
 echo "Verifying checksum..."
-cd "$TMPDIR"
+cd "$WORK_DIR"
 if command -v sha256sum >/dev/null 2>&1; then
   grep "${BINARY_NAME}" checksums.txt | sha256sum --check --quiet
 elif command -v shasum >/dev/null 2>&1; then
