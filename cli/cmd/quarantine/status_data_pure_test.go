@@ -232,6 +232,13 @@ func TestComputeAllSuitesSummary(t *testing.T) {
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "backend (5) and frontend (2) summing to 7",
+		Should:   "not contain a negative total",
+		Actual:   !strings.Contains(result, "-7"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "all-suites summary output",
 		Should:   "contain hint about suite-name for details",
 		Actual:   strings.Contains(result, "quarantine status <suite-name>"),

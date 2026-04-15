@@ -354,14 +354,34 @@
       },
       "mutation_score": 100.0,
       "insights": ["Perfect score — all 6 compilable mutations killed", "Pure function with no I/O — highly testable", "Zero-value boundary tests catch regex constant mutations"]
+    },
+    "cli/cmd/quarantine/status.go": {
+      "status": "completed",
+      "covering_tests": ["cli/cmd/quarantine/status_pure_test.go", "cli/cmd/quarantine/status_data_pure_test.go", "cli/cmd/quarantine/status_test.go", "cli/cmd/quarantine/status_all_suites_test.go"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "arithmetic": {"total": 5, "killed": 5, "survived": 0, "examples": [
+          {"line": 45, "original": "total += c.QuarantinedCount", "mutated": "total -= c.QuarantinedCount", "result": "killed", "test_that_caught_it": "TestComputeAllSuitesSummary"},
+          {"line": 70, "original": "float64(ms) / 1000.0", "mutated": "* 1000.0", "result": "killed", "test_that_caught_it": "TestFormatDurationSecondsWithOneDecimal"}
+        ]},
+        "relational": {"total": 5, "killed": 5, "survived": 0, "examples": [
+          {"line": 56, "original": "len(durations) == 0", "mutated": "!= 0", "result": "killed", "test_that_caught_it": "TestAverageDurationMsReturnsNilForEmptySlice"},
+          {"line": 136, "original": "t.Status == \"quarantined\"", "mutated": "!= \"quarantined\"", "result": "killed", "test_that_caught_it": "TestParseResultsJSONFiltersToQuarantined"}
+        ]},
+        "constant": {"total": 3, "killed": 3, "survived": 0, "examples": [
+          {"line": 88, "original": "len(entries)", "mutated": "0", "result": "killed", "test_that_caught_it": "TestComputeStatusTextWithDuration"}
+        ]}
+      },
+      "mutation_score": 100.0,
+      "insights": ["14/14 valid mutations killed (1 skipped — compile error)", "Total accumulation bug caught by negative-total assertion", "Pure functions highly testable — all arithmetic, relational, constant mutations caught"]
     }
   },
   "global_statistics": {
-    "total_modules": 22,
-    "completed_modules": 22,
-    "total_mutations": 377,
-    "total_killed": 358,
+    "total_modules": 23,
+    "completed_modules": 23,
+    "total_mutations": 391,
+    "total_killed": 372,
     "total_survived": 22,
-    "overall_score": 95.0
+    "overall_score": 95.1
   }
 }
