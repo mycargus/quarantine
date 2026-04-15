@@ -66,6 +66,9 @@ func TestStatusShowsSuiteStatusWithDuration(t *testing.T) {
 	// Tests quarantined 45, 30, 3 days ago respectively.
 	// Last failed 2, 29, 3 days ago.
 	now := time.Date(2026, 4, 14, 10, 0, 0, 0, time.UTC)
+	origNow := nowFunc
+	nowFunc = func() time.Time { return now }
+	t.Cleanup(func() { nowFunc = origNow })
 
 	quarantinedAt45 := now.AddDate(0, 0, -45).Format(time.RFC3339) // 2026-02-28
 	quarantinedAt30 := now.AddDate(0, 0, -30).Format(time.RFC3339) // 2026-03-15

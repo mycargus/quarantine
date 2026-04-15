@@ -17,6 +17,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// nowFunc is the clock used by status commands. Tests override this to pin time.
+var nowFunc = time.Now
+
 // statusEntry is a pure data type holding the fields needed for status display.
 // No I/O — deterministic.
 type statusEntry struct {
@@ -275,7 +278,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		avgMs = avg
 	}
 
-	now := time.Now().UTC()
+	now := nowFunc().UTC()
 	output := computeStatusText(suiteName, entries, avgMs, now)
 	cmd.Print(output)
 	return nil
