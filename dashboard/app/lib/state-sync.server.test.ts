@@ -116,6 +116,15 @@ const throws = async (fn: () => Promise<unknown>): Promise<boolean> => {
   }
 }
 
+const throwMessage = async (fn: () => Promise<unknown>): Promise<string> => {
+  try {
+    await fn()
+    return ""
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e)
+  }
+}
+
 describe("listStateSuites()", async (assert) => {
   assert({
     given: "a 200 response with 2 dir entries (backend/, frontend/) and 1 file entry (config.yml)",
@@ -235,4 +244,49 @@ describe("readSuiteState()", async (assert) => {
     ),
     expected: null,
   })
+
+  assert({
+    given: "a 500 response (non-200/non-404 error)",
+    should: "throw with a descriptive error about the GitHub API status",
+    actual: (
+      await throwMessage(() =>
+        readSuiteState(
+          "mycargus",
+          "my-app",
+          "token",
+          "quarantine/state",
+          "backend",
+          makeFetch500(),
+        ),
+      )
+    ).includes("GitHub API error"),
+    expected: true,
+  })
+
+  {
+    const corruptStateFetch: FetchFn = (async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        content: Buffer.from("not-valid-json").toString("base64"),
+        sha: "abc123",
+      }),
+    })) as unknown as FetchFn
+
+    assert({
+      given: "a 200 response with base64 content that decodes to invalid JSON",
+      should: "throw a SyntaxError from JSON.parse",
+      actual: await throws(() =>
+        readSuiteState(
+          "mycargus",
+          "my-app",
+          "token",
+          "quarantine/state",
+          "backend",
+          corruptStateFetch,
+        ),
+      ),
+      expected: true,
+    })
+  }
 })

@@ -226,11 +226,11 @@ describe("project() — project exists with 3 quarantined tests", async (assert)
 
     assert({
       given: "a project with trend data",
-      should: "render each date adjacent to its flaky count in a table row",
+      should: "render each trend date with its flaky count in the same row",
       actual:
-        html.includes("2026-03-18</td><td>2</td>") &&
-        html.includes("2026-03-19</td><td>1</td>") &&
-        html.includes("2026-03-20</td><td>3</td>"),
+        /2026-03-18<\/td>\s*<td[^>]*>2<\/td>/.test(html) &&
+        /2026-03-19<\/td>\s*<td[^>]*>1<\/td>/.test(html) &&
+        /2026-03-20<\/td>\s*<td[^>]*>3<\/td>/.test(html),
       expected: true,
     })
   } finally {

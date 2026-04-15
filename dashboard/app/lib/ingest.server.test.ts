@@ -490,3 +490,23 @@ describe("filterArtifactsSince() — empty string lastSynced", async (assert) =>
     expected: [1, 2],
   })
 })
+
+describe("filterArtifactsSince() — non-ISO lastSynced", async (assert) => {
+  const artifacts: Artifact[] = [
+    {
+      id: 1,
+      name: "run-1",
+      archive_download_url: "u",
+      created_at: "2026-03-15T10:00:00Z",
+      expires_at: "t",
+    },
+  ]
+
+  assert({
+    given: 'lastSynced is a non-ISO string "not-a-date"',
+    should:
+      "return no artifacts (documents implicit contract: ISO timestamps sort correctly, non-ISO may not)",
+    actual: filterArtifactsSince(artifacts, "not-a-date").map((a) => a.id),
+    expected: [],
+  })
+})

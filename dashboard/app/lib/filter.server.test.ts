@@ -208,4 +208,16 @@ describe("filterByDateRange()", async (assert) => {
     actual: filterByDateRange([], "2026-01-01", "2026-12-31"),
     expected: [],
   })
+
+  assert({
+    given: 'a non-ISO from date string "March 15, 2026"',
+    should:
+      "exclude all tests (documents implicit contract: from/until must be ISO YYYY-MM-DD format)",
+    actual: filterByDateRange(
+      [makeTest({ name: "mar test", testId: "t1", quarantinedAt: "2026-03-15T00:00:00Z" })],
+      "March 15, 2026",
+      null,
+    ).map((t) => t.name),
+    expected: [],
+  })
 })
