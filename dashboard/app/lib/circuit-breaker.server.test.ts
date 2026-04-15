@@ -10,6 +10,16 @@ import type { PollState } from "./github.server.js"
 const clean: PollState = { lastEtag: null, consecutiveFailures: 0, pausedUntil: null }
 
 const now = new Date("2026-01-01T12:00:00.000Z")
+const THIRTY_MINUTES_MS = 30 * 60 * 1000
+
+describe("PAUSE_DURATION_MS", async (assert) => {
+  assert({
+    given: "the exported constant",
+    should: "equal 30 minutes in milliseconds",
+    actual: PAUSE_DURATION_MS,
+    expected: THIRTY_MINUTES_MS,
+  })
+})
 
 describe("isPaused()", async (assert) => {
   assert({
