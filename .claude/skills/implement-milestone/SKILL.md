@@ -81,8 +81,19 @@ When the `/mikey:tdd` skill expands, it will instruct you to spawn a `tdd-agent`
 
 Rules:
 - ONE scenario per `/mikey:tdd` invocation. Do NOT batch.
-- Start with integration or e2e tests — they catch real issues faster than unit tests and drive better design.
-- Add unit tests for pure functions extracted during the Refactor step.
+- **Default to interface tests.** Interface tests exercise the public entry point (CLI command via `newRootCmd().Execute()` or HTTP route via `router.fetch()`) with external APIs mocked (`httptest.NewServer` for CLI, `token: ""` for Dashboard). Internal dependencies (SQLite, config parsing, file system) stay real. Interface tests are the sweet spot — they catch the most bugs per test.
+- Only write unit tests for pure functions extracted during the Refactor step.
+- Only escalate to contract or E2E when the scenario specifically requires it (see Step 2).
+
+**Layer decision tree** (use this when the tdd-agent asks what kind of test to write):
+
+| Scenario describes... | Test layer | Entry point |
+|---|---|---|
+| User runs a CLI command (`quarantine run`, `quarantine init`, etc.) | **Interface** | `newRootCmd().Execute()` + `httptest.NewServer` |
+| User visits a dashboard route or sees dashboard output | **Interface** | `createTestApp()` + `router.fetch()` |
+| Pure logic (parsing, merging, validation, decision-making) | **Unit** | Direct function call, no mocks |
+| Data format exchanged between CLI and dashboard | **Contract** | `/create-contract-test` |
+| Real API behavior (stateful round-trips, redirects, auth) | **E2E** | `/create-e2e-test` |
 
 **When the tdd-agent returns, IMMEDIATELY proceed to 1b. Do NOT stop.**
 
@@ -104,6 +115,22 @@ GATE: Fix ALL issues (HIGH, MEDIUM, and LOW) before proceeding. If testify repor
 2. If any command fails, fix the issue and re-run. Do NOT commit a failing build.
 3. Stage and commit with message: `milestone $1: <description of what changed>`
 4. Each commit is a safe rollback point. Never accumulate uncommitted work across scenarios.
+
+### Step 1.5 — Interface layer triage
+
+Before evaluating contract/E2E needs, verify the primary test is at the right MTP layer.
+
+For the scenario just committed, answer:
+1. **Does the scenario exercise user-facing behavior?** (CLI command, HTTP route, API endpoint)
+2. **Is the primary test an interface test?** (exercises the real entry point with external APIs mocked)
+
+If the answer to (1) is yes but (2) is no — the scenario was tested at the wrong layer:
+- If the test calls internal functions directly instead of the public entry point → rewrite as an interface test. Use `/create-interface-test` for the correct pattern.
+- If the test uses real external APIs when mocks would suffice → demote from E2E to interface.
+
+Fix layer misplacement before proceeding to Step 2. This is a GATE — do not skip.
+
+**Exception:** Pure logic scenarios (parsing, validation, merging) that have no user-facing entry point are correctly tested at the unit layer. This step only applies to scenarios that exercise I/O or user-facing behavior.
 
 ### Step 2 — Contract tests (conditional)
 

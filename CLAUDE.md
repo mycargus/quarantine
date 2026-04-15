@@ -62,6 +62,7 @@ Project skills (invoke with `/skill-name`):
 - `/implement-milestone` -- Implement a milestone using TDD and atomic commits
 - `/verify-milestone` -- Verify implementation against a milestone manifest
 - `/create-milestone` -- Generate a milestone manifest routing document
+- `/create-interface-test` -- Create an interface test (CLI binary or HTTP routes, external APIs mocked)
 - `/create-contract-test` -- Create a Prism-based contract test (offline, no credentials)
 - `/create-e2e-test` -- Create an E2E test that observes real fixture CI output (never runs the CLI binary)
 - `/review-adr` -- Check if a change contradicts an existing ADR

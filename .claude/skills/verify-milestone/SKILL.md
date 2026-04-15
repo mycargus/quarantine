@@ -79,8 +79,15 @@ For each scenario file listed in the manifest's Acceptance Scenarios section:
    - Test files in the same package as the code being tested
 3. For each scenario, determine if a corresponding test exists.
 4. Count covered vs total scenarios per file.
+5. **Check test layer placement.** For each covered scenario:
+   a. Read the scenario's Given/When/Then. Does the "When" describe a user-facing action (running a CLI command, visiting a route, invoking the binary)?
+   b. If yes, verify the test exercises the public entry point:
+      - CLI: `rootCmd.Execute()`, `exec.Command`, or `executeRunCmd`/`executeInitCmd` helpers
+      - Dashboard: `router.fetch()` via `createTestApp()`
+   c. If the test instead calls internal functions directly (e.g., importing and calling a package function for behavior that has a CLI or HTTP entry point), flag it as a **layer gap**: "Scenario N has a test but at the wrong layer (unit instead of interface)."
+   d. Pure logic scenarios (parsing, validation, transformation) are correctly at the unit layer — do not flag these.
 
-Mark each scenario file as PASS (all scenarios covered) or PARTIAL (with count and list of missing scenarios).
+Mark each scenario file as PASS (all scenarios covered at correct layer), PARTIAL (missing scenarios), or LAYER_GAP (scenarios have tests but at the wrong layer — separately listed).
 
 ### 7. Check contract test and E2E coverage
 
@@ -148,8 +155,9 @@ Print a structured report in this exact format:
 - [ ] <invariant description> — VIOLATION: <what's wrong at file:line>
 
 ### Scenario Coverage
-- [x] Scenarios N–M (filename.md) — X/X covered
+- [x] Scenarios N–M (filename.md) — X/X covered, all at correct layer
 - [ ] Scenarios N–M (filename.md) — X/Y covered, missing: Scenario Z (title)
+- [ ] Scenarios N–M (filename.md) — LAYER_GAP: Scenario Z tested at unit level, should be interface (has CLI/HTTP entry point)
 
 ### Contract Test & E2E Coverage
 - [x] All API shape interactions covered by contract tests (test/contract/*.test.js)
