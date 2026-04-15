@@ -550,6 +550,27 @@
       },
       "mutation_score": 100.0,
       "insights": ["All 8 mutations killed — perfect score after adding etag header verification", "Debounce, artifact processing, state sync, error handling all well-tested"]
+    },
+    "dashboard/app/lib/state-sync.server.ts": {
+      "status": "completed",
+      "covering_tests": ["dashboard/app/lib/state-sync.server.test.ts"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 4, "killed": 4, "survived": 0, "examples": [
+          {"line": 69, "original": "=== 404", "mutated": "!== 404", "result": "killed", "test_that_caught_it": "listStateSuites 404 test"},
+          {"line": 103, "original": "=== 404", "mutated": "!== 404", "result": "killed", "test_that_caught_it": "readSuiteState 404 test"}
+        ]},
+        "logical": {"total": 2, "killed": 2, "survived": 0, "examples": [
+          {"line": 75, "original": "!response.ok", "mutated": "response.ok", "result": "killed", "test_that_caught_it": "listStateSuites 500 test"},
+          {"line": 107, "original": "!response.ok", "mutated": "response.ok", "result": "killed", "test_that_caught_it": "readSuiteState 500 test"}
+        ]},
+        "constants": {"total": 3, "killed": 3, "survived": 0, "examples": [
+          {"line": 80, "original": "e.type === \"dir\"", "mutated": "=== \"file\"", "result": "killed", "test_that_caught_it": "listStateSuites dir filter test"},
+          {"line": 47, "original": "\"base64\"", "mutated": "\"utf8\"", "result": "killed", "test_that_caught_it": "readSuiteState decode test"}
+        ]}
+      },
+      "mutation_score": 100.0,
+      "insights": ["All 9 mutations killed — perfect score", "404 handling, error propagation, dir filtering, and base64 decoding all well-tested"]
     }
   }
 }
