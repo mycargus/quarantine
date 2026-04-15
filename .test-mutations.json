@@ -392,14 +392,31 @@
       },
       "mutation_score": 100.0,
       "insights": ["Perfect score — all 7 valid mutations killed (1 skipped — compile error)", "suiteExists, removeSuiteByName, and I/O shell confirmation logic all well tested"]
+    },
+    "cli/internal/detect/detect.go": {
+      "status": "completed",
+      "covering_tests": ["cli/internal/detect/detect_test.go", "cli/cmd/quarantine/init_test.go"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "constant": {"total": 5, "killed": 5, "survived": 0, "examples": [
+          {"line": 26, "original": "make([]string, len(r.Frameworks))", "mutated": "make([]string, 0)", "result": "killed", "test_that_caught_it": "TestInitHappyPath (panic: index out of range)"},
+          {"line": 56, "original": "[\"dependencies\", \"devDependencies\"]", "mutated": "[\"dependencies\"]", "result": "killed", "test_that_caught_it": "TestParsePackageJSONJestInDevDependencies"}
+        ]},
+        "logical": {"total": 3, "killed": 3, "survived": 0, "examples": [
+          {"line": 68, "original": "found", "mutated": "!found", "result": "killed", "test_that_caught_it": "TestScanDetectsJestAndRSpec"}
+        ]},
+        "return": {"total": 2, "killed": 2, "survived": 0, "examples": []}
+      },
+      "mutation_score": 100.0,
+      "insights": ["All 10 valid mutations killed (1 skipped — compile error)", "Names() tested indirectly through init command — panics on bad pre-allocation", "All detection logic well covered across dependencies/devDependencies, jest/vitest/rspec"]
     }
   },
   "global_statistics": {
-    "total_modules": 24,
-    "completed_modules": 24,
-    "total_mutations": 398,
-    "total_killed": 379,
+    "total_modules": 25,
+    "completed_modules": 25,
+    "total_mutations": 408,
+    "total_killed": 389,
     "total_survived": 22,
-    "overall_score": 95.2
+    "overall_score": 95.3
   }
 }
