@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/mycargus/quarantine/cli/internal/detect"
 	"github.com/mycargus/quarantine/cli/internal/git"
 	ghclient "github.com/mycargus/quarantine/cli/internal/github"
 )
@@ -28,10 +28,16 @@ func fileExists(path string) bool {
 func runInit(cmd *cobra.Command, args []string) error {
 	cmd.SetOut(cmd.OutOrStdout())
 
-	// Step 1: Detect frameworks from project files.
-	pkgJSON, _ := os.ReadFile("package.json")
-	gemfile, _ := os.ReadFile("Gemfile")
-	frameworks := detectFrameworks(string(pkgJSON), string(gemfile))
+	// Step 1: Resolve working directory (fail-fast before any other work).
+	cwd, err := os.Getwd()
+	if err != nil {
+		cmd.Printf("Error: could not determine current directory: %v\n", err)
+		return fmt.Errorf("getwd: %w", err)
+	}
+
+	// Step 2: Detect frameworks from project files.
+	detected := detect.Scan(cwd)
+	frameworks := detected.Names()
 
 	if len(frameworks) == 0 {
 		cmd.Printf("No test frameworks detected.\n")
@@ -39,7 +45,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		cmd.Printf("Detected test frameworks: %s\n", strings.Join(frameworks, ", "))
 	}
 
-	// Step 2: Validate GitHub token.
+	// Step 3: Validate GitHub token.
 	token := ghclient.ResolveToken()
 	if token == "" {
 		cmd.Printf(`
@@ -52,12 +58,7 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 		return fmt.Errorf("no GitHub token")
 	}
 
-	// Step 3: Detect owner/repo from git remote.
-	cwd, err := os.Getwd()
-	if err != nil {
-		cmd.Printf("Error: could not determine current directory: %v\n", err)
-		return fmt.Errorf("getwd: %w", err)
-	}
+	// Step 5: Detect owner/repo from git remote.
 
 	owner, repo, err := git.ParseRemote(cwd)
 	if err != nil {
@@ -65,7 +66,7 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 		return fmt.Errorf("git remote: %w", err)
 	}
 
-	// Step 4: Create GitHub client and validate token.
+	// Step 6: Create GitHub client and validate token.
 	client, err := ghclient.NewClient(owner, repo)
 	if err != nil {
 		cmd.Printf("Error: %v\n", err)
@@ -81,7 +82,7 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 		return fmt.Errorf("get repo: %w", err)
 	}
 
-	// Step 5: Write .quarantine/config.yml and .quarantine/.gitignore (skip if existing).
+	// Step 7: Write .quarantine/config.yml and .quarantine/.gitignore (skip if existing).
 	if err := os.MkdirAll(".quarantine", 0755); err != nil {
 		cmd.Printf("Error: failed to create .quarantine directory: %v\n", err)
 		return fmt.Errorf("mkdir .quarantine: %w", err)
@@ -117,7 +118,7 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 		}
 	}
 
-	// Step 6: Check and create the quarantine/state branch.
+	// Step 8: Check and create the quarantine/state branch.
 	_, branchExists, err := client.GetRef(ctx, "quarantine/state")
 	if err != nil {
 		cmd.Printf("Error: failed to check branch status: %v\n", err)
@@ -175,62 +176,6 @@ Do not edit files on this branch manually.
 	}
 
 	return nil
-}
-
-// detectFrameworks inspects package.json and Gemfile content and returns
-// the list of detected framework names (jest, vitest, rspec).
-// This is a pure function — no I/O.
-func detectFrameworks(pkgJSON, gemfile string) []string {
-	var frameworks []string
-
-	if pkgJSON != "" {
-		// Parse package.json to detect jest and vitest keys.
-		var pkg map[string]json.RawMessage
-		if err := json.Unmarshal([]byte(pkgJSON), &pkg); err == nil {
-			if hasPackageKey(pkg, "jest") {
-				frameworks = append(frameworks, "jest")
-			}
-			if hasPackageKey(pkg, "vitest") {
-				frameworks = append(frameworks, "vitest")
-			}
-		}
-	}
-
-	if gemfile != "" {
-		if gemfileContainsRSpec(gemfile) {
-			frameworks = append(frameworks, "rspec")
-		}
-	}
-
-	return frameworks
-}
-
-// hasPackageKey returns true if the parsed package.json map contains the given
-// key in "dependencies" or "devDependencies".
-// This is a pure function — no I/O.
-func hasPackageKey(pkg map[string]json.RawMessage, key string) bool {
-	for _, section := range []string{"dependencies", "devDependencies"} {
-		raw, ok := pkg[section]
-		if !ok {
-			continue
-		}
-		var deps map[string]json.RawMessage
-		if err := json.Unmarshal(raw, &deps); err != nil {
-			continue
-		}
-		if _, found := deps[key]; found {
-			return true
-		}
-	}
-	return false
-}
-
-// gemfileContainsRSpec returns true if the Gemfile content declares rspec.
-// Detects both gem 'rspec' and gem "rspec" patterns.
-// This is a pure function — no I/O.
-func gemfileContainsRSpec(gemfile string) bool {
-	return strings.Contains(gemfile, "gem 'rspec'") ||
-		strings.Contains(gemfile, `gem "rspec"`)
 }
 
 // buildSuiteEntry returns the default SuiteEntry for a given framework name.
