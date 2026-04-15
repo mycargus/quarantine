@@ -234,7 +234,7 @@ func TestComputeAllSuitesSummary(t *testing.T) {
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "backend (5) and frontend (2) summing to 7",
 		Should:   "not contain a negative total",
-		Actual:   !strings.Contains(result, "-7"),
+		Actual:   !strings.Contains(result, "Total\t-"),
 		Expected: true,
 	})
 
