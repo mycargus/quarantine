@@ -661,6 +661,32 @@
       },
       "mutation_score": 100.0,
       "insights": ["All 9 mutations killed — perfect score", "404 handling, error propagation, dir filtering, and base64 decoding all well-tested"]
+    },
+    "dashboard/app/controllers/home.tsx": {
+      "status": "completed",
+      "covering_tests": ["dashboard/app/controllers/home.test.ts", "dashboard/app/controllers/home.sync.test.ts"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 1, "killed": 1, "survived": 0, "examples": [
+          {"line": 167, "original": "=== \"ENOENT\"", "mutated": "!== \"ENOENT\"", "result": "killed", "test_that_caught_it": "ENOENT message check (new test)"}
+        ]},
+        "logical": {"total": 1, "killed": 1, "survived": 0, "examples": [
+          {"line": 182, "original": "if (token)", "mutated": "if (!token)", "result": "killed", "test_that_caught_it": "test_runs DB state check (new test)"}
+        ]},
+        "constants": {"total": 4, "killed": 4, "survived": 0, "examples": [
+          {"line": 173, "original": "status: 500", "mutated": "200", "result": "killed", "test_that_caught_it": "missing config HTTP 500 test"},
+          {"line": 13, "original": "\"Never\"", "mutated": "\"\"", "result": "killed", "test_that_caught_it": "Never text check (new test)"},
+          {"line": 74, "original": "totalQuarantined", "mutated": "0", "result": "killed", "test_that_caught_it": "total count test"}
+        ]},
+        "control_flow": {"total": 1, "killed": 1, "survived": 0, "examples": [
+          {"line": 29, "original": "issueUrl ? <a> : —", "mutated": "flipped", "result": "killed", "test_that_caught_it": "issue URL link check (new test)"}
+        ]},
+        "env_var": {"total": 1, "killed": 0, "survived": 1, "examples": [
+          {"line": 159, "original": "?? process.env.DASHBOARD_CONFIG ??", "mutated": "removed middle", "result": "survived (env var fallback not testable in unit scope)", "test_that_caught_it": null}
+        ]}
+      },
+      "mutation_score": 87.5,
+      "insights": ["7/8 mutations killed after adding 4 new assertions", "ENOENT error differentiation, token guard, Never text, and issue link ternary all now tested", "Sole survivor is env var fallback chain — not testable without process.env manipulation"]
     }
   }
 }
