@@ -1,7 +1,7 @@
-import BetterSqlite3 from "better-sqlite3"
 import { unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import BetterSqlite3 from "better-sqlite3"
 import { describe } from "riteway"
 import { bodyText, makeZipBuffer, toArrayBuffer } from "../test-helpers.js"
 import { home } from "./home.js"

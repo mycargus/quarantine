@@ -335,10 +335,19 @@ describe("upsertSuiteState()", async (assert) => {
       .get("acme", "widget") as { id: number }
 
     // First upsert: establish the row
-    upsertSuiteState(raw, projectId.id, "suite-A", 3, '{"tests":["a","b","c"]}', "2026-01-01T00:00:00Z")
+    upsertSuiteState(
+      raw,
+      projectId.id,
+      "suite-A",
+      3,
+      '{"tests":["a","b","c"]}',
+      "2026-01-01T00:00:00Z",
+    )
 
     const after1 = raw
-      .prepare("SELECT quarantined_count, state_json FROM quarantine_state WHERE project_id = ? AND suite_name = ?")
+      .prepare(
+        "SELECT quarantined_count, state_json FROM quarantine_state WHERE project_id = ? AND suite_name = ?",
+      )
       .get(projectId.id, "suite-A") as { quarantined_count: number; state_json: string }
 
     assert({
@@ -356,10 +365,19 @@ describe("upsertSuiteState()", async (assert) => {
     })
 
     // Second upsert with the same project_id + suite_name but different values
-    upsertSuiteState(raw, projectId.id, "suite-A", 7, '{"tests":["x","y","z","w"]}', "2026-02-01T00:00:00Z")
+    upsertSuiteState(
+      raw,
+      projectId.id,
+      "suite-A",
+      7,
+      '{"tests":["x","y","z","w"]}',
+      "2026-02-01T00:00:00Z",
+    )
 
     const after2 = raw
-      .prepare("SELECT quarantined_count, state_json FROM quarantine_state WHERE project_id = ? AND suite_name = ?")
+      .prepare(
+        "SELECT quarantined_count, state_json FROM quarantine_state WHERE project_id = ? AND suite_name = ?",
+      )
       .get(projectId.id, "suite-A") as { quarantined_count: number; state_json: string }
 
     // Mutation guard: if quarantined_count = excluded.state_json and state_json = excluded.quarantined_count
