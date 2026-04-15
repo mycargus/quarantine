@@ -89,10 +89,16 @@ configured under the `CI` environment (shared with the regular CI workflow):
 
 1. **Settings → Environments** → select or create `CI`
 2. **Environment secrets:**
-   - `QUARANTINE_GITHUB_TOKEN` — PAT with `repo` scope for the test repository
+   - `QUARANTINE_GITHUB_TOKEN` — fine-grained PAT scoped to the fixture repo (`QUARANTINE_TEST_OWNER/QUARANTINE_TEST_REPO`) with these permissions:
+     - **Actions**: Read and write (trigger fixture CI, watch run status)
+     - **Contents**: Read (read quarantine state branch)
+     - **Issues**: Read (observe quarantine issues)
+     - **Metadata**: Read (required by all fine-grained PATs)
 3. **Environment variables:**
    - `QUARANTINE_TEST_OWNER` — GitHub owner for the E2E test repository
    - `QUARANTINE_TEST_REPO` — GitHub repository name for E2E tests
+
+If using a classic PAT, the `repo` scope covers all of the above.
 
 See `test/e2e/README.md` for full E2E setup instructions.
 
