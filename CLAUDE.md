@@ -23,7 +23,8 @@ make dash-typecheck    # TypeScript type checking
 make contract-test     # Contract tests (Prism, offline, no credentials)
 make e2e-test          # E2E tests (requires test/e2e/.env with GitHub credentials)
 make test-lint         # Lint all test code
-make release VERSION=vX.Y.Z  # Tag and push a release (verifies CHANGELOG, runs checks)
+make release VERSION=vX.Y.Z-rc1  # Tag and push a release candidate (pre/post-release E2E in CI)
+make release VERSION=vX.Y.Z      # Tag and push a final release (promotes after rc validation)
 ```
 
 The pre-commit hook runs `make check` automatically.

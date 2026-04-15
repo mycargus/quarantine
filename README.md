@@ -380,6 +380,10 @@ This project includes skills (invoke with `/skill-name` in Claude Code):
 | `/create-user-scenario` | Writing new Given/When/Then scenarios for a feature or edge case |
 | `/sync-docs` | Scanning for inconsistencies between code and documentation |
 
+## Maintainers
+
+See [RELEASING.md](RELEASING.md) for the release process.
+
 ## Credit
 
 Inspired by the [quarantine gem] by Flexport.

@@ -1,43 +1,75 @@
-# Releasing
+# Release Process
 
-This document describes the release process for the quarantine CLI.
+## Overview
+
+Releases follow a two-phase flow: **release candidate (rc)** then **final release**. The rc phase validates the built binary in a real CI environment before promoting to a stable release.
 
 ## Prerequisites
 
 - Clean working tree on `main`
-- `CHANGELOG.md` updated with release notes under `## [X.Y.Z]`
+- CHANGELOG.md entry for the version (e.g., `## [0.1.0]`)
 - Push access to the repository
 
-## Process
+## Phase 1: Release Candidate
 
+```bash
+make release VERSION=v0.1.0-rc1
 ```
+
+The local `release.sh` script:
+1. Validates version format and CHANGELOG entry
+2. Verifies clean working tree and no duplicate tag
+3. Runs `make check` (all linters + TypeScript typecheck) and CLI, dashboard, and contract tests
+4. Verifies `go mod tidy` produces no changes
+5. Prompts for confirmation, then creates and pushes the annotated tag
+
+E2E tests are not run locally — they run in the release workflow against the real fixture repo.
+
+The GitHub Actions release workflow (`.github/workflows/release.yml`):
+1. Runs CLI, dashboard, and contract test jobs in parallel
+2. GoReleaser publishes a **prerelease** (binaries visible, excluded from `latest`)
+3. **Pre-release E2E**: runs E2E tests against existing fixture repo artifacts (validates tests still pass)
+4. **Trigger fixture repo**: dispatches `workflow_dispatch` on `mycargus/quarantine-test-fixture` with the rc version — fixture installs the rc binary and runs its CI
+5. **Post-release E2E**: runs E2E tests against the fixture repo's fresh output (smoke test of the real installed binary)
+
+If the post-release E2E fails, the rc stays as a prerelease. Fix the issue and cut a new rc (e.g., `v0.1.0-rc2`).
+
+## Phase 2: Final Release
+
+After the rc passes:
+
+```bash
 make release VERSION=v0.1.0
 ```
 
-`make release` runs `scripts/release.sh`, which:
+The same local pre-flight checks run. The release workflow runs CLI, dashboard, and contract tests, then GoReleaser publishes a **full release** (since the tag has no prerelease suffix, `prerelease: auto` marks it as stable). The `latest` API endpoint now returns this version.
 
-1. Validates the version format (`vX.Y.Z`)
-2. Verifies `CHANGELOG.md` has an entry for the version
-3. Verifies the working tree is clean
-4. Verifies the tag does not already exist
-5. Runs `make check` (lint + typecheck)
-6. Runs `make cli-test`
-7. Runs `make contract-test`
-8. Verifies `go mod tidy` produces no changes
-9. Prints the release notes and prompts for confirmation
-10. Creates an annotated tag and pushes it
+E2E jobs are skipped for final tags — the rc already validated end-to-end behavior.
 
-GitHub Actions takes over on tag push:
+## GoReleaser
 
-1. Runs CLI build, test, and lint (parallel)
-2. Runs dashboard lint, typecheck, and test (parallel)
-3. Runs contract lint and tests (parallel)
-4. Runs E2E lint and tests (parallel)
-5. After all jobs pass: verifies CHANGELOG entry, builds cross-compiled
-   binaries (linux/darwin × amd64/arm64), creates GitHub Release with
-   binaries and `checksums.txt`
+Configuration: `.goreleaser.yml`
 
-## One-time setup
+- `prerelease: auto` — tags with a prerelease suffix (e.g., `-rc1`) produce prereleases; clean tags produce full releases
+- Builds cross-compiled binaries for linux/darwin (amd64/arm64)
+- Produces `checksums.txt` for verification
+- Release notes extracted from CHANGELOG.md
+
+## Install Script
+
+`scripts/install.sh` resolves the `latest` stable release by default. Users can pin a specific version:
+
+```bash
+VERSION=v0.1.0 bash install.sh
+```
+
+The `latest` endpoint excludes prereleases, so rc binaries are only installed when explicitly requested.
+
+## Fixture Repo
+
+`mycargus/quarantine-test-fixture` runs `quarantine run jest-tests` with deliberately flaky tests. Its `ci.yml` workflow accepts a `version` input that controls which quarantine binary to install. The release workflow passes the rc tag (e.g., `v0.1.0-rc1`) so the fixture repo tests the exact prerelease binary.
+
+## One-time Setup
 
 ### `release` environment
 
@@ -81,7 +113,7 @@ gh api repos/mycargus/quarantine/branches/main/protection/required_signatures \
 All committers must configure GPG or SSH commit signing. See
 [GitHub docs on signing commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
 
-## Installing a release
+## Installing a Release
 
 ### Install script (recommended)
 
@@ -129,7 +161,7 @@ cd quarantine
 go build -o quarantine ./cli/cmd/quarantine
 ```
 
-## Verify checksums
+## Verify Checksums
 
 Each release includes `checksums.txt` with SHA-256 hashes:
 

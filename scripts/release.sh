@@ -8,49 +8,51 @@ INPUT="${1:-}"
 
 # 1. Strip leading v if present, then validate
 VERSION_NUM="${INPUT#v}"
-if [[ ! "$VERSION_NUM" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+if [[ ! "$VERSION_NUM" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
   echo "Usage: $0 <version>"
-  echo "Example: $0 0.1.0"
+  echo "Examples: $0 0.1.0   $0 0.1.0-rc1"
   exit 1
 fi
 TAG="v${VERSION_NUM}"
+# Base version without prerelease suffix (e.g. "0.1.0" from "0.1.0-rc1")
+BASE_VERSION="${VERSION_NUM%%-*}"
 
-# 3. Verify CHANGELOG.md has entry for this version
-if ! grep -q "^## \[${VERSION_NUM}\]" CHANGELOG.md; then
-  echo "Error: CHANGELOG.md has no entry for [${VERSION_NUM}]"
-  echo "Add a '## [${VERSION_NUM}]' section to CHANGELOG.md before releasing."
+# 2. Verify CHANGELOG.md has entry for this version (uses base version, not rc suffix)
+if ! grep -q "^## \[${BASE_VERSION}\]" CHANGELOG.md; then
+  echo "Error: CHANGELOG.md has no entry for [${BASE_VERSION}]"
+  echo "Add a '## [${BASE_VERSION}]' section to CHANGELOG.md before releasing."
   exit 1
 fi
 
-# 4. Extract release notes for this version
-RELEASE_NOTES=$(awk "/^## \[${VERSION_NUM}\]/{found=1; next} found && /^## \[/{exit} found && /^\[.*\]: /{exit} found{print}" CHANGELOG.md)
+# 3. Extract release notes for this version
+RELEASE_NOTES=$(awk "/^## \[${BASE_VERSION}\]/{found=1; next} found && /^## \[/{exit} found && /^\[.*\]: /{exit} found{print}" CHANGELOG.md)
 
-# 5. Verify working tree is clean
+# 4. Verify working tree is clean
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Error: Working tree is not clean. Commit or stash changes first."
   git status --short
   exit 1
 fi
 
-# 6. Verify tag doesn't already exist
+# 5. Verify tag doesn't already exist
 if git rev-parse "$TAG" >/dev/null 2>&1; then
   echo "Error: Tag $TAG already exists."
   exit 1
 fi
 
-# 7. Run lint + typecheck
+# 6. Run lint + typecheck
 echo "Running make check..."
 make check
 
-# 8. Run CLI tests
+# 7. Run tests (E2E runs in the release workflow, not locally)
 echo "Running make cli-test..."
 make cli-test
-
-# 9. Run contract tests
+echo "Running make dash-test..."
+make dash-test
 echo "Running make contract-test..."
 make contract-test
 
-# 10. Verify go mod tidy produces no changes
+# 8. Verify go mod tidy produces no changes
 echo "Verifying go.mod is tidy..."
 go mod tidy
 if [[ -n "$(git status --porcelain go.mod go.sum)" ]]; then
@@ -59,7 +61,7 @@ if [[ -n "$(git status --porcelain go.mod go.sum)" ]]; then
   exit 1
 fi
 
-# 11. Print summary
+# 9. Print summary
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  Release: $TAG"
@@ -69,17 +71,17 @@ echo "Release notes:"
 echo "$RELEASE_NOTES"
 echo ""
 
-# 12. Prompt for confirmation
+# 10. Prompt for confirmation
 read -r -p "Create and push tag $TAG? [y/N] " confirm
 if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
   echo "Aborted."
   exit 0
 fi
 
-# 13. Create annotated tag
+# 11. Create annotated tag
 git tag -a "$TAG" -m "Release $TAG"
 
-# 14. Push tag
+# 12. Push tag
 git push origin "$TAG"
 
 REMOTE_URL=$(git remote get-url origin)
