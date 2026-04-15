@@ -30,6 +30,13 @@ describe("home() — missing config", async (assert) => {
     actual: html.includes("/nonexistent/dashboard.yml"),
     expected: true,
   })
+
+  assert({
+    given: "a config path that does not exist (ENOENT)",
+    should: "include 'Config file not found' in the body (not 'Failed to load config')",
+    actual: html.includes("Config file not found"),
+    expected: true,
+  })
 })
 
 describe("home() — invalid config", async (assert) => {
@@ -187,6 +194,20 @@ describe("home() — org overview: total quarantined count", async (assert) => {
       given: "a repo with a recently quarantined test",
       should: "include the most recently quarantined test name",
       actual: html.includes("nav test"),
+      expected: true,
+    })
+
+    assert({
+      given: "a repo with a quarantined test that has an issue_url",
+      should: "include the issue URL as a link in the rendered HTML",
+      actual: html.includes("https://github.com/acme/payments-service/issues/1"),
+      expected: true,
+    })
+
+    assert({
+      given: "repos that have never been synced (no test runs)",
+      should: 'include "Never" as the last synced text',
+      actual: html.includes("Never"),
       expected: true,
     })
   } finally {

@@ -1,3 +1,4 @@
+import BetterSqlite3 from "better-sqlite3"
 import { unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -184,6 +185,20 @@ describe("home() — token provided triggers sync", async (assert) => {
       should: "return HTML content-type",
       actual: response.headers.get("Content-Type"),
       expected: "text/html; charset=utf-8",
+    })
+
+    // Verify sync actually ran by checking DB state
+    const raw = new BetterSqlite3(dbPath)
+    const rowCount = (
+      raw.prepare("SELECT COUNT(*) as count FROM test_runs").get() as { count: number }
+    ).count
+    raw.close()
+
+    assert({
+      given: "a token is provided and sync succeeds",
+      should: "insert test_runs into the database (sync ran)",
+      actual: rowCount > 0,
+      expected: true,
     })
   } finally {
     unlinkSync(configPath)
