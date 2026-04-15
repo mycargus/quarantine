@@ -409,14 +409,33 @@
       },
       "mutation_score": 100.0,
       "insights": ["All 10 valid mutations killed (1 skipped — compile error)", "Names() tested indirectly through init command — panics on bad pre-allocation", "All detection logic well covered across dependencies/devDependencies, jest/vitest/rspec"]
+    },
+    "cli/internal/github/artifacts_ops.go": {
+      "status": "completed",
+      "covering_tests": ["cli/internal/github/artifacts_contract_test.go"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 2, "killed": 1, "survived": 1, "examples": [
+          {"line": 41, "original": "!= http.StatusOK", "mutated": "== http.StatusOK", "result": "killed", "test_that_caught_it": "TestContractListArtifacts200"},
+          {"line": 72, "original": "!= http.StatusOK", "mutated": "== http.StatusOK", "result": "survived", "test_that_caught_it": null}
+        ]},
+        "return": {"total": 1, "killed": 1, "survived": 0, "examples": [
+          {"line": 52, "original": "return ar.Artifacts, nil", "mutated": "return nil, nil", "result": "killed", "test_that_caught_it": "TestContractListArtifacts200"}
+        ]},
+        "string": {"total": 1, "killed": 0, "survived": 1, "examples": [
+          {"line": 63, "original": "\"Bearer \" + c.token", "mutated": "c.token", "result": "survived", "test_that_caught_it": null}
+        ]}
+      },
+      "mutation_score": 50.0,
+      "insights": ["ListArtifacts well tested — 2/2 mutations killed", "DownloadArtifactZip has no contract tests — both mutations survived", "Bearer prefix mutation is a mock limitation (Prism doesn't validate auth headers)", "Adding contract tests for DownloadArtifactZip requires Prism artifact download endpoint support"]
     }
   },
   "global_statistics": {
-    "total_modules": 25,
-    "completed_modules": 25,
-    "total_mutations": 408,
-    "total_killed": 389,
-    "total_survived": 22,
-    "overall_score": 95.3
+    "total_modules": 26,
+    "completed_modules": 26,
+    "total_mutations": 412,
+    "total_killed": 391,
+    "total_survived": 24,
+    "overall_score": 94.9
   }
 }
