@@ -498,6 +498,35 @@
       },
       "mutation_score": 100.0,
       "insights": ["Perfect score — all 10 mutations killed", "ETag caching, 304 handling, error paths, and zip extraction all well-tested"]
+    },
+    "dashboard/app/lib/ingest.server.ts": {
+      "status": "completed",
+      "covering_tests": ["dashboard/app/lib/ingest.server.test.ts", "dashboard/app/lib/ingest-artifact.server.test.ts", "dashboard/app/lib/ingest-artifact-flaky.server.test.ts", "dashboard/app/lib/ingest-artifact-quarantine.server.test.ts", "dashboard/app/lib/ingest-artifact-unresolved.server.test.ts", "dashboard/app/lib/ingest-artifact-edge.server.test.ts"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 7, "killed": 7, "survived": 0, "examples": [
+          {"line": 100, "original": "> lastSynced", "mutated": ">= lastSynced", "result": "killed", "test_that_caught_it": "filterArtifactsSince boundary test"},
+          {"line": 301, "original": "=== \"quarantined\"", "mutated": "!== \"quarantined\"", "result": "killed", "test_that_caught_it": "ingestArtifact status filter test"}
+        ]},
+        "logical": {"total": 2, "killed": 2, "survived": 0, "examples": [
+          {"line": 289, "original": "!valid", "mutated": "valid", "result": "killed", "test_that_caught_it": "ingestArtifact validation test"},
+          {"line": 299, "original": "isNew", "mutated": "!isNew", "result": "killed", "test_that_caught_it": "ingestArtifact idempotency test"}
+        ]},
+        "constants": {"total": 2, "killed": 2, "survived": 0, "examples": [
+          {"line": 150, "original": "?? 0", "mutated": "?? 1", "result": "killed", "test_that_caught_it": "buildTestRunRecord test"}
+        ]},
+        "return_value": {"total": 7, "killed": 7, "survived": 0, "examples": [
+          {"line": 158, "original": "return \"failing\"", "mutated": "return \"passing\"", "result": "killed", "test_that_caught_it": "mapOriginalStatus test"}
+        ]},
+        "arithmetic": {"total": 1, "killed": 1, "survived": 0, "examples": [
+          {"line": 255, "original": "flaky_count + 1", "mutated": "- 1", "result": "killed", "test_that_caught_it": "incrementFlakyCount test"}
+        ]},
+        "method_swap": {"total": 1, "killed": 1, "survived": 0, "examples": [
+          {"line": 116, "original": "startsWith", "mutated": "endsWith", "result": "killed", "test_that_caught_it": "filterArtifactsByPrefix test"}
+        ]}
+      },
+      "mutation_score": 100.0,
+      "insights": ["Perfect score — all 20 mutations killed", "6 test files provide comprehensive coverage", "Pure functions, I/O, and orchestration all well-tested"]
     }
   }
 }
