@@ -534,12 +534,36 @@
       "insights": ["All 4 mutations killed — perfect score after adding DEBOUNCE_MS constant assertion", "Boundary test at exact debounce threshold catches > vs >= mutation"]
     }
   },
+    "dashboard/app/lib/filter.server.ts": {
+      "status": "completed",
+      "covering_tests": ["dashboard/app/lib/filter.server.test.ts"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 6, "killed": 6, "survived": 0, "examples": [
+          {"line": 11, "original": "=== \"\"", "mutated": "!== \"\"", "result": "killed", "test_that_caught_it": "filterBySearch empty query"},
+          {"line": 45, "original": "< fromDate", "mutated": "<= fromDate", "result": "killed", "test_that_caught_it": "inclusive lower bound test"}
+        ]},
+        "logical": {"total": 3, "killed": 3, "survived": 0, "examples": [
+          {"line": 14, "original": "||", "mutated": "&&", "result": "killed", "test_that_caught_it": "filterBySearch name-or-testId test"},
+          {"line": 40, "original": "&& (both null)", "mutated": "|| (either null)", "result": "killed", "test_that_caught_it": "filterByDateRange from-only test"}
+        ]},
+        "constants": {"total": 1, "killed": 1, "survived": 0, "examples": [
+          {"line": 44, "original": "slice(0, 10)", "mutated": "slice(0, 8)", "result": "killed", "test_that_caught_it": "filterByDateRange date comparison"}
+        ]},
+        "control_flow": {"total": 1, "killed": 0, "survived": 1, "examples": [
+          {"line": 62, "original": "filterBySearch then filterByStatus", "mutated": "filterByStatus then filterBySearch", "result": "survived (equivalent — AND composition is commutative)", "test_that_caught_it": null}
+        ]}
+      },
+      "mutation_score": 90.9,
+      "insights": ["10/11 mutations killed — excellent coverage", "Sole survivor is an equivalent mutant: filter composition order is commutative for AND-composed subset filters", "Inclusive boundary tests catch both < vs <= and > vs >= date comparison mutations"]
+    }
+  },
   "global_statistics": {
-    "total_modules": 25,
-    "completed_modules": 25,
-    "total_mutations": 437,
-    "total_killed": 413,
-    "total_survived": 26,
-    "overall_score": 94.5
+    "total_modules": 26,
+    "completed_modules": 26,
+    "total_mutations": 448,
+    "total_killed": 423,
+    "total_survived": 27,
+    "overall_score": 94.4
   }
 }
