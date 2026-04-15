@@ -391,14 +391,48 @@
       },
       "mutation_score": 100.0,
       "insights": ["All 12 mutations killed — perfect score after adding fallback field name assertion", "Error message string content well-validated", "Poll_interval logic thoroughly tested (default, zero, string, type check)"]
+    },
+    "dashboard/app/lib/db.server.ts": {
+      "status": "completed",
+      "covering_tests": ["dashboard/app/lib/db.server.test.ts", "dashboard/app/lib/db.overview.test.ts", "dashboard/app/lib/db.project.test.ts"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "arithmetic": {"total": 2, "killed": 2, "survived": 0, "examples": [
+          {"line": 269, "original": "sum + r.quarantinedCount", "mutated": "sum - r.quarantinedCount", "result": "killed", "test_that_caught_it": "getOrgOverview()"}
+        ]},
+        "relational": {"total": 4, "killed": 3, "survived": 1, "examples": [
+          {"line": 299, "original": "r != null", "mutated": "r == null", "result": "killed", "test_that_caught_it": "getOrgOverview()"},
+          {"line": 302, "original": "> 0", "mutated": ">= 0", "result": "survived (equivalent — array length never negative)", "test_that_caught_it": null}
+        ]},
+        "constants": {"total": 6, "killed": 6, "survived": 0, "examples": [
+          {"line": 202, "original": "0", "mutated": "1", "result": "killed", "test_that_caught_it": "getProjects()"},
+          {"line": 311, "original": "LIMIT 5", "mutated": "LIMIT 1", "result": "killed", "test_that_caught_it": "getOrgOverview()"}
+        ]},
+        "statement": {"total": 8, "killed": 8, "survived": 0, "examples": [
+          {"line": "304-309", "original": "WHERE qt.project_id IN (...)", "mutated": "removed", "result": "killed", "test_that_caught_it": "getOrgOverview() multi-project isolation (new test)"},
+          {"line": "428-436", "original": "WHERE p.owner = ? AND p.repo = ?", "mutated": "removed", "result": "killed", "test_that_caught_it": "getProjectTrend() multi-project isolation (new test)"},
+          {"line": "461-463", "original": "ON CONFLICT field assignments", "mutated": "swapped fields", "result": "killed", "test_that_caught_it": "upsertSuiteState() conflict path (new test)"}
+        ]},
+        "logical": {"total": 2, "killed": 2, "survived": 0, "examples": [
+          {"line": 375, "original": "AND", "mutated": "OR", "result": "killed", "test_that_caught_it": "getProjectByOwnerRepo() shared-field test (new test)"}
+        ]},
+        "sql_join": {"total": 2, "killed": 0, "survived": 2, "examples": [
+          {"line": 308, "original": "INNER JOIN", "mutated": "LEFT JOIN", "result": "survived (equivalent — NOT NULL FK constraints prevent orphans)", "test_that_caught_it": null}
+        ]},
+        "type_cast": {"total": 1, "killed": 0, "survived": 1, "examples": [
+          {"line": 414, "original": "as \"passing\" | \"failing\" | null", "mutated": "removed", "result": "survived (runtime no-op — TypeScript casts erased at runtime)", "test_that_caught_it": null}
+        ]}
+      },
+      "mutation_score": 84.0,
+      "insights": ["5 new tests killed 5 previously-surviving mutations", "4 unresolved survivors are equivalent mutants: >= 0 (length never negative), LEFT JOIN (FK constraints), type cast (erased at runtime)", "Multi-project data isolation now tested for getOrgOverview, getProjectTrend, getProjectByOwnerRepo", "upsertSuiteState ON CONFLICT path now exercised"]
     }
   },
   "global_statistics": {
-    "total_modules": 23,
-    "completed_modules": 23,
-    "total_mutations": 399,
-    "total_killed": 380,
-    "total_survived": 22,
-    "overall_score": 95.2
+    "total_modules": 24,
+    "completed_modules": 24,
+    "total_mutations": 433,
+    "total_killed": 409,
+    "total_survived": 26,
+    "overall_score": 94.5
   }
 }

@@ -261,6 +261,84 @@ describe("getOrgOverview()", async (assert) => {
     })
   }
 
+  // Mutation guard: WHERE qt.project_id IN (...) must not be removed
+  // If the WHERE clause is dropped, quarantined tests from unconfigured projects
+  // leak into the results.
+  {
+    const { db, raw } = initDb(":memory:")
+    const configuredId = await upsertProject(db, "acme", "configured-repo")
+    const unconfiguredId = await upsertProject(db, "acme", "unconfigured-repo")
+
+    // configured-repo has 2 quarantined tests
+    raw
+      .prepare(
+        "INSERT INTO quarantined_tests (project_id, test_id, name, quarantined_at, issue_url) VALUES (?, ?, ?, ?, ?)",
+      )
+      .run(
+        configuredId,
+        "c1",
+        "should work A",
+        "2026-03-01T10:00:00Z",
+        "https://github.com/acme/configured-repo/issues/1",
+      )
+    raw
+      .prepare(
+        "INSERT INTO quarantined_tests (project_id, test_id, name, quarantined_at, issue_url) VALUES (?, ?, ?, ?, ?)",
+      )
+      .run(
+        configuredId,
+        "c2",
+        "should work B",
+        "2026-03-02T10:00:00Z",
+        "https://github.com/acme/configured-repo/issues/2",
+      )
+
+    // unconfigured-repo has 5 quarantined tests — these must NOT appear
+    for (let i = 1; i <= 5; i++) {
+      raw
+        .prepare(
+          "INSERT INTO quarantined_tests (project_id, test_id, name, quarantined_at, issue_url) VALUES (?, ?, ?, ?, ?)",
+        )
+        .run(
+          unconfiguredId,
+          `u${i}`,
+          `unconfigured test ${i}`,
+          `2026-04-0${i}T00:00:00Z`,
+          `https://github.com/acme/unconfigured-repo/issues/${i}`,
+        )
+    }
+
+    const result = await getOrgOverview({ db, raw }, [{ owner: "acme", repo: "configured-repo" }])
+
+    assert({
+      given: "2 projects in DB but only 1 in the config repos list",
+      should: "return totalQuarantined of 2 (only configured-repo's tests)",
+      actual: result.totalQuarantined,
+      expected: 2,
+    })
+
+    assert({
+      given: "2 projects in DB but only 1 in the config repos list",
+      should: "return byRepo with quarantinedCount 2 for the configured repo",
+      actual: result.byRepo,
+      expected: [{ owner: "acme", repo: "configured-repo", quarantinedCount: 2 }],
+    })
+
+    assert({
+      given: "2 projects in DB but only 1 in the config repos list",
+      should: "return only configured-repo tests in mostRecentlyQuarantined",
+      actual: result.mostRecentlyQuarantined.every((t) => t.repo === "configured-repo"),
+      expected: true,
+    })
+
+    assert({
+      given: "2 projects in DB but only 1 in the config repos list",
+      should: "return 2 entries in mostRecentlyQuarantined (not 7 from both projects)",
+      actual: result.mostRecentlyQuarantined.length,
+      expected: 2,
+    })
+  }
+
   // --- mostRecentlyQuarantined limited to 5 even with more entries ---
   {
     const { db, raw } = initDb(":memory:")
