@@ -1,209 +1,594 @@
 {
   "version": "1.0",
   "test_command": "go test ./cli/...",
-  "last_updated": "2026-04-01T04:30:00Z",
+  "last_updated": "2026-04-14T00:00:00Z",
   "modules": {
     "cli/cmd/quarantine/run.go": {
       "status": "completed",
-      "covering_tests": ["cli/cmd/quarantine/run_test.go", "cli/cmd/quarantine/run_flags_test.go", "cli/cmd/quarantine/run_pure_test.go", "cli/cmd/quarantine/run_dryrun_test.go", "cli/cmd/quarantine/run_retries_test.go", "cli/cmd/quarantine/run_quarantine_test.go", "cli/cmd/quarantine/run_pr_comment_sections_test.go"],
+      "covering_tests": [
+        "cli/cmd/quarantine/run_test.go",
+        "cli/cmd/quarantine/run_flags_test.go",
+        "cli/cmd/quarantine/run_pure_test.go",
+        "cli/cmd/quarantine/run_dryrun_test.go",
+        "cli/cmd/quarantine/run_retries_test.go",
+        "cli/cmd/quarantine/run_quarantine_test.go",
+        "cli/cmd/quarantine/run_pr_comment_sections_test.go"
+      ],
       "last_tested": "2026-04-01T07:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 17, "killed": 17, "survived": 0, "examples": [
-          {"line": 710, "original": "runID == \"\"", "mutated": "!= \"\"", "result": "killed", "test_that_caught_it": "TestBuildMetadataUsesEnvRunID"},
-          {"line": 78, "original": "retriesFlag > 10", "mutated": ">= 10", "result": "killed", "test_that_caught_it": "TestRunRetriesTenNotRejected"}
-        ]},
-        "logical": {"total": 9, "killed": 9, "survived": 0, "examples": [
-          {"line": 209, "original": "qState != nil && ... == runner.RSpec", "mutated": "||", "result": "killed", "test_that_caught_it": "TestRunRSpecFilteringSkippedWhenQStateNil"},
-          {"line": 254, "original": "!dryRun && ghClient != nil", "mutated": "||", "result": "killed", "test_that_caught_it": "TestRunDryRunSkipsNotificationBlockEvenWithNonNilClient"}
-        ]},
-        "statement": {"total": 2, "killed": 0, "survived": 2, "examples": []}
+        "relational": {
+          "total": 17,
+          "killed": 17,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 710,
+              "original": "runID == \"\"",
+              "mutated": "!= \"\"",
+              "result": "killed",
+              "test_that_caught_it": "TestBuildMetadataUsesEnvRunID"
+            },
+            {
+              "line": 78,
+              "original": "retriesFlag > 10",
+              "mutated": ">= 10",
+              "result": "killed",
+              "test_that_caught_it": "TestRunRetriesTenNotRejected"
+            }
+          ]
+        },
+        "logical": {
+          "total": 9,
+          "killed": 9,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 209,
+              "original": "qState != nil && ... == runner.RSpec",
+              "mutated": "||",
+              "result": "killed",
+              "test_that_caught_it": "TestRunRSpecFilteringSkippedWhenQStateNil"
+            },
+            {
+              "line": 254,
+              "original": "!dryRun && ghClient != nil",
+              "mutated": "||",
+              "result": "killed",
+              "test_that_caught_it": "TestRunDryRunSkipsNotificationBlockEvenWithNonNilClient"
+            }
+          ]
+        },
+        "statement": {
+          "total": 2,
+          "killed": 0,
+          "survived": 2,
+          "examples": []
+        }
       },
       "mutation_score": 92.9,
-      "insights": ["All relational and logical mutations now killed", "Statement deletions remain — low-risk side-effect-only lines", "Retries boundary, RSpec filtering guard, dry-run notification block, and buildMetadata fallback all tested"]
+      "insights": [
+        "All relational and logical mutations now killed",
+        "Statement deletions remain — low-risk side-effect-only lines",
+        "Retries boundary, RSpec filtering guard, dry-run notification block, and buildMetadata fallback all tested"
+      ]
     },
     "cli/cmd/quarantine/run_notifications.go": {
       "status": "completed",
-      "covering_tests": ["cli/cmd/quarantine/run_notifications_test.go", "cli/cmd/quarantine/run_notifications_build_test.go", "cli/cmd/quarantine/run_notifications_issues_test.go"],
+      "covering_tests": [
+        "cli/cmd/quarantine/run_notifications_test.go",
+        "cli/cmd/quarantine/run_notifications_build_test.go",
+        "cli/cmd/quarantine/run_notifications_issues_test.go"
+      ],
       "last_tested": "2026-04-01T06:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 23, "killed": 23, "survived": 0, "examples": [
-          {"line": 131, "original": "len(data.Retries) > 0", "mutated": ">= 0", "result": "killed", "test_that_caught_it": "TestRenderIssueBodyOmitsRetryResultsWhenEmpty"},
-          {"line": 364, "original": "StatusCode == 410", "mutated": "!= 410", "result": "killed", "test_that_caught_it": "TestCreateIssues410LogsDisabledWarning"}
-        ]},
-        "logical": {"total": 12, "killed": 12, "survived": 0, "examples": [
-          {"line": 272, "original": "client == nil || prNumber == 0", "mutated": "&&", "result": "killed", "test_that_caught_it": "TestPostOrUpdatePRCommentNilClientIsNoOp"},
-          {"line": 122, "original": "data.Branch != \"\" || data.CommitSHA != \"\"", "mutated": "&&", "result": "killed", "test_that_caught_it": "TestRenderIssueBodyDetectedInWithOnlyBranch"}
-        ]}
+        "relational": {
+          "total": 23,
+          "killed": 23,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 131,
+              "original": "len(data.Retries) > 0",
+              "mutated": ">= 0",
+              "result": "killed",
+              "test_that_caught_it": "TestRenderIssueBodyOmitsRetryResultsWhenEmpty"
+            },
+            {
+              "line": 364,
+              "original": "StatusCode == 410",
+              "mutated": "!= 410",
+              "result": "killed",
+              "test_that_caught_it": "TestCreateIssues410LogsDisabledWarning"
+            }
+          ]
+        },
+        "logical": {
+          "total": 12,
+          "killed": 12,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 272,
+              "original": "client == nil || prNumber == 0",
+              "mutated": "&&",
+              "result": "killed",
+              "test_that_caught_it": "TestPostOrUpdatePRCommentNilClientIsNoOp"
+            },
+            {
+              "line": 122,
+              "original": "data.Branch != \"\" || data.CommitSHA != \"\"",
+              "mutated": "&&",
+              "result": "killed",
+              "test_that_caught_it": "TestRenderIssueBodyDetectedInWithOnlyBranch"
+            }
+          ]
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["All rendering, builder, and integration mutations now killed", "postOrUpdatePRComment guard, marker detection, and update-vs-create logic fully tested", "createIssuesForNewFlakyTests: status filter, skip reason, dedup, failure message, and 410 handling all tested", "Builder functions: flaky, quarantined, unquarantined, and failure entry construction fully tested"]
-    },
-    "cli/cmd/quarantine/init.go": {
-      "status": "completed",
-      "covering_tests": ["cli/cmd/quarantine/init_test.go", "cli/cmd/quarantine/init_happy_test.go", "cli/cmd/quarantine/init_error_test.go", "cli/cmd/quarantine/init_overwrite_test.go", "cli/cmd/quarantine/init_pure_test.go"],
-      "last_tested": "2026-04-01T01:30:00Z",
-      "mutations_by_type": {
-        "relational": {"total": 11, "killed": 11, "survived": 0, "examples": []},
-        "logical": {"total": 6, "killed": 6, "survived": 0, "examples": []},
-        "control_flow": {"total": 4, "killed": 3, "survived": 1, "examples": [
-          {"line": 219, "original": "} else if", "mutated": "} if", "result": "survived", "test_that_caught_it": null}
-        ]},
-        "string": {"total": 2, "killed": 2, "survived": 0, "examples": []},
-        "constant": {"total": 1, "killed": 1, "survived": 0, "examples": []},
-        "statement": {"total": 2, "killed": 1, "survived": 0, "examples": []}
-      },
-      "mutation_score": 92.3,
-      "insights": ["Line 219 else-if to if is an equivalent mutant — preceding block returns, so else is redundant", "All relational and logical operator mutations killed — excellent error handling coverage"]
+      "mutation_score": 100,
+      "insights": [
+        "All rendering, builder, and integration mutations now killed",
+        "postOrUpdatePRComment guard, marker detection, and update-vs-create logic fully tested",
+        "createIssuesForNewFlakyTests: status filter, skip reason, dedup, failure message, and 410 handling all tested",
+        "Builder functions: flaky, quarantined, unquarantined, and failure entry construction fully tested"
+      ]
     },
     "cli/internal/config/config.go": {
       "status": "completed",
-      "covering_tests": ["cli/internal/config/config_test.go", "cli/internal/config/config_defaults_test.go", "cli/internal/config/config_validate_schema_test.go", "cli/internal/config/config_validate_unknown_keys_test.go"],
+      "covering_tests": [
+        "cli/internal/config/config_test.go",
+        "cli/internal/config/config_defaults_test.go",
+        "cli/internal/config/config_validate_schema_test.go",
+        "cli/internal/config/config_validate_unknown_keys_test.go"
+      ],
       "last_tested": "2026-04-01T03:45:00Z",
       "mutations_by_type": {
-        "relational": {"total": 15, "killed": 13, "survived": 2, "examples": [
-          {"line": 151, "original": "i+1 < len()", "mutated": "i+1 <= len()", "result": "survived", "test_that_caught_it": null}
-        ]},
-        "logical": {"total": 4, "killed": 2, "survived": 2, "examples": []},
-        "constant": {"total": 9, "killed": 6, "survived": 3, "examples": []}
+        "relational": {
+          "total": 15,
+          "killed": 13,
+          "survived": 2,
+          "examples": [
+            {
+              "line": 151,
+              "original": "i+1 < len()",
+              "mutated": "i+1 <= len()",
+              "result": "survived",
+              "test_that_caught_it": null
+            }
+          ]
+        },
+        "logical": {
+          "total": 4,
+          "killed": 2,
+          "survived": 2,
+          "examples": []
+        },
+        "constant": {
+          "total": 9,
+          "killed": 6,
+          "survived": 3,
+          "examples": []
+        }
       },
       "mutation_score": 82.1,
-      "insights": ["Validation logic excellent — 13/13 relational killed", "Default value constants now tested", "YAML parsing loop boundaries survive — edge case only"]
+      "insights": [
+        "Validation logic excellent — 13/13 relational killed",
+        "Default value constants now tested",
+        "YAML parsing loop boundaries survive — edge case only"
+      ]
     },
     "cli/internal/github/init_ops.go": {
       "status": "completed",
-      "covering_tests": ["cli/cmd/quarantine/init_test.go"],
+      "covering_tests": [
+        "cli/cmd/quarantine/init_test.go"
+      ],
       "last_tested": "2026-04-01T04:30:00Z",
       "mutations_by_type": {
-        "relational": {"total": 6, "killed": 6, "survived": 0, "examples": []},
-        "arithmetic": {"total": 1, "killed": 1, "survived": 0, "examples": []},
-        "logical": {"total": 1, "killed": 0, "survived": 0, "examples": []}
+        "relational": {
+          "total": 6,
+          "killed": 6,
+          "survived": 0,
+          "examples": []
+        },
+        "arithmetic": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        },
+        "logical": {
+          "total": 1,
+          "killed": 0,
+          "survived": 0,
+          "examples": []
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["Tested indirectly through init command — all 8 valid mutations killed"]
+      "mutation_score": 100,
+      "insights": [
+        "Tested indirectly through init command — all 8 valid mutations killed"
+      ]
     },
     "cli/internal/result/result.go": {
       "status": "completed",
-      "covering_tests": ["cli/internal/result/result_test.go", "cli/internal/result/result_schema_test.go"],
+      "covering_tests": [
+        "cli/internal/result/result_test.go",
+        "cli/internal/result/result_schema_test.go"
+      ],
       "last_tested": "2026-04-01T04:30:00Z",
       "mutations_by_type": {
-        "relational": {"total": 2, "killed": 2, "survived": 0, "examples": []},
-        "constant": {"total": 2, "killed": 2, "survived": 0, "examples": []},
-        "arithmetic": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+        "relational": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": []
+        },
+        "constant": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": []
+        },
+        "arithmetic": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["Perfect score — all 5 mutations killed"]
+      "mutation_score": 100,
+      "insights": [
+        "Perfect score — all 5 mutations killed"
+      ]
     },
     "cli/internal/github/issues_ops.go": {
       "status": "completed",
-      "covering_tests": ["cli/internal/github/issues_test.go"],
+      "covering_tests": [
+        "cli/internal/github/issues_test.go"
+      ],
       "last_tested": "2026-04-01T04:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 5, "killed": 5, "survived": 0, "examples": []},
-        "logical": {"total": 2, "killed": 2, "survived": 0, "examples": []}
+        "relational": {
+          "total": 5,
+          "killed": 5,
+          "survived": 0,
+          "examples": []
+        },
+        "logical": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": []
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["Perfect score — all 7 mutations killed"]
+      "mutation_score": 100,
+      "insights": [
+        "Perfect score — all 7 mutations killed"
+      ]
     },
     "cli/internal/parser/parser.go": {
       "status": "completed",
-      "covering_tests": ["cli/internal/parser/parser_test.go", "cli/internal/parser/parser_jest_test.go", "cli/internal/parser/parser_rspec_test.go", "cli/internal/parser/parser_vitest_test.go"],
+      "covering_tests": [
+        "cli/internal/parser/parser_test.go",
+        "cli/internal/parser/parser_jest_test.go",
+        "cli/internal/parser/parser_rspec_test.go",
+        "cli/internal/parser/parser_vitest_test.go"
+      ],
       "last_tested": "2026-04-01T04:30:00Z",
       "mutations_by_type": {
-        "relational": {"total": 8, "killed": 8, "survived": 0, "examples": []},
-        "logical": {"total": 1, "killed": 0, "survived": 1, "examples": [
-          {"line": 104, "original": "&& len(suite.TestCases) > 0", "mutated": "|| len(suite.TestCases) > 0", "result": "survived", "test_that_caught_it": null}
-        ]},
-        "arithmetic": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+        "relational": {
+          "total": 8,
+          "killed": 8,
+          "survived": 0,
+          "examples": []
+        },
+        "logical": {
+          "total": 1,
+          "killed": 0,
+          "survived": 1,
+          "examples": [
+            {
+              "line": 104,
+              "original": "&& len(suite.TestCases) > 0",
+              "mutated": "|| len(suite.TestCases) > 0",
+              "result": "survived",
+              "test_that_caught_it": null
+            }
+          ]
+        },
+        "arithmetic": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        }
       },
-      "mutation_score": 90.0,
-      "insights": ["Line 104 logical op survives — no test for successful unmarshal with zero TestCases"]
+      "mutation_score": 90,
+      "insights": [
+        "Line 104 logical op survives — no test for successful unmarshal with zero TestCases"
+      ]
     },
     "cli/internal/quarantine/state.go": {
       "status": "completed",
-      "covering_tests": ["cli/internal/quarantine/state_test.go", "cli/internal/quarantine/state_merge_test.go", "cli/internal/quarantine/state_schema_test.go"],
+      "covering_tests": [
+        "cli/internal/quarantine/state_test.go",
+        "cli/internal/quarantine/state_merge_test.go",
+        "cli/internal/quarantine/state_schema_test.go"
+      ],
       "last_tested": "2026-04-01T09:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 18, "killed": 16, "survived": 2, "examples": [
-          {"line": 136, "original": "<", "mutated": "<=", "result": "survived (equivalent mutant)", "test_that_caught_it": null},
-          {"line": 140, "original": "<", "mutated": "<=", "result": "survived (equivalent mutant)", "test_that_caught_it": null}
-        ]},
-        "constant": {"total": 2, "killed": 2, "survived": 0, "examples": []},
-        "logical": {"total": 10, "killed": 9, "survived": 1, "examples": [
-          {"line": 135, "original": "&&", "mutated": "||", "result": "survived (equivalent mutant — self-heals via entry block)", "test_that_caught_it": null}
-        ]},
-        "statement": {"total": 5, "killed": 5, "survived": 0, "examples": []},
-        "return": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+        "relational": {
+          "total": 18,
+          "killed": 16,
+          "survived": 2,
+          "examples": [
+            {
+              "line": 136,
+              "original": "<",
+              "mutated": "<=",
+              "result": "survived (equivalent mutant)",
+              "test_that_caught_it": null
+            },
+            {
+              "line": 140,
+              "original": "<",
+              "mutated": "<=",
+              "result": "survived (equivalent mutant)",
+              "test_that_caught_it": null
+            }
+          ]
+        },
+        "constant": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": []
+        },
+        "logical": {
+          "total": 10,
+          "killed": 9,
+          "survived": 1,
+          "examples": [
+            {
+              "line": 135,
+              "original": "&&",
+              "mutated": "||",
+              "result": "survived (equivalent mutant — self-heals via entry block)",
+              "test_that_caught_it": null
+            }
+          ]
+        },
+        "statement": {
+          "total": 5,
+          "killed": 5,
+          "survived": 0,
+          "examples": []
+        },
+        "return": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        }
       },
       "mutation_score": 93.3,
-      "insights": ["All 3 survivors are equivalent mutants — no behavioral difference possible", "Lines 136/140: < vs <= is a no-op when values are equal", "Line 135: && vs || self-heals because the entry block immediately re-assigns the correct value", "28/30 valid mutations killed, 2 relational + 1 logical are equivalent"]
+      "insights": [
+        "All 3 survivors are equivalent mutants — no behavioral difference possible",
+        "Lines 136/140: < vs <= is a no-op when values are equal",
+        "Line 135: && vs || self-heals because the entry block immediately re-assigns the correct value",
+        "28/30 valid mutations killed, 2 relational + 1 logical are equivalent"
+      ]
     },
     "cli/internal/runner/runner.go": {
       "status": "completed",
-      "covering_tests": ["cli/internal/runner/runner_test.go"],
+      "covering_tests": [
+        "cli/internal/runner/runner_test.go"
+      ],
       "last_tested": "2026-04-01T04:30:00Z",
       "mutations_by_type": {
-        "relational": {"total": 11, "killed": 11, "survived": 0, "examples": []},
-        "constant": {"total": 3, "killed": 2, "survived": 1, "examples": [
-          {"line": 61, "original": "return -1", "mutated": "return 1", "result": "survived", "test_that_caught_it": null}
-        ]},
-        "logical": {"total": 3, "killed": 2, "survived": 1, "examples": [
-          {"line": 50, "original": "cmd.Process != nil", "mutated": "== nil", "result": "survived", "test_that_caught_it": null}
-        ]}
+        "relational": {
+          "total": 11,
+          "killed": 11,
+          "survived": 0,
+          "examples": []
+        },
+        "constant": {
+          "total": 3,
+          "killed": 2,
+          "survived": 1,
+          "examples": [
+            {
+              "line": 61,
+              "original": "return -1",
+              "mutated": "return 1",
+              "result": "survived",
+              "test_that_caught_it": null
+            }
+          ]
+        },
+        "logical": {
+          "total": 3,
+          "killed": 2,
+          "survived": 1,
+          "examples": [
+            {
+              "line": 50,
+              "original": "cmd.Process != nil",
+              "mutated": "== nil",
+              "result": "survived",
+              "test_that_caught_it": null
+            }
+          ]
+        }
       },
       "mutation_score": 88.2,
-      "insights": ["Signal forwarding guard not tested", "Error exit code -1 vs 1 not distinguished by tests"]
+      "insights": [
+        "Signal forwarding guard not tested",
+        "Error exit code -1 vs 1 not distinguished by tests"
+      ]
     },
     "cli/internal/github/contents_ops.go": {
       "status": "completed",
-      "covering_tests": ["cli/internal/github/contents_test.go"],
+      "covering_tests": [
+        "cli/internal/github/contents_test.go"
+      ],
       "last_tested": "2026-04-01T04:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 3, "killed": 3, "survived": 0, "examples": []},
-        "logical": {"total": 1, "killed": 1, "survived": 0, "examples": []},
-        "constant": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+        "relational": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": []
+        },
+        "logical": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        },
+        "constant": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["All 5 mutations killed (1 skipped due to linter)"]
+      "mutation_score": 100,
+      "insights": [
+        "All 5 mutations killed (1 skipped due to linter)"
+      ]
     },
     "cli/cmd/quarantine/main.go": {
       "status": "completed",
-      "covering_tests": ["cli/cmd/quarantine/run_pure_test.go"],
+      "covering_tests": [
+        "cli/cmd/quarantine/run_pure_test.go"
+      ],
       "last_tested": "2026-04-01T08:00:00Z",
       "mutations_by_type": {
-        "constant": {"total": 12, "killed": 12, "survived": 0, "examples": [
-          {"line": 32, "original": "SilenceUsage: true", "mutated": "false", "result": "killed", "test_that_caught_it": "test suite"},
-          {"line": 33, "original": "SilenceErrors: true", "mutated": "false", "result": "killed", "test_that_caught_it": "test suite"}
-        ]},
-        "string": {"total": 8, "killed": 8, "survived": 0, "examples": [
-          {"line": 40, "original": "Error:", "mutated": "MUTATED:", "result": "killed", "test_that_caught_it": "test suite"},
-          {"line": 80, "original": "missing separator", "mutated": "different error", "result": "killed", "test_that_caught_it": "TestNewRunCmdMissingSeparatorError"}
-        ]},
-        "statement": {"total": 7, "killed": 7, "survived": 0, "examples": []},
-        "relational": {"total": 1, "killed": 1, "survived": 0, "examples": []},
-        "logical": {"total": 1, "killed": 1, "survived": 0, "examples": []},
-        "return": {"total": 2, "killed": 2, "survived": 0, "examples": []}
+        "constant": {
+          "total": 12,
+          "killed": 12,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 32,
+              "original": "SilenceUsage: true",
+              "mutated": "false",
+              "result": "killed",
+              "test_that_caught_it": "test suite"
+            },
+            {
+              "line": 33,
+              "original": "SilenceErrors: true",
+              "mutated": "false",
+              "result": "killed",
+              "test_that_caught_it": "test suite"
+            }
+          ]
+        },
+        "string": {
+          "total": 8,
+          "killed": 8,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 40,
+              "original": "Error:",
+              "mutated": "MUTATED:",
+              "result": "killed",
+              "test_that_caught_it": "test suite"
+            },
+            {
+              "line": 80,
+              "original": "missing separator",
+              "mutated": "different error",
+              "result": "killed",
+              "test_that_caught_it": "TestNewRunCmdMissingSeparatorError"
+            }
+          ]
+        },
+        "statement": {
+          "total": 7,
+          "killed": 7,
+          "survived": 0,
+          "examples": []
+        },
+        "relational": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        },
+        "logical": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        },
+        "return": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": []
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["All 30 compilable mutations killed — perfect score", "SilenceUsage/SilenceErrors, error text, usage printing, and statement deletions all now caught", "Flag defaults, command registration, and return values all tested"]
+      "mutation_score": 100,
+      "insights": [
+        "All 30 compilable mutations killed — perfect score",
+        "SilenceUsage/SilenceErrors, error text, usage printing, and statement deletions all now caught",
+        "Flag defaults, command registration, and return values all tested"
+      ]
     },
     "cli/internal/cas/cas.go": {
       "status": "completed",
-      "covering_tests": ["cli/internal/cas/cas_test.go"],
+      "covering_tests": [
+        "cli/internal/cas/cas_test.go"
+      ],
       "last_tested": "2026-04-01T03:30:00Z",
       "mutations_by_type": {
-        "relational": {"total": 12, "killed": 10, "survived": 2, "examples": [
-          {"line": 62, "original": "!= 409", "mutated": "> 409", "result": "survived", "test_that_caught_it": null}
-        ]},
-        "logical": {"total": 3, "killed": 3, "survived": 0, "examples": []},
-        "constant": {"total": 2, "killed": 2, "survived": 0, "examples": []},
-        "statement": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+        "relational": {
+          "total": 12,
+          "killed": 10,
+          "survived": 2,
+          "examples": [
+            {
+              "line": 62,
+              "original": "!= 409",
+              "mutated": "> 409",
+              "result": "survived",
+              "test_that_caught_it": null
+            }
+          ]
+        },
+        "logical": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": []
+        },
+        "constant": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": []
+        },
+        "statement": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        }
       },
       "mutation_score": 88.9,
-      "insights": ["Status code range mutations survive — tests only use 409 and 403", "len > 0 vs >= 1 is equivalent for slices"]
+      "insights": [
+        "Status code range mutations survive — tests only use 409 and 403",
+        "len > 0 vs >= 1 is equivalent for slices"
+      ]
     },
     "cli/cmd/quarantine/doctor.go": {
       "status": "completed",
-      "covering_tests": ["cli/cmd/quarantine/doctor_test.go", "cli/cmd/quarantine/doctor_pure_test.go"],
+      "covering_tests": [
+        "cli/cmd/quarantine/doctor_test.go",
+        "cli/cmd/quarantine/doctor_pure_test.go"
+      ],
       "last_tested": "2026-04-01T01:00:00Z",
       "mutations_by_type": {
         "relational": {
@@ -211,7 +596,13 @@
           "killed": 13,
           "survived": 1,
           "examples": [
-            {"line": 75, "original": "!= nil", "mutated": "== nil", "result": "killed", "test_that_caught_it": "TestDoctorPRCommentNonNilEnabledValueIsUsed"}
+            {
+              "line": 75,
+              "original": "!= nil",
+              "mutated": "== nil",
+              "result": "killed",
+              "test_that_caught_it": "TestDoctorPRCommentNonNilEnabledValueIsUsed"
+            }
           ]
         },
         "constant": {
@@ -219,8 +610,20 @@
           "killed": 5,
           "survived": 2,
           "examples": [
-            {"line": 74, "original": "false", "mutated": "true", "result": "survived", "test_that_caught_it": null},
-            {"line": 72, "original": "\", \"", "mutated": "\"\"", "result": "survived", "test_that_caught_it": null}
+            {
+              "line": 74,
+              "original": "false",
+              "mutated": "true",
+              "result": "survived",
+              "test_that_caught_it": null
+            },
+            {
+              "line": 72,
+              "original": "\", \"",
+              "mutated": "\"\"",
+              "result": "survived",
+              "test_that_caught_it": null
+            }
           ]
         },
         "statement": {
@@ -234,8 +637,20 @@
           "killed": 3,
           "survived": 0,
           "examples": [
-            {"line": 20, "original": "full error message", "mutated": "truncated", "result": "killed", "test_that_caught_it": "TestDoctorMissingConfigExactMessage"},
-            {"line": 44, "original": "quarantine.yml has errors", "mutated": "", "result": "killed", "test_that_caught_it": "TestDoctorValidationErrorExactMessage"}
+            {
+              "line": 20,
+              "original": "full error message",
+              "mutated": "truncated",
+              "result": "killed",
+              "test_that_caught_it": "TestDoctorMissingConfigExactMessage"
+            },
+            {
+              "line": 44,
+              "original": "quarantine.yml has errors",
+              "mutated": "",
+              "result": "killed",
+              "test_that_caught_it": "TestDoctorValidationErrorExactMessage"
+            }
           ]
         },
         "logical": {
@@ -246,357 +661,1368 @@
         }
       },
       "mutation_score": 90.3,
-      "insights": ["Line 74 is an equivalent mutant — ApplyDefaults always sets the pointer, making the initial value irrelevant", "Line 72 separator is untestable in v1 because validation only permits a single label"]
+      "insights": [
+        "Line 74 is an equivalent mutant — ApplyDefaults always sets the pointer, making the initial value irrelevant",
+        "Line 72 separator is untestable in v1 because validation only permits a single label"
+      ]
     },
     "cli/cmd/quarantine/run_pr_scope.go": {
       "status": "completed",
-      "covering_tests": ["cli/cmd/quarantine/run_pr_scope_test.go", "cli/cmd/quarantine/run_pr_scope_pure_test.go", "cli/cmd/quarantine/run_pr_scope_new_to_pr_test.go"],
+      "covering_tests": [
+        "cli/cmd/quarantine/run_pr_scope_test.go",
+        "cli/cmd/quarantine/run_pr_scope_pure_test.go",
+        "cli/cmd/quarantine/run_pr_scope_new_to_pr_test.go"
+      ],
       "last_tested": "2026-04-01T03:15:00Z",
       "mutations_by_type": {
-        "relational": {"total": 11, "killed": 10, "survived": 1, "examples": [
-          {"line": 70, "original": "f == inp.FilePath", "mutated": "f != inp.FilePath", "result": "survived", "test_that_caught_it": null}
-        ]},
-        "logical": {"total": 2, "killed": 2, "survived": 0, "examples": []}
+        "relational": {
+          "total": 11,
+          "killed": 10,
+          "survived": 1,
+          "examples": [
+            {
+              "line": 70,
+              "original": "f == inp.FilePath",
+              "mutated": "f != inp.FilePath",
+              "result": "survived",
+              "test_that_caught_it": null
+            }
+          ]
+        },
+        "logical": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": []
+        }
       },
       "mutation_score": 92.3,
-      "insights": ["Line 70 new-file detection loop comparison survives — tests dont validate the exact matching logic with multiple files in newFiles list"]
+      "insights": [
+        "Line 70 new-file detection loop comparison survives — tests dont validate the exact matching logic with multiple files in newFiles list"
+      ]
     },
     "cli/internal/github/client.go": {
       "status": "completed",
-      "covering_tests": ["cli/internal/github/client_test.go"],
+      "covering_tests": [
+        "cli/internal/github/client_test.go"
+      ],
       "last_tested": "2026-04-01T04:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 3, "killed": 3, "survived": 0, "examples": []},
-        "constant": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+        "relational": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": []
+        },
+        "constant": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["Perfect score — all 4 mutations killed"]
+      "mutation_score": 100,
+      "insights": [
+        "Perfect score — all 4 mutations killed"
+      ]
     },
     "cli/internal/github/search_ops.go": {
       "status": "completed",
-      "covering_tests": ["cli/internal/github/search_test.go"],
+      "covering_tests": [
+        "cli/internal/github/search_test.go"
+      ],
       "last_tested": "2026-04-01T04:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 5, "killed": 5, "survived": 0, "examples": []},
-        "constant": {"total": 3, "killed": 3, "survived": 0, "examples": []}
+        "relational": {
+          "total": 5,
+          "killed": 5,
+          "survived": 0,
+          "examples": []
+        },
+        "constant": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": []
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["Perfect score — all 8 mutations killed, including pagination boundaries"]
+      "mutation_score": 100,
+      "insights": [
+        "Perfect score — all 8 mutations killed, including pagination boundaries"
+      ]
     },
     "cli/internal/runner/exclude_pattern.go": {
       "status": "completed",
-      "covering_tests": ["cli/internal/runner/exclude_pattern_test.go"],
+      "covering_tests": [
+        "cli/internal/runner/exclude_pattern_test.go"
+      ],
       "last_tested": "2026-04-01T10:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 7, "killed": 6, "survived": 1, "examples": [
-          {"line": 48, "original": "i <= len(s)", "mutated": "i < len(s)", "result": "killed", "test_that_caught_it": "TestMatchesExcludePatternDoubleStarConsumesFull"},
-          {"line": 60, "original": "i > 0", "mutated": "i >= 1", "result": "survived (equivalent mutant)", "test_that_caught_it": null}
-        ]},
-        "logical": {"total": 2, "killed": 2, "survived": 0, "examples": [
-          {"line": 62, "original": "ch == '/' || ch == ':'", "mutated": "ch == ':'", "result": "killed", "test_that_caught_it": "TestMatchesExcludePatternSingleStarDoesNotCrossSlash"}
-        ]},
-        "constant": {"total": 1, "killed": 0, "survived": 1, "examples": [
-          {"line": 44, "original": "return true", "mutated": "return false", "result": "survived (dead code — guarded by line 35)", "test_that_caught_it": null}
-        ]},
-        "return": {"total": 8, "killed": 8, "survived": 0, "examples": []},
-        "statement": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+        "relational": {
+          "total": 7,
+          "killed": 6,
+          "survived": 1,
+          "examples": [
+            {
+              "line": 48,
+              "original": "i <= len(s)",
+              "mutated": "i < len(s)",
+              "result": "killed",
+              "test_that_caught_it": "TestMatchesExcludePatternDoubleStarConsumesFull"
+            },
+            {
+              "line": 60,
+              "original": "i > 0",
+              "mutated": "i >= 1",
+              "result": "survived (equivalent mutant)",
+              "test_that_caught_it": null
+            }
+          ]
+        },
+        "logical": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 62,
+              "original": "ch == '/' || ch == ':'",
+              "mutated": "ch == ':'",
+              "result": "killed",
+              "test_that_caught_it": "TestMatchesExcludePatternSingleStarDoesNotCrossSlash"
+            }
+          ]
+        },
+        "constant": {
+          "total": 1,
+          "killed": 0,
+          "survived": 1,
+          "examples": [
+            {
+              "line": 44,
+              "original": "return true",
+              "mutated": "return false",
+              "result": "survived (dead code — guarded by line 35)",
+              "test_that_caught_it": null
+            }
+          ]
+        },
+        "return": {
+          "total": 8,
+          "killed": 8,
+          "survived": 0,
+          "examples": []
+        },
+        "statement": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        }
       },
       "mutation_score": 89.5,
-      "insights": ["2 of 3 original survivors now killed", "Line 44 is dead code (line 35 catches pattern=='**' before HasPrefix reaches it)", "Line 60 i>0 vs i>=1 is equivalent mutant", "Single * now tested for both / and : separators"]
+      "insights": [
+        "2 of 3 original survivors now killed",
+        "Line 44 is dead code (line 35 catches pattern=='**' before HasPrefix reaches it)",
+        "Line 60 i>0 vs i>=1 is equivalent mutant",
+        "Single * now tested for both / and : separators"
+      ]
     },
     "cli/internal/git/remote.go": {
       "status": "completed",
-      "covering_tests": ["cli/internal/git/remote_test.go"],
+      "covering_tests": [
+        "cli/internal/git/remote_test.go"
+      ],
       "last_tested": "2026-04-01T04:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 8, "killed": 8, "survived": 0, "examples": []},
-        "logical": {"total": 1, "killed": 1, "survived": 0, "examples": []},
-        "constant": {"total": 3, "killed": 3, "survived": 0, "examples": []},
-        "control_flow": {"total": 2, "killed": 2, "survived": 0, "examples": []}
+        "relational": {
+          "total": 8,
+          "killed": 8,
+          "survived": 0,
+          "examples": []
+        },
+        "logical": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        },
+        "constant": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": []
+        },
+        "control_flow": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": []
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["Perfect score — all 14 mutations killed"]
+      "mutation_score": 100,
+      "insights": [
+        "Perfect score — all 14 mutations killed"
+      ]
     },
     "cli/internal/runner/exclusion.go": {
       "status": "completed",
-      "covering_tests": ["cli/internal/runner/exclusion_test.go"],
+      "covering_tests": [
+        "cli/internal/runner/exclusion_test.go"
+      ],
       "last_tested": "2026-04-01T04:30:00Z",
       "mutations_by_type": {
-        "relational": {"total": 2, "killed": 2, "survived": 0, "examples": []},
-        "constant": {"total": 3, "killed": 3, "survived": 0, "examples": []},
-        "arithmetic": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+        "relational": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": []
+        },
+        "constant": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": []
+        },
+        "arithmetic": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["Perfect score — all 6 mutations killed"]
+      "mutation_score": 100,
+      "insights": [
+        "Perfect score — all 6 mutations killed"
+      ]
     },
     "cli/internal/quarantine/filter.go": {
       "status": "completed",
-      "covering_tests": ["cli/internal/quarantine/filter_test.go"],
+      "covering_tests": [
+        "cli/internal/quarantine/filter_test.go"
+      ],
       "last_tested": "2026-04-01T04:30:00Z",
       "mutations_by_type": {
-        "relational": {"total": 2, "killed": 2, "survived": 0, "examples": []}
+        "relational": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": []
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["Perfect score — all 2 mutations killed"]
-    }
-  },
+      "mutation_score": 100,
+      "insights": [
+        "Perfect score — all 2 mutations killed"
+      ]
+    },
     "dashboard/app/lib/circuit-breaker.server.ts": {
       "status": "completed",
-      "covering_tests": ["dashboard/app/lib/circuit-breaker.server.test.ts"],
+      "covering_tests": [
+        "dashboard/app/lib/circuit-breaker.server.test.ts"
+      ],
       "last_tested": "2026-04-14T00:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 4, "killed": 4, "survived": 0, "examples": [
-          {"line": 9, "original": ">", "mutated": ">=", "result": "killed", "test_that_caught_it": "isPaused() boundary test"},
-          {"line": 15, "original": ">=", "mutated": ">", "result": "killed", "test_that_caught_it": "recordFailure() threshold test"}
-        ]},
-        "arithmetic": {"total": 5, "killed": 5, "survived": 0, "examples": [
-          {"line": 4, "original": "30 * 60 * 1000", "mutated": "30 * 60 / 1000", "result": "killed", "test_that_caught_it": "PAUSE_DURATION_MS constant assertion (new test)"},
-          {"line": 14, "original": "+ 1", "mutated": "- 1", "result": "killed", "test_that_caught_it": "recordFailure() increment test"}
-        ]},
-        "logical": {"total": 2, "killed": 2, "survived": 0, "examples": [
-          {"line": 15, "original": "&&", "mutated": "||", "result": "killed", "test_that_caught_it": "recordFailure() already-paused test"}
-        ]},
-        "constants": {"total": 4, "killed": 4, "survived": 0, "examples": [
-          {"line": 3, "original": "FAILURE_THRESHOLD = 3", "mutated": "= 2", "result": "killed", "test_that_caught_it": "recordFailure() 2nd failure test"},
-          {"line": 27, "original": "0", "mutated": "1", "result": "killed", "test_that_caught_it": "recordSuccess() reset test"}
-        ]},
-        "statement": {"total": 1, "killed": 1, "survived": 0, "examples": [
-          {"line": 8, "original": "return false", "mutated": "removed", "result": "killed", "test_that_caught_it": "isPaused() null guard test"}
-        ]}
+        "relational": {
+          "total": 4,
+          "killed": 4,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 9,
+              "original": ">",
+              "mutated": ">=",
+              "result": "killed",
+              "test_that_caught_it": "isPaused() boundary test"
+            },
+            {
+              "line": 15,
+              "original": ">=",
+              "mutated": ">",
+              "result": "killed",
+              "test_that_caught_it": "recordFailure() threshold test"
+            }
+          ]
+        },
+        "arithmetic": {
+          "total": 5,
+          "killed": 5,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 4,
+              "original": "30 * 60 * 1000",
+              "mutated": "30 * 60 / 1000",
+              "result": "killed",
+              "test_that_caught_it": "PAUSE_DURATION_MS constant assertion (new test)"
+            },
+            {
+              "line": 14,
+              "original": "+ 1",
+              "mutated": "- 1",
+              "result": "killed",
+              "test_that_caught_it": "recordFailure() increment test"
+            }
+          ]
+        },
+        "logical": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 15,
+              "original": "&&",
+              "mutated": "||",
+              "result": "killed",
+              "test_that_caught_it": "recordFailure() already-paused test"
+            }
+          ]
+        },
+        "constants": {
+          "total": 4,
+          "killed": 4,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 3,
+              "original": "FAILURE_THRESHOLD = 3",
+              "mutated": "= 2",
+              "result": "killed",
+              "test_that_caught_it": "recordFailure() 2nd failure test"
+            },
+            {
+              "line": 27,
+              "original": "0",
+              "mutated": "1",
+              "result": "killed",
+              "test_that_caught_it": "recordSuccess() reset test"
+            }
+          ]
+        },
+        "statement": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 8,
+              "original": "return false",
+              "mutated": "removed",
+              "result": "killed",
+              "test_that_caught_it": "isPaused() null guard test"
+            }
+          ]
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["All 16 mutations killed — perfect score after adding PAUSE_DURATION_MS constant assertion", "Boundary test at line 9 (> vs >=) caught by explicit pausedUntil-equals-now test", "Threshold boundary (>= vs >) caught by 3rd-failure test"]
-    }
-  },
-  "dashboard/app/lib/config.server.ts": {
+      "mutation_score": 100,
+      "insights": [
+        "All 16 mutations killed — perfect score after adding PAUSE_DURATION_MS constant assertion",
+        "Boundary test at line 9 (> vs >=) caught by explicit pausedUntil-equals-now test",
+        "Threshold boundary (>= vs >) caught by 3rd-failure test"
+      ]
+    },
+    "dashboard/app/lib/config.server.ts": {
       "status": "completed",
-      "covering_tests": ["dashboard/app/lib/config.server.test.ts"],
+      "covering_tests": [
+        "dashboard/app/lib/config.server.test.ts"
+      ],
       "last_tested": "2026-04-14T00:00:00Z",
       "mutations_by_type": {
-        "logical": {"total": 3, "killed": 3, "survived": 0, "examples": [
-          {"line": 30, "original": "!result.success", "mutated": "result.success", "result": "killed", "test_that_caught_it": "parseConfig() missing field tests"},
-          {"line": 39, "original": "!source", "mutated": "source", "result": "killed", "test_that_caught_it": "parseConfig() empty source test"}
-        ]},
-        "constants": {"total": 6, "killed": 6, "survived": 0, "examples": [
-          {"line": 32, "original": "?? \"unknown\"", "mutated": "?? \"other\"", "result": "killed", "test_that_caught_it": "parseConfig() empty string fallback test (new test)"},
-          {"line": 46, "original": "300", "mutated": "301", "result": "killed", "test_that_caught_it": "parseConfig() default poll_interval test"}
-        ]},
-        "relational": {"total": 1, "killed": 1, "survived": 0, "examples": [
-          {"line": 46, "original": "=== \"number\"", "mutated": "!== \"number\"", "result": "killed", "test_that_caught_it": "parseConfig() poll_interval type check"}
-        ]},
-        "statement": {"total": 2, "killed": 2, "survived": 0, "examples": [
-          {"line": 37, "original": "const poll_interval = ...", "mutated": "deleted", "result": "killed", "test_that_caught_it": "parseConfig() poll_interval tests"},
-          {"line": "39-41", "original": "if (!source) throw", "mutated": "deleted", "result": "killed", "test_that_caught_it": "parseConfig() empty source test"}
-        ]}
+        "logical": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 30,
+              "original": "!result.success",
+              "mutated": "result.success",
+              "result": "killed",
+              "test_that_caught_it": "parseConfig() missing field tests"
+            },
+            {
+              "line": 39,
+              "original": "!source",
+              "mutated": "source",
+              "result": "killed",
+              "test_that_caught_it": "parseConfig() empty source test"
+            }
+          ]
+        },
+        "constants": {
+          "total": 6,
+          "killed": 6,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 32,
+              "original": "?? \"unknown\"",
+              "mutated": "?? \"other\"",
+              "result": "killed",
+              "test_that_caught_it": "parseConfig() empty string fallback test (new test)"
+            },
+            {
+              "line": 46,
+              "original": "300",
+              "mutated": "301",
+              "result": "killed",
+              "test_that_caught_it": "parseConfig() default poll_interval test"
+            }
+          ]
+        },
+        "relational": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 46,
+              "original": "=== \"number\"",
+              "mutated": "!== \"number\"",
+              "result": "killed",
+              "test_that_caught_it": "parseConfig() poll_interval type check"
+            }
+          ]
+        },
+        "statement": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 37,
+              "original": "const poll_interval = ...",
+              "mutated": "deleted",
+              "result": "killed",
+              "test_that_caught_it": "parseConfig() poll_interval tests"
+            },
+            {
+              "line": "39-41",
+              "original": "if (!source) throw",
+              "mutated": "deleted",
+              "result": "killed",
+              "test_that_caught_it": "parseConfig() empty source test"
+            }
+          ]
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["All 12 mutations killed — perfect score after adding fallback field name assertion", "Error message string content well-validated", "Poll_interval logic thoroughly tested (default, zero, string, type check)"]
+      "mutation_score": 100,
+      "insights": [
+        "All 12 mutations killed — perfect score after adding fallback field name assertion",
+        "Error message string content well-validated",
+        "Poll_interval logic thoroughly tested (default, zero, string, type check)"
+      ]
     },
     "dashboard/app/lib/db.server.ts": {
       "status": "completed",
-      "covering_tests": ["dashboard/app/lib/db.server.test.ts", "dashboard/app/lib/db.overview.test.ts", "dashboard/app/lib/db.project.test.ts"],
+      "covering_tests": [
+        "dashboard/app/lib/db.server.test.ts",
+        "dashboard/app/lib/db.overview.test.ts",
+        "dashboard/app/lib/db.project.test.ts"
+      ],
       "last_tested": "2026-04-14T00:00:00Z",
       "mutations_by_type": {
-        "arithmetic": {"total": 2, "killed": 2, "survived": 0, "examples": [
-          {"line": 269, "original": "sum + r.quarantinedCount", "mutated": "sum - r.quarantinedCount", "result": "killed", "test_that_caught_it": "getOrgOverview()"}
-        ]},
-        "relational": {"total": 4, "killed": 3, "survived": 1, "examples": [
-          {"line": 299, "original": "r != null", "mutated": "r == null", "result": "killed", "test_that_caught_it": "getOrgOverview()"},
-          {"line": 302, "original": "> 0", "mutated": ">= 0", "result": "survived (equivalent — array length never negative)", "test_that_caught_it": null}
-        ]},
-        "constants": {"total": 6, "killed": 6, "survived": 0, "examples": [
-          {"line": 202, "original": "0", "mutated": "1", "result": "killed", "test_that_caught_it": "getProjects()"},
-          {"line": 311, "original": "LIMIT 5", "mutated": "LIMIT 1", "result": "killed", "test_that_caught_it": "getOrgOverview()"}
-        ]},
-        "statement": {"total": 8, "killed": 8, "survived": 0, "examples": [
-          {"line": "304-309", "original": "WHERE qt.project_id IN (...)", "mutated": "removed", "result": "killed", "test_that_caught_it": "getOrgOverview() multi-project isolation (new test)"},
-          {"line": "428-436", "original": "WHERE p.owner = ? AND p.repo = ?", "mutated": "removed", "result": "killed", "test_that_caught_it": "getProjectTrend() multi-project isolation (new test)"},
-          {"line": "461-463", "original": "ON CONFLICT field assignments", "mutated": "swapped fields", "result": "killed", "test_that_caught_it": "upsertSuiteState() conflict path (new test)"}
-        ]},
-        "logical": {"total": 2, "killed": 2, "survived": 0, "examples": [
-          {"line": 375, "original": "AND", "mutated": "OR", "result": "killed", "test_that_caught_it": "getProjectByOwnerRepo() shared-field test (new test)"}
-        ]},
-        "sql_join": {"total": 2, "killed": 0, "survived": 2, "examples": [
-          {"line": 308, "original": "INNER JOIN", "mutated": "LEFT JOIN", "result": "survived (equivalent — NOT NULL FK constraints prevent orphans)", "test_that_caught_it": null}
-        ]},
-        "type_cast": {"total": 1, "killed": 0, "survived": 1, "examples": [
-          {"line": 414, "original": "as \"passing\" | \"failing\" | null", "mutated": "removed", "result": "survived (runtime no-op — TypeScript casts erased at runtime)", "test_that_caught_it": null}
-        ]}
+        "arithmetic": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 269,
+              "original": "sum + r.quarantinedCount",
+              "mutated": "sum - r.quarantinedCount",
+              "result": "killed",
+              "test_that_caught_it": "getOrgOverview()"
+            }
+          ]
+        },
+        "relational": {
+          "total": 4,
+          "killed": 3,
+          "survived": 1,
+          "examples": [
+            {
+              "line": 299,
+              "original": "r != null",
+              "mutated": "r == null",
+              "result": "killed",
+              "test_that_caught_it": "getOrgOverview()"
+            },
+            {
+              "line": 302,
+              "original": "> 0",
+              "mutated": ">= 0",
+              "result": "survived (equivalent — array length never negative)",
+              "test_that_caught_it": null
+            }
+          ]
+        },
+        "constants": {
+          "total": 6,
+          "killed": 6,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 202,
+              "original": "0",
+              "mutated": "1",
+              "result": "killed",
+              "test_that_caught_it": "getProjects()"
+            },
+            {
+              "line": 311,
+              "original": "LIMIT 5",
+              "mutated": "LIMIT 1",
+              "result": "killed",
+              "test_that_caught_it": "getOrgOverview()"
+            }
+          ]
+        },
+        "statement": {
+          "total": 8,
+          "killed": 8,
+          "survived": 0,
+          "examples": [
+            {
+              "line": "304-309",
+              "original": "WHERE qt.project_id IN (...)",
+              "mutated": "removed",
+              "result": "killed",
+              "test_that_caught_it": "getOrgOverview() multi-project isolation (new test)"
+            },
+            {
+              "line": "428-436",
+              "original": "WHERE p.owner = ? AND p.repo = ?",
+              "mutated": "removed",
+              "result": "killed",
+              "test_that_caught_it": "getProjectTrend() multi-project isolation (new test)"
+            },
+            {
+              "line": "461-463",
+              "original": "ON CONFLICT field assignments",
+              "mutated": "swapped fields",
+              "result": "killed",
+              "test_that_caught_it": "upsertSuiteState() conflict path (new test)"
+            }
+          ]
+        },
+        "logical": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 375,
+              "original": "AND",
+              "mutated": "OR",
+              "result": "killed",
+              "test_that_caught_it": "getProjectByOwnerRepo() shared-field test (new test)"
+            }
+          ]
+        },
+        "sql_join": {
+          "total": 2,
+          "killed": 0,
+          "survived": 2,
+          "examples": [
+            {
+              "line": 308,
+              "original": "INNER JOIN",
+              "mutated": "LEFT JOIN",
+              "result": "survived (equivalent — NOT NULL FK constraints prevent orphans)",
+              "test_that_caught_it": null
+            }
+          ]
+        },
+        "type_cast": {
+          "total": 1,
+          "killed": 0,
+          "survived": 1,
+          "examples": [
+            {
+              "line": 414,
+              "original": "as \"passing\" | \"failing\" | null",
+              "mutated": "removed",
+              "result": "survived (runtime no-op — TypeScript casts erased at runtime)",
+              "test_that_caught_it": null
+            }
+          ]
+        }
       },
-      "mutation_score": 84.0,
-      "insights": ["5 new tests killed 5 previously-surviving mutations", "4 unresolved survivors are equivalent mutants: >= 0 (length never negative), LEFT JOIN (FK constraints), type cast (erased at runtime)", "Multi-project data isolation now tested for getOrgOverview, getProjectTrend, getProjectByOwnerRepo", "upsertSuiteState ON CONFLICT path now exercised"]
+      "mutation_score": 84,
+      "insights": [
+        "5 new tests killed 5 previously-surviving mutations",
+        "4 unresolved survivors are equivalent mutants: >= 0 (length never negative), LEFT JOIN (FK constraints), type cast (erased at runtime)",
+        "Multi-project data isolation now tested for getOrgOverview, getProjectTrend, getProjectByOwnerRepo",
+        "upsertSuiteState ON CONFLICT path now exercised"
+      ]
     },
     "dashboard/app/lib/debounce.server.ts": {
       "status": "completed",
-      "covering_tests": ["dashboard/app/lib/debounce.server.test.ts"],
+      "covering_tests": [
+        "dashboard/app/lib/debounce.server.test.ts"
+      ],
       "last_tested": "2026-04-14T00:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 2, "killed": 2, "survived": 0, "examples": [
-          {"line": 9, "original": "=== null", "mutated": "!== null", "result": "killed", "test_that_caught_it": "shouldPull() null test"},
-          {"line": 11, "original": ">", "mutated": ">=", "result": "killed", "test_that_caught_it": "shouldPull() boundary test"}
-        ]},
-        "arithmetic": {"total": 2, "killed": 2, "survived": 0, "examples": [
-          {"line": 1, "original": "5 * 60 * 1000", "mutated": "5 * 60 / 1000", "result": "killed", "test_that_caught_it": "DEBOUNCE_MS constant assertion (new test)"},
-          {"line": 10, "original": "- new Date()", "mutated": "+ new Date()", "result": "killed", "test_that_caught_it": "shouldPull() stale test"}
-        ]}
+        "relational": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 9,
+              "original": "=== null",
+              "mutated": "!== null",
+              "result": "killed",
+              "test_that_caught_it": "shouldPull() null test"
+            },
+            {
+              "line": 11,
+              "original": ">",
+              "mutated": ">=",
+              "result": "killed",
+              "test_that_caught_it": "shouldPull() boundary test"
+            }
+          ]
+        },
+        "arithmetic": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 1,
+              "original": "5 * 60 * 1000",
+              "mutated": "5 * 60 / 1000",
+              "result": "killed",
+              "test_that_caught_it": "DEBOUNCE_MS constant assertion (new test)"
+            },
+            {
+              "line": 10,
+              "original": "- new Date()",
+              "mutated": "+ new Date()",
+              "result": "killed",
+              "test_that_caught_it": "shouldPull() stale test"
+            }
+          ]
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["All 4 mutations killed — perfect score after adding DEBOUNCE_MS constant assertion", "Boundary test at exact debounce threshold catches > vs >= mutation"]
-    }
-  },
+      "mutation_score": 100,
+      "insights": [
+        "All 4 mutations killed — perfect score after adding DEBOUNCE_MS constant assertion",
+        "Boundary test at exact debounce threshold catches > vs >= mutation"
+      ]
+    },
     "dashboard/app/lib/filter.server.ts": {
       "status": "completed",
-      "covering_tests": ["dashboard/app/lib/filter.server.test.ts"],
+      "covering_tests": [
+        "dashboard/app/lib/filter.server.test.ts"
+      ],
       "last_tested": "2026-04-14T00:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 6, "killed": 6, "survived": 0, "examples": [
-          {"line": 11, "original": "=== \"\"", "mutated": "!== \"\"", "result": "killed", "test_that_caught_it": "filterBySearch empty query"},
-          {"line": 45, "original": "< fromDate", "mutated": "<= fromDate", "result": "killed", "test_that_caught_it": "inclusive lower bound test"}
-        ]},
-        "logical": {"total": 3, "killed": 3, "survived": 0, "examples": [
-          {"line": 14, "original": "||", "mutated": "&&", "result": "killed", "test_that_caught_it": "filterBySearch name-or-testId test"},
-          {"line": 40, "original": "&& (both null)", "mutated": "|| (either null)", "result": "killed", "test_that_caught_it": "filterByDateRange from-only test"}
-        ]},
-        "constants": {"total": 1, "killed": 1, "survived": 0, "examples": [
-          {"line": 44, "original": "slice(0, 10)", "mutated": "slice(0, 8)", "result": "killed", "test_that_caught_it": "filterByDateRange date comparison"}
-        ]},
-        "control_flow": {"total": 1, "killed": 0, "survived": 1, "examples": [
-          {"line": 62, "original": "filterBySearch then filterByStatus", "mutated": "filterByStatus then filterBySearch", "result": "survived (equivalent — AND composition is commutative)", "test_that_caught_it": null}
-        ]}
+        "relational": {
+          "total": 6,
+          "killed": 6,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 11,
+              "original": "=== \"\"",
+              "mutated": "!== \"\"",
+              "result": "killed",
+              "test_that_caught_it": "filterBySearch empty query"
+            },
+            {
+              "line": 45,
+              "original": "< fromDate",
+              "mutated": "<= fromDate",
+              "result": "killed",
+              "test_that_caught_it": "inclusive lower bound test"
+            }
+          ]
+        },
+        "logical": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 14,
+              "original": "||",
+              "mutated": "&&",
+              "result": "killed",
+              "test_that_caught_it": "filterBySearch name-or-testId test"
+            },
+            {
+              "line": 40,
+              "original": "&& (both null)",
+              "mutated": "|| (either null)",
+              "result": "killed",
+              "test_that_caught_it": "filterByDateRange from-only test"
+            }
+          ]
+        },
+        "constants": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 44,
+              "original": "slice(0, 10)",
+              "mutated": "slice(0, 8)",
+              "result": "killed",
+              "test_that_caught_it": "filterByDateRange date comparison"
+            }
+          ]
+        },
+        "control_flow": {
+          "total": 1,
+          "killed": 0,
+          "survived": 1,
+          "examples": [
+            {
+              "line": 62,
+              "original": "filterBySearch then filterByStatus",
+              "mutated": "filterByStatus then filterBySearch",
+              "result": "survived (equivalent — AND composition is commutative)",
+              "test_that_caught_it": null
+            }
+          ]
+        }
       },
       "mutation_score": 90.9,
-      "insights": ["10/11 mutations killed — excellent coverage", "Sole survivor is an equivalent mutant: filter composition order is commutative for AND-composed subset filters", "Inclusive boundary tests catch both < vs <= and > vs >= date comparison mutations"]
-    }
-  },
-  "global_statistics": {
-    "total_modules": 27,
-    "completed_modules": 27,
-    "total_mutations": 458,
-    "total_killed": 433,
-    "total_survived": 27,
-    "overall_score": 94.5
-  },
+      "insights": [
+        "10/11 mutations killed — excellent coverage",
+        "Sole survivor is an equivalent mutant: filter composition order is commutative for AND-composed subset filters",
+        "Inclusive boundary tests catch both < vs <= and > vs >= date comparison mutations"
+      ]
+    },
     "dashboard/app/lib/github.server.ts": {
       "status": "completed",
-      "covering_tests": ["dashboard/app/lib/github.server.test.ts"],
+      "covering_tests": [
+        "dashboard/app/lib/github.server.test.ts"
+      ],
       "last_tested": "2026-04-14T00:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 3, "killed": 3, "survived": 0, "examples": [
-          {"line": 41, "original": "etag !== null", "mutated": "=== null", "result": "killed", "test_that_caught_it": "null etag test"},
-          {"line": 47, "original": "=== 304", "mutated": "!== 304", "result": "killed", "test_that_caught_it": "304 Not Modified test"}
-        ]},
-        "logical": {"total": 1, "killed": 1, "survived": 0, "examples": [
-          {"line": 51, "original": "!response.ok", "mutated": "response.ok", "result": "killed", "test_that_caught_it": "API error handling test"}
-        ]},
-        "constants": {"total": 5, "killed": 5, "survived": 0, "examples": [
-          {"line": 48, "original": "notModified: true", "mutated": "false", "result": "killed", "test_that_caught_it": "304 response test"},
-          {"line": 60, "original": "responseEtag", "mutated": "null", "result": "killed", "test_that_caught_it": "etag response test"}
-        ]},
-        "index": {"total": 1, "killed": 1, "survived": 0, "examples": [
-          {"line": 83, "original": "entries[0]", "mutated": "entries[entries.length-1]", "result": "killed", "test_that_caught_it": "multi-entry zip test"}
-        ]}
+        "relational": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 41,
+              "original": "etag !== null",
+              "mutated": "=== null",
+              "result": "killed",
+              "test_that_caught_it": "null etag test"
+            },
+            {
+              "line": 47,
+              "original": "=== 304",
+              "mutated": "!== 304",
+              "result": "killed",
+              "test_that_caught_it": "304 Not Modified test"
+            }
+          ]
+        },
+        "logical": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 51,
+              "original": "!response.ok",
+              "mutated": "response.ok",
+              "result": "killed",
+              "test_that_caught_it": "API error handling test"
+            }
+          ]
+        },
+        "constants": {
+          "total": 5,
+          "killed": 5,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 48,
+              "original": "notModified: true",
+              "mutated": "false",
+              "result": "killed",
+              "test_that_caught_it": "304 response test"
+            },
+            {
+              "line": 60,
+              "original": "responseEtag",
+              "mutated": "null",
+              "result": "killed",
+              "test_that_caught_it": "etag response test"
+            }
+          ]
+        },
+        "index": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 83,
+              "original": "entries[0]",
+              "mutated": "entries[entries.length-1]",
+              "result": "killed",
+              "test_that_caught_it": "multi-entry zip test"
+            }
+          ]
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["Perfect score — all 10 mutations killed", "ETag caching, 304 handling, error paths, and zip extraction all well-tested"]
+      "mutation_score": 100,
+      "insights": [
+        "Perfect score — all 10 mutations killed",
+        "ETag caching, 304 handling, error paths, and zip extraction all well-tested"
+      ]
     },
     "dashboard/app/lib/ingest.server.ts": {
       "status": "completed",
-      "covering_tests": ["dashboard/app/lib/ingest.server.test.ts", "dashboard/app/lib/ingest-artifact.server.test.ts", "dashboard/app/lib/ingest-artifact-flaky.server.test.ts", "dashboard/app/lib/ingest-artifact-quarantine.server.test.ts", "dashboard/app/lib/ingest-artifact-unresolved.server.test.ts", "dashboard/app/lib/ingest-artifact-edge.server.test.ts"],
+      "covering_tests": [
+        "dashboard/app/lib/ingest.server.test.ts",
+        "dashboard/app/lib/ingest-artifact.server.test.ts",
+        "dashboard/app/lib/ingest-artifact-flaky.server.test.ts",
+        "dashboard/app/lib/ingest-artifact-quarantine.server.test.ts",
+        "dashboard/app/lib/ingest-artifact-unresolved.server.test.ts",
+        "dashboard/app/lib/ingest-artifact-edge.server.test.ts"
+      ],
       "last_tested": "2026-04-14T00:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 7, "killed": 7, "survived": 0, "examples": [
-          {"line": 100, "original": "> lastSynced", "mutated": ">= lastSynced", "result": "killed", "test_that_caught_it": "filterArtifactsSince boundary test"},
-          {"line": 301, "original": "=== \"quarantined\"", "mutated": "!== \"quarantined\"", "result": "killed", "test_that_caught_it": "ingestArtifact status filter test"}
-        ]},
-        "logical": {"total": 2, "killed": 2, "survived": 0, "examples": [
-          {"line": 289, "original": "!valid", "mutated": "valid", "result": "killed", "test_that_caught_it": "ingestArtifact validation test"},
-          {"line": 299, "original": "isNew", "mutated": "!isNew", "result": "killed", "test_that_caught_it": "ingestArtifact idempotency test"}
-        ]},
-        "constants": {"total": 2, "killed": 2, "survived": 0, "examples": [
-          {"line": 150, "original": "?? 0", "mutated": "?? 1", "result": "killed", "test_that_caught_it": "buildTestRunRecord test"}
-        ]},
-        "return_value": {"total": 7, "killed": 7, "survived": 0, "examples": [
-          {"line": 158, "original": "return \"failing\"", "mutated": "return \"passing\"", "result": "killed", "test_that_caught_it": "mapOriginalStatus test"}
-        ]},
-        "arithmetic": {"total": 1, "killed": 1, "survived": 0, "examples": [
-          {"line": 255, "original": "flaky_count + 1", "mutated": "- 1", "result": "killed", "test_that_caught_it": "incrementFlakyCount test"}
-        ]},
-        "method_swap": {"total": 1, "killed": 1, "survived": 0, "examples": [
-          {"line": 116, "original": "startsWith", "mutated": "endsWith", "result": "killed", "test_that_caught_it": "filterArtifactsByPrefix test"}
-        ]}
+        "relational": {
+          "total": 7,
+          "killed": 7,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 100,
+              "original": "> lastSynced",
+              "mutated": ">= lastSynced",
+              "result": "killed",
+              "test_that_caught_it": "filterArtifactsSince boundary test"
+            },
+            {
+              "line": 301,
+              "original": "=== \"quarantined\"",
+              "mutated": "!== \"quarantined\"",
+              "result": "killed",
+              "test_that_caught_it": "ingestArtifact status filter test"
+            }
+          ]
+        },
+        "logical": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 289,
+              "original": "!valid",
+              "mutated": "valid",
+              "result": "killed",
+              "test_that_caught_it": "ingestArtifact validation test"
+            },
+            {
+              "line": 299,
+              "original": "isNew",
+              "mutated": "!isNew",
+              "result": "killed",
+              "test_that_caught_it": "ingestArtifact idempotency test"
+            }
+          ]
+        },
+        "constants": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 150,
+              "original": "?? 0",
+              "mutated": "?? 1",
+              "result": "killed",
+              "test_that_caught_it": "buildTestRunRecord test"
+            }
+          ]
+        },
+        "return_value": {
+          "total": 7,
+          "killed": 7,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 158,
+              "original": "return \"failing\"",
+              "mutated": "return \"passing\"",
+              "result": "killed",
+              "test_that_caught_it": "mapOriginalStatus test"
+            }
+          ]
+        },
+        "arithmetic": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 255,
+              "original": "flaky_count + 1",
+              "mutated": "- 1",
+              "result": "killed",
+              "test_that_caught_it": "incrementFlakyCount test"
+            }
+          ]
+        },
+        "method_swap": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 116,
+              "original": "startsWith",
+              "mutated": "endsWith",
+              "result": "killed",
+              "test_that_caught_it": "filterArtifactsByPrefix test"
+            }
+          ]
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["Perfect score — all 20 mutations killed", "6 test files provide comprehensive coverage", "Pure functions, I/O, and orchestration all well-tested"]
+      "mutation_score": 100,
+      "insights": [
+        "Perfect score — all 20 mutations killed",
+        "6 test files provide comprehensive coverage",
+        "Pure functions, I/O, and orchestration all well-tested"
+      ]
     },
     "dashboard/app/lib/sync.server.ts": {
       "status": "completed",
-      "covering_tests": ["dashboard/app/lib/sync.server.test.ts", "dashboard/app/lib/sync.server.state.test.ts"],
+      "covering_tests": [
+        "dashboard/app/lib/sync.server.test.ts",
+        "dashboard/app/lib/sync.server.state.test.ts"
+      ],
       "last_tested": "2026-04-14T00:00:00Z",
       "mutations_by_type": {
-        "logical": {"total": 1, "killed": 1, "survived": 0, "examples": [
-          {"line": 44, "original": "!shouldPull(...)", "mutated": "shouldPull(...)", "result": "killed", "test_that_caught_it": "second call within 5 min test"}
-        ]},
-        "relational": {"total": 1, "killed": 1, "survived": 0, "examples": [
-          {"line": 69, "original": "state !== null", "mutated": "=== null", "result": "killed", "test_that_caught_it": "state enumeration test"}
-        ]},
-        "constants": {"total": 3, "killed": 3, "survived": 0, "examples": [
-          {"line": 48, "original": "null (etag)", "mutated": "\"fake-etag\"", "result": "killed", "test_that_caught_it": "If-None-Match header capture (new test)"},
-          {"line": 49, "original": "ARTIFACT_PREFIX", "mutated": "\"\"", "result": "killed", "test_that_caught_it": "no matching artifacts test"}
-        ]},
-        "statement": {"total": 3, "killed": 3, "survived": 0, "examples": [
-          {"line": 81, "original": "updateLastPulledAt(...)", "mutated": "removed", "result": "killed", "test_that_caught_it": "last_pulled_at update test"},
-          {"line": "66-79", "original": "state sync loop", "mutated": "removed", "result": "killed", "test_that_caught_it": "state enumeration test"}
-        ]}
+        "logical": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 44,
+              "original": "!shouldPull(...)",
+              "mutated": "shouldPull(...)",
+              "result": "killed",
+              "test_that_caught_it": "second call within 5 min test"
+            }
+          ]
+        },
+        "relational": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 69,
+              "original": "state !== null",
+              "mutated": "=== null",
+              "result": "killed",
+              "test_that_caught_it": "state enumeration test"
+            }
+          ]
+        },
+        "constants": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 48,
+              "original": "null (etag)",
+              "mutated": "\"fake-etag\"",
+              "result": "killed",
+              "test_that_caught_it": "If-None-Match header capture (new test)"
+            },
+            {
+              "line": 49,
+              "original": "ARTIFACT_PREFIX",
+              "mutated": "\"\"",
+              "result": "killed",
+              "test_that_caught_it": "no matching artifacts test"
+            }
+          ]
+        },
+        "statement": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 81,
+              "original": "updateLastPulledAt(...)",
+              "mutated": "removed",
+              "result": "killed",
+              "test_that_caught_it": "last_pulled_at update test"
+            },
+            {
+              "line": "66-79",
+              "original": "state sync loop",
+              "mutated": "removed",
+              "result": "killed",
+              "test_that_caught_it": "state enumeration test"
+            }
+          ]
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["All 8 mutations killed — perfect score after adding etag header verification", "Debounce, artifact processing, state sync, error handling all well-tested"]
+      "mutation_score": 100,
+      "insights": [
+        "All 8 mutations killed — perfect score after adding etag header verification",
+        "Debounce, artifact processing, state sync, error handling all well-tested"
+      ]
     },
     "dashboard/app/lib/state-sync.server.ts": {
       "status": "completed",
-      "covering_tests": ["dashboard/app/lib/state-sync.server.test.ts"],
+      "covering_tests": [
+        "dashboard/app/lib/state-sync.server.test.ts"
+      ],
       "last_tested": "2026-04-14T00:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 4, "killed": 4, "survived": 0, "examples": [
-          {"line": 69, "original": "=== 404", "mutated": "!== 404", "result": "killed", "test_that_caught_it": "listStateSuites 404 test"},
-          {"line": 103, "original": "=== 404", "mutated": "!== 404", "result": "killed", "test_that_caught_it": "readSuiteState 404 test"}
-        ]},
-        "logical": {"total": 2, "killed": 2, "survived": 0, "examples": [
-          {"line": 75, "original": "!response.ok", "mutated": "response.ok", "result": "killed", "test_that_caught_it": "listStateSuites 500 test"},
-          {"line": 107, "original": "!response.ok", "mutated": "response.ok", "result": "killed", "test_that_caught_it": "readSuiteState 500 test"}
-        ]},
-        "constants": {"total": 3, "killed": 3, "survived": 0, "examples": [
-          {"line": 80, "original": "e.type === \"dir\"", "mutated": "=== \"file\"", "result": "killed", "test_that_caught_it": "listStateSuites dir filter test"},
-          {"line": 47, "original": "\"base64\"", "mutated": "\"utf8\"", "result": "killed", "test_that_caught_it": "readSuiteState decode test"}
-        ]}
+        "relational": {
+          "total": 4,
+          "killed": 4,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 69,
+              "original": "=== 404",
+              "mutated": "!== 404",
+              "result": "killed",
+              "test_that_caught_it": "listStateSuites 404 test"
+            },
+            {
+              "line": 103,
+              "original": "=== 404",
+              "mutated": "!== 404",
+              "result": "killed",
+              "test_that_caught_it": "readSuiteState 404 test"
+            }
+          ]
+        },
+        "logical": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 75,
+              "original": "!response.ok",
+              "mutated": "response.ok",
+              "result": "killed",
+              "test_that_caught_it": "listStateSuites 500 test"
+            },
+            {
+              "line": 107,
+              "original": "!response.ok",
+              "mutated": "response.ok",
+              "result": "killed",
+              "test_that_caught_it": "readSuiteState 500 test"
+            }
+          ]
+        },
+        "constants": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 80,
+              "original": "e.type === \"dir\"",
+              "mutated": "=== \"file\"",
+              "result": "killed",
+              "test_that_caught_it": "listStateSuites dir filter test"
+            },
+            {
+              "line": 47,
+              "original": "\"base64\"",
+              "mutated": "\"utf8\"",
+              "result": "killed",
+              "test_that_caught_it": "readSuiteState decode test"
+            }
+          ]
+        }
       },
-      "mutation_score": 100.0,
-      "insights": ["All 9 mutations killed — perfect score", "404 handling, error propagation, dir filtering, and base64 decoding all well-tested"]
+      "mutation_score": 100,
+      "insights": [
+        "All 9 mutations killed — perfect score",
+        "404 handling, error propagation, dir filtering, and base64 decoding all well-tested"
+      ]
     },
     "dashboard/app/controllers/home.tsx": {
       "status": "completed",
-      "covering_tests": ["dashboard/app/controllers/home.test.ts", "dashboard/app/controllers/home.sync.test.ts"],
+      "covering_tests": [
+        "dashboard/app/controllers/home.test.ts",
+        "dashboard/app/controllers/home.sync.test.ts"
+      ],
       "last_tested": "2026-04-14T00:00:00Z",
       "mutations_by_type": {
-        "relational": {"total": 1, "killed": 1, "survived": 0, "examples": [
-          {"line": 167, "original": "=== \"ENOENT\"", "mutated": "!== \"ENOENT\"", "result": "killed", "test_that_caught_it": "ENOENT message check (new test)"}
-        ]},
-        "logical": {"total": 1, "killed": 1, "survived": 0, "examples": [
-          {"line": 182, "original": "if (token)", "mutated": "if (!token)", "result": "killed", "test_that_caught_it": "test_runs DB state check (new test)"}
-        ]},
-        "constants": {"total": 4, "killed": 4, "survived": 0, "examples": [
-          {"line": 173, "original": "status: 500", "mutated": "200", "result": "killed", "test_that_caught_it": "missing config HTTP 500 test"},
-          {"line": 13, "original": "\"Never\"", "mutated": "\"\"", "result": "killed", "test_that_caught_it": "Never text check (new test)"},
-          {"line": 74, "original": "totalQuarantined", "mutated": "0", "result": "killed", "test_that_caught_it": "total count test"}
-        ]},
-        "control_flow": {"total": 1, "killed": 1, "survived": 0, "examples": [
-          {"line": 29, "original": "issueUrl ? <a> : —", "mutated": "flipped", "result": "killed", "test_that_caught_it": "issue URL link check (new test)"}
-        ]},
-        "env_var": {"total": 1, "killed": 0, "survived": 1, "examples": [
-          {"line": 159, "original": "?? process.env.DASHBOARD_CONFIG ??", "mutated": "removed middle", "result": "survived (env var fallback not testable in unit scope)", "test_that_caught_it": null}
-        ]}
+        "relational": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 167,
+              "original": "=== \"ENOENT\"",
+              "mutated": "!== \"ENOENT\"",
+              "result": "killed",
+              "test_that_caught_it": "ENOENT message check (new test)"
+            }
+          ]
+        },
+        "logical": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 182,
+              "original": "if (token)",
+              "mutated": "if (!token)",
+              "result": "killed",
+              "test_that_caught_it": "test_runs DB state check (new test)"
+            }
+          ]
+        },
+        "constants": {
+          "total": 4,
+          "killed": 4,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 173,
+              "original": "status: 500",
+              "mutated": "200",
+              "result": "killed",
+              "test_that_caught_it": "missing config HTTP 500 test"
+            },
+            {
+              "line": 13,
+              "original": "\"Never\"",
+              "mutated": "\"\"",
+              "result": "killed",
+              "test_that_caught_it": "Never text check (new test)"
+            },
+            {
+              "line": 74,
+              "original": "totalQuarantined",
+              "mutated": "0",
+              "result": "killed",
+              "test_that_caught_it": "total count test"
+            }
+          ]
+        },
+        "control_flow": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 29,
+              "original": "issueUrl ? <a> : —",
+              "mutated": "flipped",
+              "result": "killed",
+              "test_that_caught_it": "issue URL link check (new test)"
+            }
+          ]
+        },
+        "env_var": {
+          "total": 1,
+          "killed": 0,
+          "survived": 1,
+          "examples": [
+            {
+              "line": 159,
+              "original": "?? process.env.DASHBOARD_CONFIG ??",
+              "mutated": "removed middle",
+              "result": "survived (env var fallback not testable in unit scope)",
+              "test_that_caught_it": null
+            }
+          ]
+        }
       },
       "mutation_score": 87.5,
-      "insights": ["7/8 mutations killed after adding 4 new assertions", "ENOENT error differentiation, token guard, Never text, and issue link ternary all now tested", "Sole survivor is env var fallback chain — not testable without process.env manipulation"]
+      "insights": [
+        "7/8 mutations killed after adding 4 new assertions",
+        "ENOENT error differentiation, token guard, Never text, and issue link ternary all now tested",
+        "Sole survivor is env var fallback chain — not testable without process.env manipulation"
+      ]
+    },
+    "dashboard/app/controllers/project.tsx": {
+      "status": "completed",
+      "covering_tests": [
+        "dashboard/app/controllers/project.test.ts",
+        "dashboard/app/controllers/project.filters.test.ts"
+      ],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 149,
+              "original": "=== null",
+              "mutated": "!== null",
+              "result": "killed",
+              "test_that_caught_it": "project not found test"
+            }
+          ]
+        },
+        "logical": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 37,
+              "original": "&&",
+              "mutated": "||",
+              "result": "killed",
+              "test_that_caught_it": "issue_url without issue_number test (new test)"
+            },
+            {
+              "line": 160,
+              "original": "||",
+              "mutated": "&&",
+              "result": "killed",
+              "test_that_caught_it": "status filter test"
+            }
+          ]
+        },
+        "constants": {
+          "total": 4,
+          "killed": 4,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 152,
+              "original": "status: 404",
+              "mutated": "200",
+              "result": "killed",
+              "test_that_caught_it": "not found status test"
+            },
+            {
+              "line": 35,
+              "original": "\"Never\"",
+              "mutated": "\"\"",
+              "result": "killed",
+              "test_that_caught_it": "null lastFlakyAt test"
+            }
+          ]
+        },
+        "field_swap": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 178,
+              "original": "tests.length",
+              "mutated": "allTests.length",
+              "result": "killed",
+              "test_that_caught_it": "filtered count test"
+            },
+            {
+              "line": 95,
+              "original": "filteredCount",
+              "mutated": "totalCount",
+              "result": "killed",
+              "test_that_caught_it": "filters test"
+            }
+          ]
+        }
+      },
+      "mutation_score": 100,
+      "insights": [
+        "All 11 mutations killed — perfect score after adding issue_url/issue_number mismatch test",
+        "Handler logic, filter integration, and JSX rendering all well-tested"
+      ]
+    },
+    "cli/cmd/quarantine/init.go": {
+      "status": "completed",
+      "covering_tests": [
+        "cli/cmd/quarantine/init_test.go",
+        "cli/cmd/quarantine/init_happy_test.go",
+        "cli/cmd/quarantine/init_error_test.go",
+        "cli/cmd/quarantine/init_overwrite_test.go",
+        "cli/cmd/quarantine/init_pure_test.go"
+      ],
+      "last_tested": "2026-04-01T01:30:00Z",
+      "mutations_by_type": {
+        "relational": {
+          "total": 11,
+          "killed": 11,
+          "survived": 0,
+          "examples": []
+        },
+        "logical": {
+          "total": 6,
+          "killed": 6,
+          "survived": 0,
+          "examples": []
+        },
+        "control_flow": {
+          "total": 4,
+          "killed": 3,
+          "survived": 1,
+          "examples": [
+            {
+              "line": 219,
+              "original": "} else if",
+              "mutated": "} if",
+              "result": "survived",
+              "test_that_caught_it": null
+            }
+          ]
+        },
+        "string": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": []
+        },
+        "constant": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        },
+        "statement": {
+          "total": 2,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        }
+      },
+      "mutation_score": 92.3,
+      "insights": [
+        "Line 219 else-if to if is an equivalent mutant — preceding block returns, so else is redundant",
+        "All relational and logical operator mutations killed — excellent error handling coverage"
+      ]
     }
+  },
+  "global_statistics": {
+    "total_modules": 32,
+    "completed_modules": 32,
+    "total_mutations": 485,
+    "total_killed": 453,
+    "total_survived": 30,
+    "overall_score": 93.4
   }
 }

@@ -103,6 +103,23 @@ describe("project() — project exists with 3 quarantined tests", async (assert)
       "2026-03-15T07:00:00Z",
     )
 
+  // test-4: issue_url present but issue_number null — must NOT render as a link
+  raw
+    .prepare(
+      `INSERT INTO quarantined_tests
+        (project_id, test_id, name, issue_number, issue_url, quarantined_at, last_flaky_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      projectId,
+      "test-4",
+      "should checkout cart",
+      null,
+      "https://github.com/acme/payments-service/issues/99",
+      "2026-03-05T12:00:00Z",
+      null,
+    )
+
   // Insert trend data: 3 days of test runs
   raw
     .prepare(
@@ -214,6 +231,13 @@ describe("project() — project exists with 3 quarantined tests", async (assert)
       should: "render '—' in the issue column",
       actual: html.includes("—"),
       expected: true,
+    })
+
+    assert({
+      given: "a quarantined test with issue_url but null issue_number",
+      should: "not render issue 99 as a link (both must be non-null)",
+      actual: html.includes('href="https://github.com/acme/payments-service/issues/99"'),
+      expected: false,
     })
 
     assert({
