@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	riteway "github.com/mycargus/riteway-golang"
+
+	"github.com/mycargus/quarantine/cli/internal/config"
 )
 
 // --- Version validation ---
@@ -213,5 +215,91 @@ version: 1
 		Should:   "not produce a custom-labels error",
 		Actual:   containsString(errs, "Custom labels are not supported in this version. Only ['quarantine'] is accepted."),
 		Expected: false,
+	})
+}
+
+// --- Per-suite retries validation (ValidateSuiteRetries is a pure function) ---
+
+func TestValidateSuiteRetriesAboveMax(t *testing.T) {
+	err := config.ValidateSuiteRetries(20)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "retries value of 20 (above max)",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+}
+
+func TestValidateSuiteRetriesNegativeRejected(t *testing.T) {
+	err := config.ValidateSuiteRetries(-1)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "retries value of -1 (negative)",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+}
+
+func TestValidateSuiteRetriesJustAboveMax(t *testing.T) {
+	err := config.ValidateSuiteRetries(11)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "retries value of 11 (just above max)",
+		Should:   "return an error",
+		Actual:   err != nil,
+		Expected: true,
+	})
+}
+
+func TestValidateSuiteRetriesBoundaries(t *testing.T) {
+	errMin := config.ValidateSuiteRetries(1)
+	errMax := config.ValidateSuiteRetries(10)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "retries value of 1 (lower boundary)",
+		Should:   "not return an error",
+		Actual:   errMin == nil,
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "retries value of 10 (upper boundary)",
+		Should:   "not return an error",
+		Actual:   errMax == nil,
+		Expected: true,
+	})
+}
+
+func TestValidateSuiteRetriesZeroAccepted(t *testing.T) {
+	err := config.ValidateSuiteRetries(0)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "retries value of 0 (unset/default)",
+		Should:   "not return an error",
+		Actual:   err == nil,
+		Expected: true,
+	})
+}
+
+func TestValidateSuitesIncludesRetriesError(t *testing.T) {
+	suite := parseSuiteYAML(t, `
+version: 1
+test_suites:
+  - name: backend
+    command: ["npm", "test"]
+    junitxml: "junit.xml"
+    rerun_command: ["npm", "test", "--", "{name}"]
+    retries: 20
+`)
+
+	errs := config.ValidateSuites([]config.TestSuite{suite})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a suite with retries: 20 validated through ValidateSuites",
+		Should:   "include the suite-prefixed retries error",
+		Actual:   containsString(errs, `suite "backend": invalid retries value: 20, must be between 1 and 10`),
+		Expected: true,
 	})
 }

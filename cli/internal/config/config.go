@@ -344,6 +344,17 @@ func ValidateSuiteJUnitXML(junitxml string) error {
 	return nil
 }
 
+// ValidateSuiteRetries returns a non-nil error when the suite's retries field
+// is non-zero and outside the valid range of 1–10.
+// A value of 0 means "use default" and is valid.
+// This is a pure function — no I/O.
+func ValidateSuiteRetries(retries int) error {
+	if retries != 0 && (retries < 1 || retries > 10) {
+		return fmt.Errorf("invalid retries value: %d, must be between 1 and 10", retries)
+	}
+	return nil
+}
+
 // ValidateSuiteRerunCommand returns a non-nil error when the suite's
 // rerun_command field is absent or empty.
 // This is a pure function — no I/O.
@@ -377,6 +388,10 @@ func ValidateSuites(suites []TestSuite) []string {
 		}
 
 		if err := ValidateSuiteRerunCommand(s.RerunCommand); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %s", prefix, err))
+		}
+
+		if err := ValidateSuiteRetries(s.Retries); err != nil {
 			errs = append(errs, fmt.Sprintf("%s: %s", prefix, err))
 		}
 	}
