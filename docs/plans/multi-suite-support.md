@@ -1160,7 +1160,7 @@ guidance may be added later.
 | Results JSON includes `suite_name` field | Dashboard association |
 | Repo root discovery from subdirectory | Git-based walk-up |
 
-### Integration tests
+### Interface tests
 
 | What | Why |
 |------|-----|

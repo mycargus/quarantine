@@ -8,7 +8,7 @@ import (
 	riteway "github.com/mycargus/riteway-golang"
 )
 
-// TestInitDetectsJestAndRSpec is the integration test for Scenario 110.
+// TestInitDetectsJestAndRSpec is the interface test for Scenario 110.
 // Given a repo with package.json (jest in devDependencies) and Gemfile (gem 'rspec'),
 // when quarantine init runs, it auto-detects both frameworks and creates
 // .quarantine/config.yml with two pre-filled suite entries.

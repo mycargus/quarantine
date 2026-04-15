@@ -527,7 +527,7 @@ the Search API.
 `cli/cmd/quarantine/run_notifications.go`. `TestContractIssueTitleFormat` in
 `cli/cmd/quarantine/contract_test.go` guards the prefix value.
 Issue body structure tested in `run_notifications_test.go`.
-410-handling tested end-to-end in integration tests.
+410-handling tested end-to-end in interface tests.
 
 ---
 
@@ -749,7 +749,7 @@ discovery loop.
 colocated unit tests.
 
 **Current validation:** Planned. JS Prism contract tests in
-`test/contract/github-app.test.js`. Integration tests in
+`test/contract/github-app.test.js`. Interface tests in
 `dashboard/test/installation-sync.integration.test.ts` verify the sync logic
 (including pagination across multiple pages) against mock HTTP servers with
 real SQLite.
@@ -803,7 +803,7 @@ the user's accessible repo set.
 **Current validation:** Planned. JS Prism contract tests in
 `test/contract/github-app.test.js` will validate 200, 403, and 404 response
 shapes. The 403 case covers a user without access to the installation. The
-404 case covers a deleted installation. Integration tests in
+404 case covers a deleted installation. Interface tests in
 `dashboard/test/user-permissions.integration.test.ts` verify the filtering
 logic (including pagination across multiple pages) against mock HTTP servers
 with real SQLite.

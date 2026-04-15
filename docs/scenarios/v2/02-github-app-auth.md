@@ -223,7 +223,7 @@ Removed: no refresh tokens. Session expiry is handled by cookie `Max-Age`.
 
 ### Scenario 38: Real installation token exchange succeeds end-to-end [v2]
 
-**Risk:** Integration tests with mocks pass but the real GitHub App API rejects our JWT format, token exchange, or API calls.
+**Risk:** Interface tests with mocks pass but the real GitHub App API rejects our JWT format, token exchange, or API calls.
 
 **Given** the CI environment has real dev App credentials (private key, client ID, installation ID)
 **When** the E2E test generates a JWT, exchanges it for an installation token, and uses the token to call `GET /repos/{owner}/{repo}`

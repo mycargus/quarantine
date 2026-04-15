@@ -16,7 +16,7 @@ import (
 
 // --- Scenario 125: two parallel suite runs operate on separate state files ---
 // Path format is already unit-tested in TestSuiteStatePath (run_suite_state_test.go).
-// This integration test verifies the isolation property end-to-end.
+// This interface test verifies the isolation property end-to-end.
 
 // fakeTwoSuiteAPI creates a server that tracks separate PUT requests to
 // backend and frontend state file paths. It handles branch checks, 404 for

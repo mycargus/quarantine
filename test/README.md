@@ -1,6 +1,6 @@
 # Test Infrastructure
 
-External test suites live here. These are separate from the CLI's Go unit/integration tests (`cli/`) and the dashboard's TypeScript tests (`dashboard/`).
+External test suites live here. These are separate from the CLI's Go unit/interface tests (`cli/`) and the dashboard's TypeScript tests (`dashboard/`).
 
 ## Suites
 

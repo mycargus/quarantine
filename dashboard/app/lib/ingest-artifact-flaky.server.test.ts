@@ -1,5 +1,5 @@
 /**
- * Integration tests for ingestArtifact() — flaky detection handling (Scenario 89).
+ * Interface tests for ingestArtifact() — flaky detection handling (Scenario 89).
  *
  * Verifies that test entries with status "flaky" increment flaky_count and update
  * last_flaky_at and last_run_status to "passing", while entries with status

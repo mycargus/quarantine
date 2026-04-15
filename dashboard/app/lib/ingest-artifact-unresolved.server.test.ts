@@ -1,5 +1,5 @@
 /**
- * Integration tests for ingestArtifact() — unresolved test handling (Scenario 140).
+ * Interface tests for ingestArtifact() — unresolved test handling (Scenario 140).
  *
  * Verifies that test entries with status "unresolved" are:
  * - stored with their status preserved (unresolved_tests count in test_runs)

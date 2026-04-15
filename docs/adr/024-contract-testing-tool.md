@@ -7,7 +7,7 @@
 
 Quarantine (Go CLI + Remix 3 dashboard) interacts with GitHub APIs across multiple surfaces: Contents API for state, Issues API for tickets, Artifacts API for results, PR Comments API.
 
-Integration tests use dependency injection (e.g., `fetchFn`) to mock HTTP calls, but this creates mock-fidelity risk — the real API could diverge from mocks.
+Interface tests use dependency injection (e.g., `fetchFn`) to mock HTTP calls, but this creates mock-fidelity risk — the real API could diverge from mocks.
 
 Contract tests address this by serving mock responses from vendored OpenAPI specs and validating request/response shapes against the spec.
 

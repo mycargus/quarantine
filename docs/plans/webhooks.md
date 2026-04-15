@@ -59,7 +59,7 @@ Before implementation, an ADR is needed for **public endpoint exposure**. The v1
 - Use GitHub's published test vector
 - Event routing: `routeWebhookEvent(eventType, action, payload)` returns typed action enum
 
-**Integration tests:**
+**Interface tests:**
 - POST with valid signature -> 200, installation recorded
 - Invalid signature -> 401, no DB changes
 - Duplicate `X-GitHub-Delivery` -> 200, no duplicate records

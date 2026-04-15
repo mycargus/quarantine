@@ -148,7 +148,7 @@ func TestRunSearchTruncatedEmitsWarning(t *testing.T) {
 	})
 }
 
-// --- Scenario 60: Rate limit warning (integration) ---
+// --- Scenario 60: Rate limit warning (interface) ---
 
 func TestRunRateLimitLowEmitsWarningAndContinues(t *testing.T) {
 	dir := t.TempDir()

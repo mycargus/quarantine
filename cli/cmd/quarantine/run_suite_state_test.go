@@ -67,9 +67,9 @@ func TestSuiteIssueLabel(t *testing.T) {
 	})
 }
 
-// --- Integration test helpers for suite-mode per-suite state/PR-comment/label (Scenario 121) ---
+// --- Interface test helpers for suite-mode per-suite state/PR-comment/label (Scenario 121) ---
 
-// flakySuiteResult holds all observable outcomes of a flaky-suite integration run.
+// flakySuiteResult holds all observable outcomes of a flaky-suite interface run.
 type flakySuiteResult struct {
 	err              error
 	capturedStatePath string // URL path of the state-file PUT request
@@ -78,7 +78,7 @@ type flakySuiteResult struct {
 }
 
 // runFlakySuiteIntegration is the shared arrange-act helper for Scenarios 121's
-// three integration tests. It sets up a flaky suite scenario, runs the command
+// three interface tests. It sets up a flaky suite scenario, runs the command
 // once, and returns all observable outcomes. Each test then asserts its unique
 // concern against the result.
 func runFlakySuiteIntegration(t *testing.T, suiteName string, prNumber int) flakySuiteResult {
@@ -278,7 +278,7 @@ test_suites:
 	return configPath, xmlPath
 }
 
-// --- Integration tests: Scenario 121 ---
+// --- Interface tests: Scenario 121 ---
 // Each test shares the same scenario (backend suite, flaky test) via
 // runFlakySuiteIntegration and asserts its unique concern.
 

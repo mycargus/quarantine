@@ -133,7 +133,7 @@ All tests use `t.TempDir()` + riteway assertions.
 
 ### `cli/cmd/quarantine/init_happy_test.go`
 
-New integration tests:
+New interface tests:
 
 - Detection pre-fills default: create `package.json` w/ jest, send `"\n\n\n"`,
   verify `framework: jest`.
@@ -189,5 +189,5 @@ verify tests align with the test philosophy and check for code design issues
    `promptFramework()`, handle three cases (`/mikey:tdd`)
 6. `/mikey:testify --with-design` on init tests
 7. Verify all existing tests pass
-8. Add integration tests
+8. Add interface tests
 9. Update documentation

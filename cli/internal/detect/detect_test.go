@@ -10,7 +10,7 @@ import (
 	"github.com/mycargus/quarantine/cli/internal/detect"
 )
 
-// --- Scan integration test (I/O shell) ---
+// --- Scan interface test (I/O shell) ---
 
 func TestScanDetectsJestAndRSpec(t *testing.T) {
 	dir := t.TempDir()

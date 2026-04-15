@@ -14,7 +14,7 @@ import (
 	riteway "github.com/mycargus/riteway-golang"
 )
 
-// --- Integration test: quarantined-files.txt written before command runs (Scenario 135) ---
+// --- Interface test: quarantined-files.txt written before command runs (Scenario 135) ---
 
 func TestRunWritesQuarantinedFilesTxtBeforeCommand(t *testing.T) {
 	dir := t.TempDir()
@@ -180,7 +180,7 @@ test_suites:
 	})
 }
 
-// --- Integration test: quarantined-files.txt written as empty file when no quarantined tests (Scenario 136) ---
+// --- Interface test: quarantined-files.txt written as empty file when no quarantined tests (Scenario 136) ---
 
 func TestRunWritesEmptyQuarantinedFilesTxtWhenNoTests(t *testing.T) {
 	dir := t.TempDir()
@@ -299,7 +299,7 @@ test_suites:
 	})
 }
 
-// --- Integration test: quarantined-files.txt written as empty file in degraded mode (I3 — design gap) ---
+// --- Interface test: quarantined-files.txt written as empty file in degraded mode (I3 — design gap) ---
 
 func TestRunWritesEmptyQuarantinedFilesTxtInDegradedMode(t *testing.T) {
 	dir := t.TempDir()

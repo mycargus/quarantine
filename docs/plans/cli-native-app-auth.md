@@ -58,7 +58,7 @@ v2 CLI auth uses `actions/create-github-app-token` (ADR-026). This works because
 - `ResolveTokenProvider` returns correct provider per env var priority
 - Test keys generated in-test via `crypto/rsa.GenerateKey`
 
-**Integration tests:**
+**Interface tests:**
 - `httptest.Server` serves `POST /app/installations/{id}/access_tokens`
 - Token caching: second call reuses cached token
 - Token refresh: after simulated expiry, next call triggers exchange

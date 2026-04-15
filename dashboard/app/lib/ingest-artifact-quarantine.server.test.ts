@@ -1,5 +1,5 @@
 /**
- * Integration tests for ingestArtifact() — quarantined_tests population (Scenario 87).
+ * Interface tests for ingestArtifact() — quarantined_tests population (Scenario 87).
  *
  * Verifies that quarantined test entries in the artifact JSON are upserted into
  * the quarantined_tests table with correct field mappings.

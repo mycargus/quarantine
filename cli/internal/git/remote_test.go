@@ -155,7 +155,7 @@ func TestParseGitHubURLHTTPSSinglePathComponent(t *testing.T) {
 	})
 }
 
-// --- ParseRemote integration tests (run git subprocess) ---
+// --- ParseRemote interface tests (run git subprocess) ---
 
 func TestParseRemoteNotAGitRepo(t *testing.T) {
 	dir := t.TempDir()

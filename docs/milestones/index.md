@@ -687,7 +687,7 @@ hardens and documents the entire system.
 6. Dashboard pulls and displays data from real GitHub Artifacts via on-demand
    sync (not just test fixtures). (FR-1.5.2)
 7. UI is responsive on desktop and tablet viewports. (FR-1.5.6)
-8. Unit and integration tests cover: chart data queries, filter logic, search
+8. Unit and interface tests cover: chart data queries, filter logic, search
    functionality, cross-repo aggregation.
 9. On-demand sync fires on page load when data is stale, reads token from
    env, and respects the debounce. (FR-1.5.3, NFR-2.3.4)
@@ -700,7 +700,7 @@ hardens and documents the entire system.
 
 **Key implementation notes:**
 
-- Trend data requires multiple test runs over time. Integration testing should
+- Trend data requires multiple test runs over time. Interface testing should
   use a series of fixture files representing runs on different dates.
 - The dashboard stores a SHA-256 hash of `test_id` internally for efficient
   indexing. This is an internal optimization, not part of the cross-system
