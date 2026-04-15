@@ -559,11 +559,35 @@
     }
   },
   "global_statistics": {
-    "total_modules": 26,
-    "completed_modules": 26,
-    "total_mutations": 448,
-    "total_killed": 423,
+    "total_modules": 27,
+    "completed_modules": 27,
+    "total_mutations": 458,
+    "total_killed": 433,
     "total_survived": 27,
-    "overall_score": 94.4
+    "overall_score": 94.5
+  },
+    "dashboard/app/lib/github.server.ts": {
+      "status": "completed",
+      "covering_tests": ["dashboard/app/lib/github.server.test.ts"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 3, "killed": 3, "survived": 0, "examples": [
+          {"line": 41, "original": "etag !== null", "mutated": "=== null", "result": "killed", "test_that_caught_it": "null etag test"},
+          {"line": 47, "original": "=== 304", "mutated": "!== 304", "result": "killed", "test_that_caught_it": "304 Not Modified test"}
+        ]},
+        "logical": {"total": 1, "killed": 1, "survived": 0, "examples": [
+          {"line": 51, "original": "!response.ok", "mutated": "response.ok", "result": "killed", "test_that_caught_it": "API error handling test"}
+        ]},
+        "constants": {"total": 5, "killed": 5, "survived": 0, "examples": [
+          {"line": 48, "original": "notModified: true", "mutated": "false", "result": "killed", "test_that_caught_it": "304 response test"},
+          {"line": 60, "original": "responseEtag", "mutated": "null", "result": "killed", "test_that_caught_it": "etag response test"}
+        ]},
+        "index": {"total": 1, "killed": 1, "survived": 0, "examples": [
+          {"line": 83, "original": "entries[0]", "mutated": "entries[entries.length-1]", "result": "killed", "test_that_caught_it": "multi-entry zip test"}
+        ]}
+      },
+      "mutation_score": 100.0,
+      "insights": ["Perfect score — all 10 mutations killed", "ETag caching, 304 handling, error paths, and zip extraction all well-tested"]
+    }
   }
 }
