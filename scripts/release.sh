@@ -6,6 +6,21 @@ set -euo pipefail
 
 INPUT="${1:-}"
 
+# Helper: run a command silently, show pass/fail, dump output on failure
+run_step() {
+  local label="$1"
+  shift
+  printf "  %-40s" "$label"
+  if output=$("$@" 2>&1); then
+    echo "✓"
+  else
+    echo "FAIL"
+    echo ""
+    echo "$output"
+    exit 1
+  fi
+}
+
 # 1. Strip leading v if present, then validate
 VERSION_NUM="${INPUT#v}"
 if [[ ! "$VERSION_NUM" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
@@ -40,28 +55,25 @@ if git rev-parse "$TAG" >/dev/null 2>&1; then
   exit 1
 fi
 
-# 6. Run lint + typecheck
-echo "Running make check..."
-make check
+# 6. Run lint, typecheck, and tests
+echo "Pre-flight checks:"
+run_step "lint (cli)" make cli-lint
+run_step "lint (dashboard)" make dash-lint
+run_step "lint (test)" make test-lint
+run_step "typecheck (dashboard)" make dash-typecheck
+run_step "test (cli)" make cli-test
+run_step "test (dashboard)" make dash-test-ci
+run_step "test (contract)" make contract-test
+run_step "go mod tidy" go mod tidy
 
-# 7. Run tests (E2E runs in the release workflow, not locally)
-echo "Running make cli-test..."
-make cli-test
-echo "Running make dash-test-ci..."
-make dash-test-ci
-echo "Running make contract-test..."
-make contract-test
-
-# 8. Verify go mod tidy produces no changes
-echo "Verifying go.mod is tidy..."
-go mod tidy
+# 7. Verify go mod tidy produced no changes
 if [[ -n "$(git status --porcelain go.mod go.sum)" ]]; then
   echo "Error: go mod tidy produced changes. Commit them first."
   git checkout -- go.mod go.sum
   exit 1
 fi
 
-# 9. Print summary
+# 8. Print summary
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  Release: $TAG"
@@ -71,7 +83,7 @@ echo "Release notes:"
 echo "$RELEASE_NOTES"
 echo ""
 
-# 10. Prompt for confirmation (requires interactive terminal)
+# 9. Prompt for confirmation (requires interactive terminal)
 if [[ ! -t 0 ]]; then
   echo "Error: stdin is not a terminal. Run this script interactively."
   exit 1
@@ -82,10 +94,10 @@ if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
   exit 0
 fi
 
-# 11. Create annotated tag
+# 10. Create annotated tag
 git tag -a "$TAG" -m "Release $TAG"
 
-# 12. Push tag
+# 11. Push tag
 git push origin "$TAG"
 
 REMOTE_URL=$(git remote get-url origin)
