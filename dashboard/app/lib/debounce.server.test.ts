@@ -1,8 +1,17 @@
 import { describe } from "riteway"
-import { shouldPull } from "./debounce.server.js"
+import { DEBOUNCE_MS, shouldPull } from "./debounce.server.js"
 
 const FIVE_MIN = 5 * 60 * 1000
 const now = new Date("2026-03-28T10:06:00.000Z")
+
+describe("DEBOUNCE_MS", async (assert) => {
+  assert({
+    given: "the exported constant",
+    should: "equal 5 minutes in milliseconds",
+    actual: DEBOUNCE_MS,
+    expected: FIVE_MIN,
+  })
+})
 
 describe("shouldPull()", async (assert) => {
   assert({
