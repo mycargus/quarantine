@@ -85,10 +85,17 @@ describe("syncRepo() — first call with null last_pulled_at", async (assert) =>
     makeArtifact(2, "quarantine-results-2"),
     makeArtifact(3, "quarantine-results-3"),
   ]
-  const fetchFn = makeFakeFetch(artifacts)
+  const capturedListHeaders: Record<string, string>[] = []
+  const wrappedFetch: FetchFn = (async (url: string | URL | Request, init?: RequestInit) => {
+    const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url
+    if (urlStr.includes("/actions/artifacts?")) {
+      capturedListHeaders.push((init?.headers ?? {}) as Record<string, string>)
+    }
+    return makeFakeFetch(artifacts)(url, init)
+  }) as unknown as FetchFn
   const warnings: string[] = []
 
-  await syncRepo(owner, repo, "fake-token", handle, now, fetchFn, (msg) => warnings.push(msg))
+  await syncRepo(owner, repo, "fake-token", handle, now, wrappedFetch, (msg) => warnings.push(msg))
 
   const testRunRows = handle.raw.prepare("SELECT run_id FROM test_runs ORDER BY run_id").all() as {
     run_id: string
@@ -116,6 +123,13 @@ describe("syncRepo() — first call with null last_pulled_at", async (assert) =>
     should: "produce no warnings",
     actual: warnings.length,
     expected: 0,
+  })
+
+  assert({
+    given: "a first sync with no prior etag",
+    should: "not send If-None-Match header (null etag)",
+    actual: "If-None-Match" in (capturedListHeaders[0] ?? {}),
+    expected: false,
   })
 })
 
