@@ -7,7 +7,7 @@ import (
 	riteway "github.com/mycargus/riteway-golang"
 )
 
-// Interface tests are in run_quarantined_files_integration_test.go.
+// Interface tests are in run_quarantined_files_interface_test.go.
 
 // --- Unit tests: quarantinedFilePaths pure function (Scenario 135) ---
 

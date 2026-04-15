@@ -32,7 +32,7 @@ go build -ldflags "-X main.version=v0.1.0" -o bin/quarantine ./cli/cmd/quarantin
 
 - Test assertions: `riteway.Assert(t, riteway.Case[T]{...})` from `github.com/mycargus/riteway-golang`.
 - Test fixtures live in `testdata/` at the repo root.
-- Interface tests use build tag `integration`. E2E tests use build tag `e2e`.
+- E2E tests use build tag `e2e`.
 - Error handling: never break the build. See `docs/specs/error-handling.md`.
 - Exit codes: 0 = success, 1 = test failures (never used for quarantine errors), 2 = quarantine error.
 - **Output routing:** `init` writes to stdout. `run` writes diagnostic/status output to stderr so it doesn't contaminate the test runner's stdout.

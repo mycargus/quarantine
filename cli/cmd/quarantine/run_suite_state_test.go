@@ -77,11 +77,11 @@ type flakySuiteResult struct {
 	capturedComment  string // body of the PR comment POST
 }
 
-// runFlakySuiteIntegration is the shared arrange-act helper for Scenarios 121's
+// runFlakySuiteInterface is the shared arrange-act helper for Scenarios 121's
 // three interface tests. It sets up a flaky suite scenario, runs the command
 // once, and returns all observable outcomes. Each test then asserts its unique
 // concern against the result.
-func runFlakySuiteIntegration(t *testing.T, suiteName string, prNumber int) flakySuiteResult {
+func runFlakySuiteInterface(t *testing.T, suiteName string, prNumber int) flakySuiteResult {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -280,10 +280,10 @@ test_suites:
 
 // --- Interface tests: Scenario 121 ---
 // Each test shares the same scenario (backend suite, flaky test) via
-// runFlakySuiteIntegration and asserts its unique concern.
+// runFlakySuiteInterface and asserts its unique concern.
 
 func TestRunSuiteCreatesPerSuiteStatePath(t *testing.T) {
-	r := runFlakySuiteIntegration(t, "backend", 42)
+	r := runFlakySuiteInterface(t, "backend", 42)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a backend suite where the test is flaky",
@@ -302,7 +302,7 @@ func TestRunSuiteCreatesPerSuiteStatePath(t *testing.T) {
 }
 
 func TestRunSuiteUsesPerSuitePRCommentMarker(t *testing.T) {
-	r := runFlakySuiteIntegration(t, "backend", 42)
+	r := runFlakySuiteInterface(t, "backend", 42)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a backend suite with a flaky test running on PR 42",
@@ -320,7 +320,7 @@ func TestRunSuiteUsesPerSuitePRCommentMarker(t *testing.T) {
 }
 
 func TestRunSuiteIssueHasSuiteNameInLabel(t *testing.T) {
-	r := runFlakySuiteIntegration(t, "backend", 42)
+	r := runFlakySuiteInterface(t, "backend", 42)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a backend suite with a flaky test",
