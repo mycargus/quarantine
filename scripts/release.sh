@@ -47,8 +47,8 @@ make check
 # 7. Run tests (E2E runs in the release workflow, not locally)
 echo "Running make cli-test..."
 make cli-test
-echo "Running make dash-test..."
-make dash-test
+echo "Running make dash-test-ci..."
+make dash-test-ci
 echo "Running make contract-test..."
 make contract-test
 
