@@ -338,14 +338,30 @@
       },
       "mutation_score": 100.0,
       "insights": ["Perfect score — all 2 mutations killed"]
+    },
+    "cli/cmd/quarantine/doctor_retry.go": {
+      "status": "completed",
+      "covering_tests": ["cli/cmd/quarantine/doctor_pure_test.go"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "logical": {"total": 3, "killed": 3, "survived": 0, "examples": [
+          {"line": 20, "original": "||", "mutated": "&&", "result": "killed", "test_that_caught_it": "TestDetectRetryTimes"}
+        ]},
+        "constant": {"total": 2, "killed": 2, "survived": 0, "examples": [
+          {"line": 8, "original": "[1-9]", "mutated": "[0-9]", "result": "killed", "test_that_caught_it": "TestDetectRetryTimes"}
+        ]},
+        "return": {"total": 1, "killed": 1, "survived": 0, "examples": []}
+      },
+      "mutation_score": 100.0,
+      "insights": ["Perfect score — all 6 compilable mutations killed", "Pure function with no I/O — highly testable", "Zero-value boundary tests catch regex constant mutations"]
     }
   },
   "global_statistics": {
-    "total_modules": 21,
-    "completed_modules": 21,
-    "total_mutations": 371,
-    "total_killed": 352,
+    "total_modules": 22,
+    "completed_modules": 22,
+    "total_mutations": 377,
+    "total_killed": 358,
     "total_survived": 22,
-    "overall_score": 94.9
+    "overall_score": 95.0
   }
 }
