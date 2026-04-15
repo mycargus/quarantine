@@ -22,6 +22,29 @@ flowchart TD
     A --> B --> C --> D --> A
 ```
 
+## Install
+
+**Shell script** (recommended):
+
+```sh
+curl -sSL https://raw.githubusercontent.com/mycargus/quarantine/main/scripts/install.sh | bash
+```
+
+Pin a version or change the install directory:
+
+```sh
+curl -sSL https://raw.githubusercontent.com/mycargus/quarantine/main/scripts/install.sh | VERSION=v0.1.0 bash
+curl -sSL https://raw.githubusercontent.com/mycargus/quarantine/main/scripts/install.sh | INSTALL_DIR=./bin bash
+```
+
+The script detects your OS and architecture, downloads the binary, and verifies the SHA-256 checksum.
+
+**Build from source:**
+
+```sh
+go build -o quarantine ./cli/cmd/quarantine
+```
+
 ## Quick Start
 
 1. Run `quarantine init` in your repo root:
@@ -30,23 +53,28 @@ flowchart TD
 quarantine init
 ```
 
-This interactively creates `quarantine.yml` and the `quarantine/state` branch on GitHub. The minimal config it produces looks like:
+This auto-detects test frameworks in your project, creates `.quarantine/config.yml`, and sets up the `quarantine/state` branch on GitHub. A minimal config looks like:
 
 ```yaml
 version: 1
-framework: jest  # or rspec or vitest
+
+test_suites:
+  - name: unit
+    command: ["npx", "jest", "--ci"]
+    junitxml: "junit.xml"
+    rerun_command: ["npx", "jest", "--testNamePattern", "{name}"]
 ```
 
 `github.owner` and `github.repo` are auto-detected from your git remote.
 
 2. Set `QUARANTINE_GITHUB_TOKEN` (or `GITHUB_TOKEN`) in your CI environment.
 
-3. Wrap your test command in CI:
+3. Add quarantine to your CI workflow:
 
 **Jest** (install `jest-junit` first: `npm install --save-dev jest-junit`):
 ```yaml
 - name: Run tests
-  run: quarantine run -- jest --ci --reporters=default --reporters=jest-junit
+  run: quarantine run unit
   env:
     QUARANTINE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -54,14 +82,14 @@ framework: jest  # or rspec or vitest
   if: always()
   uses: actions/upload-artifact@v4
   with:
-    name: quarantine-results-<suite-name>-${{ github.run_id }}
-    path: .quarantine/<suite-name>/results.json
+    name: quarantine-results-unit-${{ github.run_id }}
+    path: .quarantine/unit/results.json
 ```
 
 **RSpec** (install `rspec_junit_formatter` first: `gem 'rspec_junit_formatter'`):
 ```yaml
 - name: Run tests
-  run: quarantine run -- bundle exec rspec --format RspecJunitFormatter --out rspec.xml
+  run: quarantine run backend
   env:
     QUARANTINE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -69,14 +97,14 @@ framework: jest  # or rspec or vitest
   if: always()
   uses: actions/upload-artifact@v4
   with:
-    name: quarantine-results-<suite-name>-${{ github.run_id }}
-    path: .quarantine/<suite-name>/results.json
+    name: quarantine-results-backend-${{ github.run_id }}
+    path: .quarantine/backend/results.json
 ```
 
 **Vitest** (built-in JUnit support — no extra dependencies):
 ```yaml
 - name: Run tests
-  run: quarantine run -- vitest run --reporter=junit --outputFile=junit-report.xml
+  run: quarantine run frontend
   env:
     QUARANTINE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -84,85 +112,107 @@ framework: jest  # or rspec or vitest
   if: always()
   uses: actions/upload-artifact@v4
   with:
-    name: quarantine-results-<suite-name>-${{ github.run_id }}
-    path: .quarantine/<suite-name>/results.json
+    name: quarantine-results-frontend-${{ github.run_id }}
+    path: .quarantine/frontend/results.json
 ```
 
 That's it. Quarantine handles detection, quarantine state, GitHub Issues, and PR comments automatically.
 
-### Non-standard setups (pnpm, bun, custom config)
+### Multi-suite setup
 
-If your project uses a package manager other than npm, or a custom Jest config, set `rerun_command` in `quarantine.yml`:
+Configure multiple test suites in a single repo:
 
 ```yaml
-# pnpm
-rerun_command: "pnpm exec jest --testNamePattern '{name}'"
+version: 1
 
-# bun
-rerun_command: "bunx jest --testNamePattern '{name}'"
+test_suites:
+  - name: backend
+    command: ["bundle", "exec", "rspec"]
+    junitxml: "rspec.xml"
+    rerun_command: ["bundle", "exec", "rspec", "-e", "{name}"]
 
-# custom jest config
-rerun_command: "npx jest --config jest.ci.config.js --testNamePattern '{name}'"
+  - name: frontend
+    command: ["npx", "jest", "--ci"]
+    junitxml: "junit.xml"
+    rerun_command: ["npx", "jest", "--testNamePattern", "{name}"]
 ```
 
-`{name}`, `{classname}`, and `{file}` are substituted with values from the failing test's JUnit XML entry. See [`docs/specs/config-schema.md`](docs/specs/config-schema.md#rerun_command) for the full reference.
+Each suite has its own quarantine state, issues, and PR comments. Run them independently:
+
+```yaml
+- run: quarantine run backend
+- run: quarantine run frontend
+```
+
+### Rerun command placeholders
+
+The `rerun_command` supports these placeholders, substituted from each failing test's JUnit XML entry:
+
+| Placeholder   | Source |
+|---------------|--------|
+| `{name}`      | `name` attribute from `<testcase>` |
+| `{classname}` | `classname` attribute from `<testcase>` |
+| `{file}`      | `file_path` component of the test ID |
 
 ## Features (v1)
 
-- **Zero-friction integration:** one command wraps your existing test runner
+- **Zero-friction integration:** `quarantine init` + `quarantine run <suite>` is the entire setup
+- **Multi-suite support:** configure multiple test suites per repo, each with independent state
 - **Flaky detection:** re-runs failing tests N times (default 3); a test that fails then passes is flagged as flaky
-- **Build protection:** build exits 0 if only newly-quarantined tests failed; quarantined tests are excluded from future builds entirely (*supported test frameworks only)
+- **Build protection:** build exits 0 if only newly-quarantined tests failed; quarantined tests are excluded from future builds entirely (*Jest and Vitest; RSpec supports detection only*)
 - **GitHub-native state:** quarantine state stored on a dedicated `quarantine/state` branch — no external database
 - **GitHub Issues:** one issue per flaky test; closing the issue unquarantines the test
-- **PR comments:** summary of flaky test results posted on each PR
-- **Dashboard:** Web UI with trends and cross-repo analytics (pulls from GitHub Artifacts; read-only in v1)
-- **Supported frameworks:** RSpec, Jest, Vitest. All three support flaky detection. Jest and Vitest also support automatic exclusion of quarantined tests from subsequent builds; RSpec supports detection only.
+- **PR comments:** per-suite summary of flaky test results posted on each PR
+- **Timeouts:** configurable per-suite timeout and rerun timeout with graceful shutdown
+- **Dashboard:** web UI with trends and cross-repo analytics (pulls from GitHub Artifacts; read-only in v1)
+- **Supported frameworks:** RSpec, Jest, Vitest
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `quarantine init` | Initialize quarantine for a repo (creates `quarantine.yml` and the state branch) |
-| `quarantine run -- <cmd>` | Wrap your test command with flaky detection and quarantine enforcement |
-| `quarantine doctor` | Validate `quarantine.yml` and print the resolved configuration |
+| `quarantine init` | Initialize quarantine for a repo (creates `.quarantine/config.yml` and the state branch) |
+| `quarantine run [suite-name]` | Run the named suite with flaky detection and quarantine enforcement (name optional when only one suite is configured) |
+| `quarantine status [suite-name]` | Show quarantine status (quarantined test count, oldest tests, duration estimates) |
+| `quarantine suite list` | List all configured test suites |
+| `quarantine suite remove <name>` | Remove a test suite from the configuration |
+| `quarantine doctor` | Validate `.quarantine/config.yml` and print the resolved configuration |
 | `quarantine version` | Print the CLI version |
 
+### `quarantine run` flags
+
+| Flag | Description |
+|------|-------------|
+| `--quiet` | Suppress all informational output (errors only) |
+| `--dry-run` | Analyze existing JUnit XML without running tests or writing state |
+| `--pr <number>` | Override PR number for comments |
+| `--timeout <duration>` | Override the suite's timeout for this run (e.g. `30m`, `1h`) |
+
 ## Debugging
-
-### --verbose
-
-Shows one line per GitHub API call, rate limit info, and config resolution:
-
-```
-[quarantine] GET /repos/owner/repo/git/ref/heads/quarantine/state -> 200 (84ms)
-[quarantine] X-RateLimit-Remaining: 987, resets at 14:30 UTC
-[quarantine] config: framework=jest (from quarantine.yml)
-[quarantine] config: retries=3 (from default)
-```
-
-```sh
-quarantine run --verbose -- jest --ci
-```
 
 ### --quiet
 
 Suppresses all informational output. Only errors are printed.
 
 ```sh
-quarantine run --quiet -- jest --ci
+quarantine run --quiet unit
 ```
 
-`--verbose` and `--quiet` are mutually exclusive.
+### --dry-run
 
-### QUARANTINE_DEBUG
-
-Enables the same output as `--verbose` without modifying your CI config. Useful when `quarantine run` is embedded in a shared script you can't easily change.
+Analyzes existing JUnit XML results without running the test command or writing quarantine state. Useful for testing your config:
 
 ```sh
-QUARANTINE_DEBUG=1 quarantine run -- jest --ci
+quarantine run --dry-run unit
 ```
 
-`--quiet` takes precedence over `QUARANTINE_DEBUG`.
+### quarantine doctor
+
+Validates `.quarantine/config.yml` and prints the resolved configuration, including auto-detected values. Use this to verify your setup:
+
+```sh
+quarantine doctor
+```
 
 ## Architecture
 
@@ -177,15 +227,18 @@ See [`docs/specs/architecture.md`](docs/specs/architecture.md) for the full syst
 Zero-friction adoption for teams already on GitHub Actions. Everything runs through your existing `GITHUB_TOKEN` — no new accounts, no SaaS dependencies in the CI path.
 
 - `quarantine init` + `quarantine doctor`
+- Multi-suite configuration (`.quarantine/config.yml`)
 - Test execution + JUnit XML parsing (Jest, Vitest, RSpec)
 - Flaky detection via configurable retry
 - Quarantine state on `quarantine/state` branch (SHA-based CAS)
-- Pre-execution exclusion of quarantined tests
+- Pre-execution exclusion of quarantined tests (Jest, Vitest)
 - GitHub Issue per flaky test (deduplicated)
-- PR comment summaries
+- Per-suite PR comment summaries
+- Suite management (`suite list`, `suite remove`, `status`)
+- Configurable timeouts with graceful shutdown
 - Result artifacts for dashboard ingestion
 - Web dashboard with trend analytics
-- Cross-compiled binaries (4 targets: linux/darwin x amd64/arm64)
+- Cross-compiled binaries (linux/darwin x amd64/arm64)
 
 ### v2 — Expanded Integrations
 
@@ -231,22 +284,19 @@ Quarantine could not find the JUnit XML output. This means either the test runne
 ```
 Or pass `--reporters=jest-junit` on the command line.
 
-**Fix — RSpec:** Add `rspec_junit_formatter` to your Gemfile and pass `--format RspecJunitFormatter --out rspec.xml`. Set `junitxml: rspec.xml` in `quarantine.yml`.
+**Fix — RSpec:** Add `rspec_junit_formatter` to your Gemfile and pass `--format RspecJunitFormatter --out rspec.xml`.
 
-**Fix — Vitest:** Pass `--reporter=junit --outputFile=junit-report.xml`. Set `junitxml: junit-report.xml` in `quarantine.yml`.
+**Fix — Vitest:** Pass `--reporter=junit --outputFile=junit-report.xml`.
 
-**Fix — wrong path:** Run `quarantine doctor` to see the resolved `junitxml` path. Override it with `--junitxml`:
-```sh
-quarantine run --junitxml path/to/output.xml -- <your test command>
-```
+**Fix — wrong path:** Check the `junitxml` field for your suite in `.quarantine/config.yml`. The glob pattern must match the path where your test runner writes XML output.
 
 ---
 
-### "branch not found: quarantine/state"
+### "Error: Quarantine is not initialized for this repository. Run 'quarantine init' first."
 
-The `quarantine/state` branch has not been created. This happens when `quarantine init` was never run, or the branch was deleted.
+The `quarantine/state` branch does not exist. This happens when `quarantine init` was never run, or the branch was deleted.
 
-**Fix:** Run `quarantine init` to recreate the branch:
+**Fix:** Run `quarantine init` to create (or recreate) the branch:
 ```sh
 quarantine init
 ```
@@ -294,19 +344,13 @@ Your CI runs are consuming API quota. Quarantine uses approximately 3–5 API ca
 
 ### Tests fail to retry / flaky tests not detected
 
-If the default rerun command doesn't work in your setup (e.g., you use pnpm, bun, or a non-standard path), set `rerun_command` in `quarantine.yml`:
-
-```yaml
-rerun_command: "pnpm exec jest --testNamePattern '{name}'"
-```
-
-Run `quarantine run --verbose` to see the exact rerun commands being used and any errors.
+Check that `rerun_command` is correct for your setup. Run `quarantine doctor` to validate your config, then check the `rerun_command` array in `.quarantine/config.yml` for the affected suite.
 
 ## Development
 
 ### Setup
 
-Prerequisites: 
+Prerequisites:
 - [asdf](https://asdf-vm.com/) (manages Go and Node.js versions via `.tool-versions`)
 - [corepack](https://nodejs.org/api/corepack.html) (manages pnpm version via `packageManager` in `package.json`)
 
@@ -328,6 +372,7 @@ This project includes skills (invoke with `/skill-name` in Claude Code):
 | `/implement-milestone` | Implementing a predefined milestone using TDD and atomic commits |
 | `/verify-milestone` | Verifying a milestone's implementation against its manifest |
 | `/create-milestone` | Generating a milestone manifest that points agents to source docs |
+| `/create-interface-test` | Creating an interface test (CLI binary or HTTP routes, external APIs mocked) |
 | `/create-contract-test` | Creating a Prism-based contract test against vendored OpenAPI specs |
 | `/create-e2e-test` | Creating an E2E test that verifies real API behavior matches mocks |
 | `/review-adr` | Checking if a proposed change contradicts an existing ADR |
