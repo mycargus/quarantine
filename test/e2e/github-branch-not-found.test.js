@@ -15,7 +15,7 @@
  */
 
 import { assert } from "riteway/vitest"
-import { afterAll, beforeAll, describe, test } from "vitest"
+import { describe, test } from "vitest"
 
 // Use a branch name that cannot collide with any real quarantine branch.
 // Previously this used "quarantine/e2e-branch-not-found" which shared the

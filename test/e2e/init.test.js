@@ -48,14 +48,6 @@ async function branchExists() {
   return res.status === 200
 }
 
-async function deleteBranch() {
-  const res = await ghRequest("DELETE", `/git/refs/heads/${BRANCH}`)
-  if (res.status !== 204) {
-    const text = await res.text()
-    throw new Error(`deleteBranch: unexpected ${res.status}: ${text}`)
-  }
-}
-
 async function getFileOnBranch(path) {
   const res = await ghRequest("GET", `/contents/${path}?ref=${BRANCH}`)
   if (res.status !== 200) {
