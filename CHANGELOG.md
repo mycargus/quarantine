@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-03-31
+## [0.1.0] - 2026-04-15
 
 ### Added
 
@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for Jest, RSpec, and Vitest test frameworks via JUnit XML
 - Degraded mode: falls back to cached `quarantine.json` on GitHub API errors without breaking the build
 - Cross-compiled binaries for linux/darwin (amd64/arm64)
+- Install script (`scripts/install.sh`) with checksum verification
+- Two-phase release process with rc prerelease validation
+
+### Fixed
+
+- Install script no longer overwrites the system `TMPDIR` variable
 
 [Unreleased]: https://github.com/mycargus/quarantine/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/mycargus/quarantine/releases/tag/v0.1.0

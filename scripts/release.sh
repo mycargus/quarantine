@@ -71,7 +71,11 @@ echo "Release notes:"
 echo "$RELEASE_NOTES"
 echo ""
 
-# 10. Prompt for confirmation
+# 10. Prompt for confirmation (requires interactive terminal)
+if [[ ! -t 0 ]]; then
+  echo "Error: stdin is not a terminal. Run this script interactively."
+  exit 1
+fi
 read -r -p "Create and push tag $TAG? [y/N] " confirm
 if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
   echo "Aborted."
