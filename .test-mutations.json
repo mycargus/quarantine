@@ -368,12 +368,37 @@
       "insights": ["All 16 mutations killed — perfect score after adding PAUSE_DURATION_MS constant assertion", "Boundary test at line 9 (> vs >=) caught by explicit pausedUntil-equals-now test", "Threshold boundary (>= vs >) caught by 3rd-failure test"]
     }
   },
+  "dashboard/app/lib/config.server.ts": {
+      "status": "completed",
+      "covering_tests": ["dashboard/app/lib/config.server.test.ts"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "logical": {"total": 3, "killed": 3, "survived": 0, "examples": [
+          {"line": 30, "original": "!result.success", "mutated": "result.success", "result": "killed", "test_that_caught_it": "parseConfig() missing field tests"},
+          {"line": 39, "original": "!source", "mutated": "source", "result": "killed", "test_that_caught_it": "parseConfig() empty source test"}
+        ]},
+        "constants": {"total": 6, "killed": 6, "survived": 0, "examples": [
+          {"line": 32, "original": "?? \"unknown\"", "mutated": "?? \"other\"", "result": "killed", "test_that_caught_it": "parseConfig() empty string fallback test (new test)"},
+          {"line": 46, "original": "300", "mutated": "301", "result": "killed", "test_that_caught_it": "parseConfig() default poll_interval test"}
+        ]},
+        "relational": {"total": 1, "killed": 1, "survived": 0, "examples": [
+          {"line": 46, "original": "=== \"number\"", "mutated": "!== \"number\"", "result": "killed", "test_that_caught_it": "parseConfig() poll_interval type check"}
+        ]},
+        "statement": {"total": 2, "killed": 2, "survived": 0, "examples": [
+          {"line": 37, "original": "const poll_interval = ...", "mutated": "deleted", "result": "killed", "test_that_caught_it": "parseConfig() poll_interval tests"},
+          {"line": "39-41", "original": "if (!source) throw", "mutated": "deleted", "result": "killed", "test_that_caught_it": "parseConfig() empty source test"}
+        ]}
+      },
+      "mutation_score": 100.0,
+      "insights": ["All 12 mutations killed — perfect score after adding fallback field name assertion", "Error message string content well-validated", "Poll_interval logic thoroughly tested (default, zero, string, type check)"]
+    }
+  },
   "global_statistics": {
-    "total_modules": 22,
-    "completed_modules": 22,
-    "total_mutations": 387,
-    "total_killed": 368,
+    "total_modules": 23,
+    "completed_modules": 23,
+    "total_mutations": 399,
+    "total_killed": 380,
     "total_survived": 22,
-    "overall_score": 95.1
+    "overall_score": 95.2
   }
 }
