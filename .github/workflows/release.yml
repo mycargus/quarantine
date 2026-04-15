@@ -180,7 +180,11 @@ jobs:
 
       - uses: pnpm/action-setup@v5
         with:
-          package_json_file: test/package.json
+          package_json_file: dashboard/package.json
+
+      - name: Install dashboard dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: dashboard
 
       - name: Install test dependencies
         run: pnpm install --frozen-lockfile
@@ -263,7 +267,11 @@ jobs:
 
       - uses: pnpm/action-setup@v5
         with:
-          package_json_file: test/package.json
+          package_json_file: dashboard/package.json
+
+      - name: Install dashboard dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: dashboard
 
       - name: Install test dependencies
         run: pnpm install --frozen-lockfile
