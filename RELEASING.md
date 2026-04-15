@@ -36,7 +36,7 @@ If the post-release E2E fails, the rc stays as a prerelease. Fix the issue and c
 
 ## Phase 2: Final Release
 
-After the rc passes:
+After the rc workflow completes successfully (monitor at **Actions → Release**):
 
 ```bash
 make release VERSION=v0.1.0
@@ -67,7 +67,7 @@ The `latest` endpoint excludes prereleases, so rc binaries are only installed wh
 
 ## Fixture Repo
 
-`mycargus/quarantine-test-fixture` runs `quarantine run jest-tests` with deliberately flaky tests. Its `ci.yml` workflow accepts a `version` input that controls which quarantine binary to install. The release workflow passes the rc tag (e.g., `v0.1.0-rc1`) so the fixture repo tests the exact prerelease binary.
+`mycargus/quarantine-test-fixture` runs `quarantine run jest-tests` with deliberately flaky tests. Its `upload-test-artifact.yml` workflow accepts a `version` input that controls which quarantine binary to install. The release workflow passes the rc tag (e.g., `v0.1.0-rc1`) so the fixture repo tests the exact prerelease binary.
 
 ## One-time Setup
 
