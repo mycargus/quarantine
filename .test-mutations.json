@@ -430,12 +430,40 @@
       "insights": ["ListArtifacts well tested — 2/2 mutations killed", "DownloadArtifactZip has no contract tests — both mutations survived", "Bearer prefix mutation is a mock limitation (Prism doesn't validate auth headers)", "Adding contract tests for DownloadArtifactZip requires Prism artifact download endpoint support"]
     }
   },
+    "dashboard/app/lib/circuit-breaker.server.ts": {
+      "status": "completed",
+      "covering_tests": ["dashboard/app/lib/circuit-breaker.server.test.ts"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 4, "killed": 4, "survived": 0, "examples": [
+          {"line": 9, "original": ">", "mutated": ">=", "result": "killed", "test_that_caught_it": "isPaused() boundary test"},
+          {"line": 15, "original": ">=", "mutated": ">", "result": "killed", "test_that_caught_it": "recordFailure() threshold test"}
+        ]},
+        "arithmetic": {"total": 5, "killed": 5, "survived": 0, "examples": [
+          {"line": 4, "original": "30 * 60 * 1000", "mutated": "30 * 60 / 1000", "result": "killed", "test_that_caught_it": "PAUSE_DURATION_MS constant assertion (new test)"},
+          {"line": 14, "original": "+ 1", "mutated": "- 1", "result": "killed", "test_that_caught_it": "recordFailure() increment test"}
+        ]},
+        "logical": {"total": 2, "killed": 2, "survived": 0, "examples": [
+          {"line": 15, "original": "&&", "mutated": "||", "result": "killed", "test_that_caught_it": "recordFailure() already-paused test"}
+        ]},
+        "constants": {"total": 4, "killed": 4, "survived": 0, "examples": [
+          {"line": 3, "original": "FAILURE_THRESHOLD = 3", "mutated": "= 2", "result": "killed", "test_that_caught_it": "recordFailure() 2nd failure test"},
+          {"line": 27, "original": "0", "mutated": "1", "result": "killed", "test_that_caught_it": "recordSuccess() reset test"}
+        ]},
+        "statement": {"total": 1, "killed": 1, "survived": 0, "examples": [
+          {"line": 8, "original": "return false", "mutated": "removed", "result": "killed", "test_that_caught_it": "isPaused() null guard test"}
+        ]}
+      },
+      "mutation_score": 100.0,
+      "insights": ["All 16 mutations killed — perfect score after adding PAUSE_DURATION_MS constant assertion", "Boundary test at line 9 (> vs >=) caught by explicit pausedUntil-equals-now test", "Threshold boundary (>= vs >) caught by 3rd-failure test"]
+    }
+  },
   "global_statistics": {
-    "total_modules": 26,
-    "completed_modules": 26,
-    "total_mutations": 412,
-    "total_killed": 391,
-    "total_survived": 24,
-    "overall_score": 94.9
+    "total_modules": 22,
+    "completed_modules": 22,
+    "total_mutations": 387,
+    "total_killed": 368,
+    "total_survived": 22,
+    "overall_score": 95.1
   }
 }
