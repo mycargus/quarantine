@@ -213,7 +213,7 @@ jobs:
           # Record timestamp BEFORE dispatching to avoid missing our run
           DISPATCH_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-          gh workflow run ci.yml \
+          gh workflow run upload-test-artifact.yml \
             --repo "$OWNER/$REPO" \
             --field version="${{ needs.meta.outputs.version }}"
 
@@ -221,7 +221,7 @@ jobs:
           echo "Waiting for fixture CI run to start..."
           RUN_ID=""
           for i in $(seq 1 30); do
-            RUN_ID=$(gh run list --repo "$OWNER/$REPO" --workflow ci.yml \
+            RUN_ID=$(gh run list --repo "$OWNER/$REPO" --workflow upload-test-artifact.yml \
               --limit 5 --json databaseId,createdAt,event \
               --jq "[.[] | select(.event == \"workflow_dispatch\" and .createdAt >= \"$DISPATCH_TIME\")] | .[0].databaseId")
             if [[ -n "$RUN_ID" && "$RUN_ID" != "null" ]]; then
