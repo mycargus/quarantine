@@ -42,7 +42,7 @@ After the rc workflow completes successfully (monitor at **Actions → Release**
 make release VERSION=v0.1.0
 ```
 
-The same local pre-flight checks run. The release workflow runs CLI, dashboard, and contract tests, then GoReleaser publishes a **full release** (since the tag has no prerelease suffix, `prerelease: auto` marks it as stable). The `latest` API endpoint now returns this version.
+Local pre-flight checks are skipped (the rc already validated the code). The release workflow runs CLI, dashboard, and contract tests, then GoReleaser publishes a **full release** (since the tag has no prerelease suffix, `prerelease: auto` marks it as stable). The `latest` API endpoint now returns this version.
 
 E2E jobs are skipped for final tags — the rc already validated end-to-end behavior.
 

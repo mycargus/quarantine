@@ -55,22 +55,31 @@ if git rev-parse "$TAG" >/dev/null 2>&1; then
   exit 1
 fi
 
-# 6. Run lint, typecheck, and tests
-echo "Pre-flight checks:"
-run_step "lint (cli)" make cli-lint
-run_step "lint (dashboard)" make dash-lint
-run_step "lint (test)" make test-lint
-run_step "typecheck (dashboard)" make dash-typecheck
-run_step "test (cli)" make cli-test
-run_step "test (dashboard)" make dash-test-ci
-run_step "test (contract)" make contract-test
-run_step "go mod tidy" go mod tidy
+# 6. Run lint, typecheck, and tests (skipped for final releases — rc already validated)
+IS_RC=false
+if [[ "$VERSION_NUM" == *-* ]]; then
+  IS_RC=true
+fi
 
-# 7. Verify go mod tidy produced no changes
-if [[ -n "$(git status --porcelain go.mod go.sum)" ]]; then
-  echo "Error: go mod tidy produced changes. Commit them first."
-  git checkout -- go.mod go.sum
-  exit 1
+if [[ "$IS_RC" == "true" ]]; then
+  echo "Pre-flight checks:"
+  run_step "lint (cli)" make cli-lint
+  run_step "lint (dashboard)" make dash-lint
+  run_step "lint (test)" make test-lint
+  run_step "typecheck (dashboard)" make dash-typecheck
+  run_step "test (cli)" make cli-test
+  run_step "test (dashboard)" make dash-test-ci
+  run_step "test (contract)" make contract-test
+  run_step "go mod tidy" go mod tidy
+
+  # 7. Verify go mod tidy produced no changes
+  if [[ -n "$(git status --porcelain go.mod go.sum)" ]]; then
+    echo "Error: go mod tidy produced changes. Commit them first."
+    git checkout -- go.mod go.sum
+    exit 1
+  fi
+else
+  echo "Skipping local pre-flight (rc already validated)."
 fi
 
 # 8. Print summary
