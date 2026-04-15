@@ -97,8 +97,8 @@ poll_interval: 300
 
   assert({
     given: "an empty string",
-    should: "throw an error identifying a missing required field",
-    actual: throws(() => parseConfig("")) !== null,
+    should: 'throw an error containing "unknown" as the field name fallback',
+    actual: throws(() => parseConfig(""))?.includes('"unknown"'),
     expected: true,
   })
 
