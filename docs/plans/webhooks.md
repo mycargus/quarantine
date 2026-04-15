@@ -2,7 +2,7 @@
 
 > **Status:** All webhooks deferred to v3 (ADR-027).
 > State consolidation uses a scheduled GitHub Actions workflow + CLI command
-> instead of webhooks (see `docs/plans/multi-suite-support.md` D6).
+> instead of webhooks (see ADR-032).
 >
 > **Decision record:** ADR-027
 
@@ -73,7 +73,7 @@ Before implementation, an ADR is needed for **public endpoint exposure**. The v1
 
 ## Dashboard State Consolidation (Multi-Suite)
 
-With multi-suite support (see `docs/plans/multi-suite-support.md`), each test
+With multi-suite support (see ADR-010), each test
 suite stores its quarantine state in a separate file on the `quarantine/state`
 branch (e.g., `.quarantine/backend/state.json`). The dashboard must enumerate
 and read each file per poll, resulting in 1 + N API calls per repo (1 directory
@@ -81,7 +81,7 @@ list + N file reads).
 
 **v2 approach (no webhooks):** A scheduled GitHub Actions workflow runs
 `quarantine state consolidate`, which reads all per-suite state files and writes
-a single `state.json` on the state branch. See `docs/plans/multi-suite-support.md`
+a single `state.json` on the state branch. See ADR-032
 (D6) for details. This avoids all webhook infrastructure (public endpoint,
 webhook secret, HMAC verification, job queue).
 

@@ -50,7 +50,7 @@ The dashboard stores a SHA-256 hash of `test_id` internally for efficient databa
 
 ### Amendment: Per-Suite Scoping (2026-04-11)
 
-With multi-suite support (see `docs/plans/multi-suite-support.md`), test IDs are
+With multi-suite support (see ADR-010, ADR-032), test IDs are
 no longer assumed to be globally unique across suites. Each suite has its own
 state file at `.quarantine/<suite-name>/state.json` on the `quarantine/state`
 branch (see ADR-032). Test ID uniqueness is scoped to a single suite's state

@@ -5,7 +5,7 @@
 
 ## Context
 
-Multi-suite support (see `docs/plans/multi-suite-support.md`) requires quarantine
+Multi-suite support (see ADR-010) requires quarantine
 to manage quarantine state, PR comments, and GitHub issue dedup independently
 per test suite. A repository may have multiple suites (backend, frontend, e2e)
 running as independent CI steps, possibly in parallel.

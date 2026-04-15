@@ -48,5 +48,5 @@ review. The infrastructure required for even one webhook type (public endpoint,
 webhook secret, HMAC verification, idempotency tracking) is the same as for all
 webhook types. The state consolidation optimization is achievable via a scheduled
 GitHub Actions workflow + a `quarantine state consolidate` CLI command, which
-requires zero webhook infrastructure. See `docs/plans/multi-suite-support.md`
-(D6) for the replacement approach. All webhooks remain deferred to v3.
+requires zero webhook infrastructure. See ADR-032.
+All webhooks remain deferred to v3.

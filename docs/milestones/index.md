@@ -49,7 +49,7 @@ Phase 4 -- Multi-Suite Conversion (depends on M1-M8 verified)
           state/notifications, init with framework detection, delete old format.
     M10: Additive features. suite list/remove, quarantine status, timeouts,
           quarantined-files.txt, dashboard migration, schema updates.
-    See docs/plans/multi-suite-support.md.
+    See ADR-010, ADR-030, ADR-031, ADR-032.
 
 Phase 5 -- Init UX improvements (depends on M9)
   M11: Init UX improvements
@@ -777,7 +777,7 @@ hardens and documents the entire system.
 ## Phase 4 -- Multi-Suite Conversion
 
 Phase 4 converts the single-framework CLI (M1--M8) to the multi-suite model
-defined in `docs/plans/multi-suite-support.md`. Two milestones: M9 changes
+defined across ADR-010, ADR-030, ADR-031, and ADR-032. Two milestones: M9 changes
 the irreducibly coupled core; M10 adds features on the stable surface M9
 provides.
 
@@ -860,8 +860,7 @@ provides.
 
 **Key implementation notes:**
 
-- See `docs/plans/multi-suite-support.md` for the complete migration impact
-  matrix and atomic commit sequence.
+- See ADR-010 (config model), ADR-031 (command execution), ADR-032 (state isolation) for migration impact
 - 68+ Go files reference old identifiers (`quarantine.yml`, `framework`,
   `quarantine-bot`, `quarantine.json`, `BuildExclusionArgs`, `SplitShellArgs`).
   All must be updated.
@@ -978,11 +977,8 @@ provides.
 
 **Key implementation notes:**
 
-- See `docs/plans/auto-detect-framework.md` for the detect package design.
-- See `docs/plans/non-interactive-init.md` for flag semantics and TTY
-  detection approach.
 - M9 already implements framework detection and pre-filling. M11 adds
-  non-interactive mode on top of that foundation.
+  per-suite retries validation on top of that foundation.
 
 ---
 

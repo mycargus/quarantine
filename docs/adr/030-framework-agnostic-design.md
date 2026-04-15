@@ -11,7 +11,7 @@ bundles three concerns: a default JUnit XML path, a default rerun command, and a
 default exclusion mechanism. In practice, users with custom setups (pnpm, bun,
 monorepos, custom wrappers) override every value it provides.
 
-The multi-suite support plan (`docs/plans/multi-suite-support.md`) replaces the
+Multi-suite support (ADR-010) replaces the
 single `framework` field with named test suites, each specifying its own
 `command`, `junitxml`, and `rerun_command`. Quarantine does not need to know the
 framework --- it needs concrete values.

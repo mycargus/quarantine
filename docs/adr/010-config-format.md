@@ -18,8 +18,7 @@ frameworks.
 
 The original flat schema (`quarantine.yml` with a single `framework` field) is
 replaced by `.quarantine/config.yml` with a `test_suites` array. This amendment
-is driven by the multi-suite support plan (`docs/plans/multi-suite-support.md`)
-and ADR-030 (framework-agnostic design, which supersedes ADR-016).
+is driven by ADR-030 (framework-agnostic design, which supersedes ADR-016).
 
 **Key changes from prior amendment:**
 
@@ -29,7 +28,7 @@ and ADR-030 (framework-agnostic design, which supersedes ADR-016).
 2. **`framework` field removed.** Superseded by ADR-030. Quarantine is
    framework-agnostic.
 3. **`exclude` field removed.** With the test suite model, the user controls
-   which tests run via the suite's `command` field (see plan decision D12).
+   which tests run via the suite's `command` field.
 4. **`rerun_command` moved** from a top-level optional override to a required
    per-suite field.
 5. **`test_suites` array added** (required, non-empty). Each suite has `name`,

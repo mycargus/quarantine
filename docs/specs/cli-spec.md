@@ -3,7 +3,7 @@
 > Last updated: 2026-03-17 (M9 update pending)
 >
 > **IMPORTANT — M9 migration pending:** This document describes the pre-M9
-> CLI interface. The multi-suite plan (`docs/plans/multi-suite-support.md`) makes
+> CLI interface. Multi-suite support (ADR-010, ADR-031, ADR-032) makes
 > the following breaking changes that supersede this document until M9 completes:
 >
 > - `quarantine run [flags] -- <test command>` → `quarantine run [suite-name] [flags]`

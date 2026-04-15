@@ -3,7 +3,7 @@
 > Last updated: 2026-03-19 (M9 update pending)
 >
 > **IMPORTANT — M9 migration pending:** The multi-suite plan
-> (`docs/plans/multi-suite-support.md`) makes significant changes to state paths,
+> makes significant changes to state paths,
 > artifact paths, and the sequence diagram. Key changes:
 >
 > - State: `quarantine.json` → `.quarantine/<suite-name>/state.json` (one per suite)
