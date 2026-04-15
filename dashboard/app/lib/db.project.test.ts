@@ -46,6 +46,48 @@ describe("getProjectByOwnerRepo()", async (assert) => {
       expected: true,
     })
   }
+
+  // Mutation guard: WHERE owner = ? AND repo = ? must not become OR
+  {
+    const handle = initDb(":memory:")
+    // Two projects that share the owner but differ on repo, and share the repo but differ on owner
+    await upsertProject(handle.db, "acme", "alpha")
+    await upsertProject(handle.db, "acme", "beta")
+    await upsertProject(handle.db, "other-org", "alpha")
+
+    // Query for the unique intersection: owner=acme AND repo=beta
+    // If WHERE becomes OR, rows matching owner=acme OR repo=beta would include
+    // acme/alpha and other-org/alpha as well, so .get() would return a different row or error.
+    const result = await getProjectByOwnerRepo(handle, "acme", "beta")
+
+    assert({
+      given: "two projects sharing owner 'acme' and two sharing repo 'alpha'",
+      should: "return only the project where BOTH owner='acme' AND repo='beta' match",
+      actual: result?.owner === "acme" && result?.repo === "beta",
+      expected: true,
+    })
+
+    // The other shared-owner project must not be returned when its repo doesn't match
+    const alphaResult = await getProjectByOwnerRepo(handle, "acme", "alpha")
+
+    assert({
+      given: "two projects sharing owner 'acme' and two sharing repo 'alpha'",
+      should: "return acme/alpha when querying for owner='acme' repo='alpha'",
+      actual: alphaResult?.owner === "acme" && alphaResult?.repo === "alpha",
+      expected: true,
+    })
+
+    // A query for a non-existent exact combination must return null even though
+    // each individual field exists in some other row
+    const noMatch = await getProjectByOwnerRepo(handle, "other-org", "beta")
+
+    assert({
+      given: "owner='other-org' exists but with repo='alpha', not 'beta'",
+      should: "return null when no project matches both owner AND repo",
+      actual: noMatch,
+      expected: null,
+    })
+  }
 })
 
 describe("getProjectQuarantinedTests()", async (assert) => {
@@ -221,6 +263,31 @@ describe("getProjectQuarantinedTests()", async (assert) => {
       expected: [],
     })
   }
+
+  // Mutation guard: lastRunStatus ?? null must not become ?? "passing" or ?? "failing"
+  {
+    const handle = initDb(":memory:")
+    const projectId = await upsertProject(handle.db, "acme", "payments-service")
+
+    // Insert a quarantined_test with last_run_status explicitly NULL
+    handle.raw
+      .prepare(
+        `INSERT INTO quarantined_tests
+          (project_id, test_id, name, quarantined_at, last_run_status)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(projectId, "null-status-test", "should have null status", "2026-01-01T00:00:00Z", null)
+
+    const results = await getProjectQuarantinedTests(handle, "acme", "payments-service")
+    const test = results.find((t) => t.testId === "null-status-test")
+
+    assert({
+      given: "a quarantined_test row with last_run_status = NULL in the database",
+      should: "return lastRunStatus as null (not 'passing' or 'failing')",
+      actual: test?.lastRunStatus,
+      expected: null,
+    })
+  }
 })
 
 describe("getProjectTrend()", async (assert) => {
@@ -394,6 +461,54 @@ describe("getProjectTrend()", async (assert) => {
       given: "runs on March 1 and March 3 with no run on March 2",
       should: "not include March 2 in the result",
       actual: trend.some((p) => p.date === "2026-03-02"),
+      expected: false,
+    })
+  }
+
+  // Mutation guard: WHERE p.owner = ? AND p.repo = ? must not be removed
+  {
+    const handle = initDb(":memory:")
+    const projectAId = await upsertProject(handle.db, "acme", "payments-service")
+    const projectBId = await upsertProject(handle.db, "acme", "other-service")
+
+    // payments-service: 3 flaky tests on one day
+    handle.raw
+      .prepare(
+        `INSERT INTO test_runs
+          (project_id, run_id, branch, commit_sha, timestamp, total_tests, passed_tests, failed_tests, flaky_tests)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(projectAId, "run-a", "main", "sha-a", "2026-04-01T10:00:00Z", 100, 97, 0, 3)
+
+    // other-service: 10 flaky tests on a different day
+    handle.raw
+      .prepare(
+        `INSERT INTO test_runs
+          (project_id, run_id, branch, commit_sha, timestamp, total_tests, passed_tests, failed_tests, flaky_tests)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(projectBId, "run-b", "main", "sha-b", "2026-04-02T10:00:00Z", 100, 90, 0, 10)
+
+    const trend = await getProjectTrend(handle, "acme", "payments-service")
+
+    assert({
+      given: "two projects with test runs on different days",
+      should: "return only 1 data point for payments-service (not both projects' runs)",
+      actual: trend.length,
+      expected: 1,
+    })
+
+    assert({
+      given: "payments-service has 3 flaky tests on 2026-04-01",
+      should: "return flakyCount 3 for that single data point",
+      actual: trend[0]?.flakyCount,
+      expected: 3,
+    })
+
+    assert({
+      given: "other-service has runs on 2026-04-02 but is not queried",
+      should: "not include 2026-04-02 in payments-service trend",
+      actual: trend.some((p) => p.date === "2026-04-02"),
       expected: false,
     })
   }

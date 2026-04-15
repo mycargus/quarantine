@@ -10,6 +10,7 @@ import {
   updateLastPulledAt,
   updateLastSynced,
   upsertProject,
+  upsertSuiteState,
 } from "./db.server.js"
 
 describe("initDb()", async (assert) => {
@@ -323,6 +324,59 @@ describe("initDb() last_pulled_at migration idempotency", async (assert) => {
     })
   } finally {
     unlinkSync(tmpPath)
+  }
+})
+
+describe("upsertSuiteState()", async (assert) => {
+  {
+    const { raw } = initDb(":memory:")
+    const projectId = raw
+      .prepare("INSERT INTO projects (owner, repo) VALUES (?, ?) RETURNING id")
+      .get("acme", "widget") as { id: number }
+
+    // First upsert: establish the row
+    upsertSuiteState(raw, projectId.id, "suite-A", 3, '{"tests":["a","b","c"]}', "2026-01-01T00:00:00Z")
+
+    const after1 = raw
+      .prepare("SELECT quarantined_count, state_json FROM quarantine_state WHERE project_id = ? AND suite_name = ?")
+      .get(projectId.id, "suite-A") as { quarantined_count: number; state_json: string }
+
+    assert({
+      given: "a first call to upsertSuiteState",
+      should: "store quarantined_count 3",
+      actual: after1.quarantined_count,
+      expected: 3,
+    })
+
+    assert({
+      given: "a first call to upsertSuiteState",
+      should: "store the provided state_json",
+      actual: after1.state_json,
+      expected: '{"tests":["a","b","c"]}',
+    })
+
+    // Second upsert with the same project_id + suite_name but different values
+    upsertSuiteState(raw, projectId.id, "suite-A", 7, '{"tests":["x","y","z","w"]}', "2026-02-01T00:00:00Z")
+
+    const after2 = raw
+      .prepare("SELECT quarantined_count, state_json FROM quarantine_state WHERE project_id = ? AND suite_name = ?")
+      .get(projectId.id, "suite-A") as { quarantined_count: number; state_json: string }
+
+    // Mutation guard: if quarantined_count = excluded.state_json and state_json = excluded.quarantined_count
+    // were swapped, quarantined_count would be the JSON string and state_json would be the integer.
+    assert({
+      given: "a second call to upsertSuiteState with quarantined_count=7 and a new state_json",
+      should: "update quarantined_count to 7 (not the state_json value)",
+      actual: after2.quarantined_count,
+      expected: 7,
+    })
+
+    assert({
+      given: "a second call to upsertSuiteState with quarantined_count=7 and a new state_json",
+      should: "update state_json to the new JSON string (not the quarantined_count value)",
+      actual: after2.state_json,
+      expected: '{"tests":["x","y","z","w"]}',
+    })
   }
 })
 
