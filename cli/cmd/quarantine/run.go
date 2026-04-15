@@ -450,8 +450,14 @@ func removeUnquarantinedTests(ctx context.Context, cmd *cobra.Command, cfg *conf
 // (new-to-PR tests per ADR-022 — no persistent quarantine without a GitHub Issue).
 // Returns true if the state was modified.
 func addNewFlakyTests(state *qstate.State, res result.Result, skipReasons map[string]string) bool {
+	return addNewFlakyTestsAt(state, res, skipReasons, time.Now().UTC().Format(time.RFC3339))
+}
+
+// addNewFlakyTestsAt is the pure variant of addNewFlakyTests. It accepts a
+// timestamp string instead of calling time.Now(), following the At-variant
+// pattern used by BuildAt, MergeAt, MarshalAt, and NewEmptyStateAt.
+func addNewFlakyTestsAt(state *qstate.State, res result.Result, skipReasons map[string]string, timestamp string) bool {
 	changed := false
-	now := time.Now().UTC().Format(time.RFC3339)
 	for _, t := range res.Tests {
 		if t.Status != "flaky" {
 			continue
@@ -462,7 +468,7 @@ func addNewFlakyTests(state *qstate.State, res result.Result, skipReasons map[st
 		if state.HasTest(t.TestID) {
 			// Already quarantined — update last_flaky_at and flaky count.
 			entry := state.Tests[t.TestID]
-			entry.LastFailureAt = now
+			entry.LastFailureAt = timestamp
 			entry.FlakyCount++
 			state.AddTest(entry)
 			changed = true
@@ -475,10 +481,10 @@ func addNewFlakyTests(state *qstate.State, res result.Result, skipReasons map[st
 			FilePath:      t.FilePath,
 			Classname:     t.Classname,
 			Name:          t.Name,
-			FirstFlakyAt:  now,
-			LastFailureAt:   now,
+			FirstFlakyAt:  timestamp,
+			LastFailureAt: timestamp,
 			FlakyCount:    1,
-			QuarantinedAt: now,
+			QuarantinedAt: timestamp,
 			QuarantinedBy: "auto",
 		})
 	}

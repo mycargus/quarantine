@@ -256,7 +256,7 @@ func TestClassifyPRScope(t *testing.T) {
 	})
 }
 
-func TestAddNewFlakyTestsUpdatesExistingEntry(t *testing.T) {
+func TestAddNewFlakyTestsAtUpdatesExistingEntry(t *testing.T) {
 	state := qstate.NewEmptyState()
 	state.AddTest(qstate.Entry{
 		TestID:     "src/payment.test.js::PaymentService::should process payment",
@@ -270,7 +270,7 @@ func TestAddNewFlakyTestsUpdatesExistingEntry(t *testing.T) {
 		}},
 	}
 
-	changed := addNewFlakyTests(state, res, nil)
+	changed := addNewFlakyTestsAt(state, res, nil, "2026-01-15T10:00:00Z")
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "a flaky test already present in quarantine state",
@@ -288,11 +288,64 @@ func TestAddNewFlakyTestsUpdatesExistingEntry(t *testing.T) {
 		Expected: 4,
 	})
 
-	riteway.Assert(t, riteway.Case[bool]{
+	riteway.Assert(t, riteway.Case[string]{
 		Given:    "a flaky test already present in quarantine state",
-		Should:   "update LastFailureAt to a non-empty timestamp",
-		Actual:   entry.LastFailureAt != "",
+		Should:   "set LastFailureAt to the provided timestamp",
+		Actual:   entry.LastFailureAt,
+		Expected: "2026-01-15T10:00:00Z",
+	})
+}
+
+func TestAddNewFlakyTestsAtAddsNewEntry(t *testing.T) {
+	state := qstate.NewEmptyState()
+
+	res := result.Result{
+		Tests: []result.TestEntry{{
+			TestID:    "src/checkout.test.js::Checkout::applies discount",
+			FilePath:  "src/checkout.test.js",
+			Classname: "Checkout",
+			Name:      "applies discount",
+			Status:    "flaky",
+		}},
+	}
+
+	changed := addNewFlakyTestsAt(state, res, nil, "2026-01-15T10:00:00Z")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a new flaky test not yet in quarantine state",
+		Should:   "return changed=true",
+		Actual:   changed,
 		Expected: true,
+	})
+
+	entry := state.Tests["src/checkout.test.js::Checkout::applies discount"]
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a new flaky test added to state",
+		Should:   "set FirstFlakyAt to the provided timestamp",
+		Actual:   entry.FirstFlakyAt,
+		Expected: "2026-01-15T10:00:00Z",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a new flaky test added to state",
+		Should:   "set LastFailureAt to the provided timestamp",
+		Actual:   entry.LastFailureAt,
+		Expected: "2026-01-15T10:00:00Z",
+	})
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a new flaky test added to state",
+		Should:   "set QuarantinedAt to the provided timestamp",
+		Actual:   entry.QuarantinedAt,
+		Expected: "2026-01-15T10:00:00Z",
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a new flaky test added to state",
+		Should:   "set FlakyCount to 1",
+		Actual:   entry.FlakyCount,
+		Expected: 1,
 	})
 }
 
