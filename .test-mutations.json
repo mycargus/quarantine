@@ -374,14 +374,32 @@
       },
       "mutation_score": 100.0,
       "insights": ["14/14 valid mutations killed (1 skipped — compile error)", "Total accumulation bug caught by negative-total assertion", "Pure functions highly testable — all arithmetic, relational, constant mutations caught"]
+    },
+    "cli/cmd/quarantine/suite.go": {
+      "status": "completed",
+      "covering_tests": ["cli/cmd/quarantine/suite_list_test.go", "cli/cmd/quarantine/suite_remove_test.go"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 3, "killed": 3, "survived": 0, "examples": [
+          {"line": 64, "original": "s.Name == name", "mutated": "!= name", "result": "killed", "test_that_caught_it": "TestSuiteRemoveSuiteNotFoundErrors"},
+          {"line": 76, "original": "e.name != name", "mutated": "== name", "result": "killed", "test_that_caught_it": "TestRemoveSuiteFromSlice"}
+        ]},
+        "logical": {"total": 1, "killed": 1, "survived": 0, "examples": [
+          {"line": 145, "original": "!suiteExists(...)", "mutated": "suiteExists(...)", "result": "killed", "test_that_caught_it": "TestSuiteRemoveConfirmedRemovesSuiteFromConfig"}
+        ]},
+        "constant": {"total": 1, "killed": 1, "survived": 0, "examples": []},
+        "return": {"total": 2, "killed": 2, "survived": 0, "examples": []}
+      },
+      "mutation_score": 100.0,
+      "insights": ["Perfect score — all 7 valid mutations killed (1 skipped — compile error)", "suiteExists, removeSuiteByName, and I/O shell confirmation logic all well tested"]
     }
   },
   "global_statistics": {
-    "total_modules": 23,
-    "completed_modules": 23,
-    "total_mutations": 391,
-    "total_killed": 372,
+    "total_modules": 24,
+    "completed_modules": 24,
+    "total_mutations": 398,
+    "total_killed": 379,
     "total_survived": 22,
-    "overall_score": 95.1
+    "overall_score": 95.2
   }
 }
