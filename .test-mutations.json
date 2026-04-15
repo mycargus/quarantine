@@ -425,13 +425,30 @@
       },
       "mutation_score": 84.0,
       "insights": ["5 new tests killed 5 previously-surviving mutations", "4 unresolved survivors are equivalent mutants: >= 0 (length never negative), LEFT JOIN (FK constraints), type cast (erased at runtime)", "Multi-project data isolation now tested for getOrgOverview, getProjectTrend, getProjectByOwnerRepo", "upsertSuiteState ON CONFLICT path now exercised"]
+    },
+    "dashboard/app/lib/debounce.server.ts": {
+      "status": "completed",
+      "covering_tests": ["dashboard/app/lib/debounce.server.test.ts"],
+      "last_tested": "2026-04-14T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {"total": 2, "killed": 2, "survived": 0, "examples": [
+          {"line": 9, "original": "=== null", "mutated": "!== null", "result": "killed", "test_that_caught_it": "shouldPull() null test"},
+          {"line": 11, "original": ">", "mutated": ">=", "result": "killed", "test_that_caught_it": "shouldPull() boundary test"}
+        ]},
+        "arithmetic": {"total": 2, "killed": 2, "survived": 0, "examples": [
+          {"line": 1, "original": "5 * 60 * 1000", "mutated": "5 * 60 / 1000", "result": "killed", "test_that_caught_it": "DEBOUNCE_MS constant assertion (new test)"},
+          {"line": 10, "original": "- new Date()", "mutated": "+ new Date()", "result": "killed", "test_that_caught_it": "shouldPull() stale test"}
+        ]}
+      },
+      "mutation_score": 100.0,
+      "insights": ["All 4 mutations killed — perfect score after adding DEBOUNCE_MS constant assertion", "Boundary test at exact debounce threshold catches > vs >= mutation"]
     }
   },
   "global_statistics": {
-    "total_modules": 24,
-    "completed_modules": 24,
-    "total_mutations": 433,
-    "total_killed": 409,
+    "total_modules": 25,
+    "completed_modules": 25,
+    "total_mutations": 437,
+    "total_killed": 413,
     "total_survived": 26,
     "overall_score": 94.5
   }
