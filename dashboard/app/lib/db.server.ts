@@ -332,6 +332,7 @@ export async function getOrgOverview(handle: DbHandle, repos: RepoConfig[]): Pro
 
 /**
  * Get test runs for a project.
+ * @todo Implement when test run history feature is built.
  */
 export async function getTestRuns(_projectId: number): Promise<TestRun[]> {
   return []

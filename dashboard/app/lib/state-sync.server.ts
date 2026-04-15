@@ -104,6 +104,10 @@ export async function readSuiteState(
     return null
   }
 
+  if (!response.ok) {
+    throw new Error(`GitHub API error reading state for ${suiteName}: ${response.status}`)
+  }
+
   const file = (await response.json()) as ContentsFileResponse
   return decodeBase64Json(file.content) as QuarantineState
 }
