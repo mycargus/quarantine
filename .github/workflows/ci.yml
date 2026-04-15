@@ -109,6 +109,14 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: test
 
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: dashboard/package.json
+
+      - name: Install dashboard dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: dashboard
+
       - name: Lint
         run: make e2e-lint-ci
 
