@@ -135,22 +135,22 @@ describe("parseConfig() — edge cases", async (assert) => {
 
 describe("parseConfig() — source: github-app", async (assert) => {
   assert({
-    given: 'YAML with source: github-app and no repos',
+    given: "YAML with source: github-app and no repos",
     should: 'parse successfully with source "github-app"',
     actual: parseConfig("source: github-app").source,
     expected: "github-app",
   })
 
   assert({
-    given: 'YAML with source: github-app and repos present',
-    should: 'parse successfully, silently ignoring repos',
+    given: "YAML with source: github-app and repos present",
+    should: "parse successfully, silently ignoring repos",
     actual: parseConfig("source: github-app\nrepos:\n  - owner: foo\n    repo: bar").source,
     expected: "github-app",
   })
 
   assert({
-    given: 'YAML with source: manual and no repos (regression guard)',
-    should: 'still throw an error identifying the missing repos field',
+    given: "YAML with source: manual and no repos (regression guard)",
+    should: "still throw an error identifying the missing repos field",
     actual: throws(() => parseConfig("source: manual"))?.includes("repos"),
     expected: true,
   })

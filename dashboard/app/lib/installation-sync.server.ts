@@ -27,9 +27,7 @@ export function validateAppCredentials(env: AppCredentialInput): AppCredentials 
   }
 
   if (blank.length > 0) {
-    throw new Error(
-      blank.map((name) => `${name} is set but blank`).join("; "),
-    )
+    throw new Error(blank.map((name) => `${name} is set but blank`).join("; "))
   }
 
   if (missing.length === 1) {
@@ -92,9 +90,7 @@ export interface StartupDeps {
   log?: (msg: string) => void
 }
 
-export async function startGitHubAppMode(
-  deps: StartupDeps,
-): Promise<{ raw: RawDatabase }> {
+export async function startGitHubAppMode(deps: StartupDeps): Promise<{ raw: RawDatabase }> {
   const { raw } = initDb(deps.dbPath)
 
   await syncInstallations(raw, {
@@ -108,10 +104,7 @@ export async function startGitHubAppMode(
   return { raw }
 }
 
-export async function syncInstallations(
-  raw: RawDatabase,
-  deps: SyncDeps,
-): Promise<void> {
+export async function syncInstallations(raw: RawDatabase, deps: SyncDeps): Promise<void> {
   try {
     // 1. Fetch all installations (with pagination)
     const allInstallations: GitHubInstallation[] = []
@@ -222,9 +215,7 @@ export async function syncInstallations(
         .all() as Array<{ id: number }>
 
       const now = new Date().toISOString()
-      const markRemoved = raw.prepare(
-        "UPDATE installations SET removed_at = ? WHERE id = ?",
-      )
+      const markRemoved = raw.prepare("UPDATE installations SET removed_at = ? WHERE id = ?")
       const clearInstallationId = raw.prepare(
         "UPDATE projects SET installation_id = NULL WHERE installation_id = ?",
       )

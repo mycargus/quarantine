@@ -10,9 +10,9 @@ import { createServer, type IncomingMessage, type Server } from "node:http"
 import { describe } from "riteway"
 import { initDb } from "../app/lib/db.server.js"
 import {
-  syncInstallations,
-  startGitHubAppMode,
   type SyncDeps,
+  startGitHubAppMode,
+  syncInstallations,
 } from "../app/lib/installation-sync.server.js"
 
 interface RequestEntry {
@@ -127,7 +127,9 @@ describe("syncInstallations() — single page, no Link header", async (assert) =
       expected: false,
     })
 
-    const rows = raw.prepare("SELECT id, account_login, suspended_at, removed_at FROM installations ORDER BY id").all() as Array<{
+    const rows = raw
+      .prepare("SELECT id, account_login, suspended_at, removed_at FROM installations ORDER BY id")
+      .all() as Array<{
       id: number
       account_login: string
       suspended_at: string | null
@@ -184,9 +186,7 @@ describe("startGitHubAppMode() — zero installations at startup", async (assert
 
     try {
       // Verify installations table has 0 rows
-      const installationRows = raw
-        .prepare("SELECT id FROM installations")
-        .all()
+      const installationRows = raw.prepare("SELECT id FROM installations").all()
 
       assert({
         given: "zero installations returned by the API",
@@ -350,9 +350,7 @@ describe("startGitHubAppMode() — startup sync", async (assert) => {
 
       // Verify projects table has 2 rows with correct installation_id
       const projectRows = raw
-        .prepare(
-          "SELECT owner, repo, installation_id FROM projects ORDER BY repo",
-        )
+        .prepare("SELECT owner, repo, installation_id FROM projects ORDER BY repo")
         .all() as Array<{ owner: string; repo: string; installation_id: number }>
 
       assert({
@@ -383,10 +381,7 @@ describe("startGitHubAppMode() — startup sync", async (assert) => {
         given: "startup sync completing",
         should: "call /app/installations before /installation/repositories",
         actual: relevantRequests,
-        expected: [
-          "/app/installations?per_page=100",
-          "/installation/repositories?per_page=100",
-        ],
+        expected: ["/app/installations?per_page=100", "/installation/repositories?per_page=100"],
       })
     } finally {
       raw.close()
@@ -410,14 +405,10 @@ describe("syncInstallations() — API returns 500", async (assert) => {
   try {
     // Seed pre-existing data to verify it survives the failure
     raw
-      .prepare(
-        "INSERT INTO installations (id, account_login, suspended_at) VALUES (?, ?, ?)",
-      )
+      .prepare("INSERT INTO installations (id, account_login, suspended_at) VALUES (?, ?, ?)")
       .run(99, "existing-org", null)
     raw
-      .prepare(
-        "INSERT INTO projects (owner, repo, installation_id) VALUES (?, ?, ?)",
-      )
+      .prepare("INSERT INTO projects (owner, repo, installation_id) VALUES (?, ?, ?)")
       .run("existing-org", "existing-repo", 99)
 
     const logs: string[] = []
@@ -464,9 +455,7 @@ describe("syncInstallations() — API returns 500", async (assert) => {
       given: "GET /app/installations returns 500",
       should: "leave the pre-existing project unchanged",
       actual: projectRows,
-      expected: [
-        { owner: "existing-org", repo: "existing-repo", installation_id: 99 },
-      ],
+      expected: [{ owner: "existing-org", repo: "existing-repo", installation_id: 99 }],
     })
 
     // Verify the error was logged

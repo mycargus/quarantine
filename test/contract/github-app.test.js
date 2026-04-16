@@ -23,16 +23,13 @@ if (!PRISM_URL) {
 
 describe("GitHub Apps API — create installation access token", () => {
   test("POST /app/installations/{id}/access_tokens returns 201 with token and expires_at", async () => {
-    const res = await fetch(
-      `${PRISM_URL}/app/installations/1/access_tokens`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer contract-test-token",
-          Accept: "application/vnd.github+json",
-        },
+    const res = await fetch(`${PRISM_URL}/app/installations/1/access_tokens`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer contract-test-token",
+        Accept: "application/vnd.github+json",
       },
-    )
+    })
 
     assert({
       given: "POST /app/installations/{id}/access_tokens",
@@ -58,17 +55,14 @@ describe("GitHub Apps API — create installation access token", () => {
   })
 
   test("POST /app/installations/{id}/access_tokens returns 401 when unauthenticated (Prefer: code=401)", async () => {
-    const res = await fetch(
-      `${PRISM_URL}/app/installations/1/access_tokens`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer contract-test-token",
-          Accept: "application/vnd.github+json",
-          Prefer: "code=401",
-        },
+    const res = await fetch(`${PRISM_URL}/app/installations/1/access_tokens`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer contract-test-token",
+        Accept: "application/vnd.github+json",
+        Prefer: "code=401",
       },
-    )
+    })
 
     assert({
       given: "POST /app/installations/{id}/access_tokens with Prefer: code=401",
@@ -87,17 +81,14 @@ describe("GitHub Apps API — create installation access token", () => {
   })
 
   test("POST /app/installations/{id}/access_tokens returns 403 when integration lacks access (Prefer: code=403)", async () => {
-    const res = await fetch(
-      `${PRISM_URL}/app/installations/1/access_tokens`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer contract-test-token",
-          Accept: "application/vnd.github+json",
-          Prefer: "code=403",
-        },
+    const res = await fetch(`${PRISM_URL}/app/installations/1/access_tokens`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer contract-test-token",
+        Accept: "application/vnd.github+json",
+        Prefer: "code=403",
       },
-    )
+    })
 
     assert({
       given: "POST /app/installations/{id}/access_tokens with Prefer: code=403",
@@ -116,17 +107,14 @@ describe("GitHub Apps API — create installation access token", () => {
   })
 
   test("POST /app/installations/{id}/access_tokens returns 404 when installation not found (Prefer: code=404)", async () => {
-    const res = await fetch(
-      `${PRISM_URL}/app/installations/1/access_tokens`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer contract-test-token",
-          Accept: "application/vnd.github+json",
-          Prefer: "code=404",
-        },
+    const res = await fetch(`${PRISM_URL}/app/installations/1/access_tokens`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer contract-test-token",
+        Accept: "application/vnd.github+json",
+        Prefer: "code=404",
       },
-    )
+    })
 
     assert({
       given: "POST /app/installations/{id}/access_tokens with Prefer: code=404",
@@ -145,17 +133,14 @@ describe("GitHub Apps API — create installation access token", () => {
   })
 
   test("POST /app/installations/{id}/access_tokens returns 422 on validation error (Prefer: code=422)", async () => {
-    const res = await fetch(
-      `${PRISM_URL}/app/installations/1/access_tokens`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer contract-test-token",
-          Accept: "application/vnd.github+json",
-          Prefer: "code=422",
-        },
+    const res = await fetch(`${PRISM_URL}/app/installations/1/access_tokens`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer contract-test-token",
+        Accept: "application/vnd.github+json",
+        Prefer: "code=422",
       },
-    )
+    })
 
     assert({
       given: "POST /app/installations/{id}/access_tokens with Prefer: code=422",

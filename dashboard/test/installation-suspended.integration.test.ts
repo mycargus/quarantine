@@ -8,10 +8,7 @@
 import { createServer, type IncomingMessage, type Server } from "node:http"
 import { describe } from "riteway"
 import { initDb } from "../app/lib/db.server.js"
-import {
-  syncInstallations,
-  type SyncDeps,
-} from "../app/lib/installation-sync.server.js"
+import { type SyncDeps, syncInstallations } from "../app/lib/installation-sync.server.js"
 
 interface MockRoute {
   status: number
@@ -137,15 +134,13 @@ describe("syncInstallations() — suspended installation becomes active again", 
   try {
     // Pre-seed: installation exists with a non-null suspended_at
     raw
-      .prepare(
-        "INSERT INTO installations (id, account_login, suspended_at) VALUES (?, ?, ?)",
-      )
+      .prepare("INSERT INTO installations (id, account_login, suspended_at) VALUES (?, ?, ?)")
       .run(1, "acme", "2026-03-15T10:00:00Z")
 
     // Verify the pre-seed worked
-    const before = raw
-      .prepare("SELECT suspended_at FROM installations WHERE id = ?")
-      .get(1) as { suspended_at: string | null }
+    const before = raw.prepare("SELECT suspended_at FROM installations WHERE id = ?").get(1) as {
+      suspended_at: string | null
+    }
 
     assert({
       given: "a pre-seeded installation with suspended_at set",

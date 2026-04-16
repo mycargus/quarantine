@@ -10,10 +10,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
 import { describe } from "riteway"
 import { initDb } from "../app/lib/db.server.js"
-import {
-  syncInstallations,
-  type SyncDeps,
-} from "../app/lib/installation-sync.server.js"
+import { type SyncDeps, syncInstallations } from "../app/lib/installation-sync.server.js"
 
 interface RequestEntry {
   method: string
@@ -69,10 +66,7 @@ describe("syncInstallations() — paginates through all installations and repos"
             { id: 2, account: { login: "org2", id: 200 }, suspended_at: null },
           ]),
         )
-      } else if (
-        path === "/installation/repositories" &&
-        auth === "token mock-token-1"
-      ) {
+      } else if (path === "/installation/repositories" && auth === "token mock-token-1") {
         const page = url.searchParams.get("page") ?? "1"
         if (page === "1") {
           const repos = Array.from({ length: 100 }, (_, i) => ({
@@ -94,10 +88,7 @@ describe("syncInstallations() — paginates through all installations and repos"
           res.writeHead(200, { "Content-Type": "application/json" })
           res.end(JSON.stringify({ total_count: 110, repositories: repos }))
         }
-      } else if (
-        path === "/installation/repositories" &&
-        auth === "token mock-token-2"
-      ) {
+      } else if (path === "/installation/repositories" && auth === "token mock-token-2") {
         const repos = Array.from({ length: 40 }, (_, i) => ({
           owner: { login: "org2" },
           name: `repo-${i + 1}`,
@@ -117,9 +108,7 @@ describe("syncInstallations() — paginates through all installations and repos"
     res.writeHead(500)
     res.end()
   }
-  const { url, server, requestLog } = await startCustomServer(
-    (req, res) => handler(req, res),
-  )
+  const { url, server, requestLog } = await startCustomServer((req, res) => handler(req, res))
   handler = createPaginationHandler(url)
 
   const { raw } = initDb(":memory:")
@@ -156,9 +145,9 @@ describe("syncInstallations() — paginates through all installations and repos"
     })
 
     // Verify total project count
-    const totalProjects = raw
-      .prepare("SELECT COUNT(*) as count FROM projects")
-      .get() as { count: number }
+    const totalProjects = raw.prepare("SELECT COUNT(*) as count FROM projects").get() as {
+      count: number
+    }
 
     assert({
       given: "110 repos for installation 1 and 40 repos for installation 2",
@@ -169,9 +158,7 @@ describe("syncInstallations() — paginates through all installations and repos"
 
     // Verify projects per installation
     const inst1Projects = raw
-      .prepare(
-        "SELECT COUNT(*) as count FROM projects WHERE installation_id = ?",
-      )
+      .prepare("SELECT COUNT(*) as count FROM projects WHERE installation_id = ?")
       .get(1) as { count: number }
 
     assert({
@@ -182,9 +169,7 @@ describe("syncInstallations() — paginates through all installations and repos"
     })
 
     const inst2Projects = raw
-      .prepare(
-        "SELECT COUNT(*) as count FROM projects WHERE installation_id = ?",
-      )
+      .prepare("SELECT COUNT(*) as count FROM projects WHERE installation_id = ?")
       .get(2) as { count: number }
 
     assert({

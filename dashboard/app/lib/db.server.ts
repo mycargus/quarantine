@@ -189,9 +189,7 @@ function runMigrations(raw: RawDatabase): void {
   `)
 
   try {
-    raw.exec(
-      "ALTER TABLE projects ADD COLUMN installation_id INTEGER REFERENCES installations(id)",
-    )
+    raw.exec("ALTER TABLE projects ADD COLUMN installation_id INTEGER REFERENCES installations(id)")
   } catch {
     // Column already exists — ignore
   }

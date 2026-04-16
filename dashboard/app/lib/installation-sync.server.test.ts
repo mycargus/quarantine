@@ -1,8 +1,5 @@
 import { describe } from "riteway"
-import {
-  shouldSyncInstallations,
-  validateAppCredentials,
-} from "./installation-sync.server.js"
+import { shouldSyncInstallations, validateAppCredentials } from "./installation-sync.server.js"
 
 const throws = (fn: () => unknown): string | null => {
   try {
