@@ -15,10 +15,15 @@ import { createApp } from "../app/app.js"
 import { bodyText } from "../app/test-helpers.js"
 import { createTestApp, seedTestDb } from "./helpers.js"
 
+function authedRequest(url: string, cookie: string): Request {
+  return new Request(url, { headers: { Cookie: cookie } })
+}
+
 describe("GET / — valid config, empty repos", async (assert) => {
-  const { router, cleanup } = createTestApp({ repos: [] })
+  const { router, sessionCookie, cleanup } = createTestApp({ repos: [] })
+  const cookie = await sessionCookie()
   try {
-    const response = await router.fetch(new Request("http://localhost/"))
+    const response = await router.fetch(authedRequest("http://localhost/", cookie))
     const html = await bodyText(response)
 
     assert({
@@ -44,7 +49,8 @@ describe("GET / — valid config, seeded DB with projects", async (assert) => {
     { owner: "acme", repo: "payments" },
     { owner: "acme", repo: "frontend" },
   ]
-  const { router, dbPath, cleanup } = createTestApp({ repos })
+  const { router, dbPath, sessionCookie, cleanup } = createTestApp({ repos })
+  const cookie = await sessionCookie()
 
   seedTestDb(dbPath, [
     {
@@ -73,7 +79,7 @@ describe("GET / — valid config, seeded DB with projects", async (assert) => {
   ])
 
   try {
-    const response = await router.fetch(new Request("http://localhost/"))
+    const response = await router.fetch(authedRequest("http://localhost/", cookie))
     const html = await bodyText(response)
 
     assert({
@@ -109,12 +115,15 @@ describe("GET / — valid config, seeded DB with projects", async (assert) => {
 })
 
 describe("GET / — missing config file", async (assert) => {
+  const { sessionCookie } = createTestApp({ repos: [] })
+  const cookie = await sessionCookie()
   const router = createApp({
     configPath: "/nonexistent/path/dashboard.yml",
     dbPath: "/tmp/unused.db",
     token: "",
+    sessionSecret: "test-secret",
   })
-  const response = await router.fetch(new Request("http://localhost/"))
+  const response = await router.fetch(authedRequest("http://localhost/", cookie))
   const html = await bodyText(response)
 
   assert({
@@ -136,9 +145,16 @@ describe("GET / — invalid config content", async (assert) => {
   const configPath = join(tmpdir(), `dashboard-iface-bad-${randomUUID()}.yml`)
   writeFileSync(configPath, "not_a_valid_config: true", "utf8")
 
-  const router = createApp({ configPath, dbPath: "/tmp/unused.db", token: "" })
+  const { sessionCookie } = createTestApp({ repos: [] })
+  const cookie = await sessionCookie()
+  const router = createApp({
+    configPath,
+    dbPath: "/tmp/unused.db",
+    token: "",
+    sessionSecret: "test-secret",
+  })
   try {
-    const response = await router.fetch(new Request("http://localhost/"))
+    const response = await router.fetch(authedRequest("http://localhost/", cookie))
     const html = await bodyText(response)
 
     assert({

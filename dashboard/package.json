@@ -19,6 +19,10 @@
     "seed": "node --import tsx/esm scripts/seed.ts"
   },
   "dependencies": {
+    "@remix-run/auth": "0.1.0",
+    "@remix-run/auth-middleware": "0.1.0",
+    "@remix-run/session": "0.4.1",
+    "@remix-run/session-middleware": "0.2.0",
     "adm-zip": "^0.5.17",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",

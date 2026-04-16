@@ -1,6 +1,8 @@
+import { requireAuth } from "@remix-run/auth-middleware"
 import { createRouter } from "remix/fetch-router"
 import { home } from "./controllers/home.js"
 import { project } from "./controllers/project.js"
+import { createSessionMiddleware } from "./lib/session.server.js"
 import { routes } from "./routes.js"
 
 export interface AppOptions {
@@ -8,16 +10,26 @@ export interface AppOptions {
   dbPath?: string
   token?: string
   fetchFn?: typeof fetch
+  sessionSecret?: string
 }
 
+const DEFAULT_SECRET = "dev-secret-change-in-production"
+
 export function createApp(opts: AppOptions = {}) {
-  const router = createRouter()
+  const { session, auth } = createSessionMiddleware(opts.sessionSecret ?? DEFAULT_SECRET)
+
+  const router = createRouter({ middleware: [session, auth] })
   router.map(routes, {
     actions: {
-      home: () => home(opts),
+      home: {
+        middleware: [requireAuth()],
+        handler: () => home(opts),
+      },
       health: () => new Response("ok", { status: 200 }),
-      projectDetail: (ctx) =>
-        project(ctx.params.owner, ctx.params.repo, ctx.request.url, opts.dbPath),
+      projectDetail: {
+        middleware: [requireAuth()],
+        handler: (ctx) => project(ctx.params.owner, ctx.params.repo, ctx.request.url, opts.dbPath),
+      },
     },
   })
   return router

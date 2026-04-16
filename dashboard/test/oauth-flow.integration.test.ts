@@ -23,3 +23,19 @@ describe("GET /health — no authentication provided", async (assert) => {
     cleanup()
   }
 })
+
+describe("GET / — no session cookie (unauthenticated)", async (assert) => {
+  const { router, cleanup } = createTestApp({ repos: [] })
+  try {
+    const response = await router.fetch(new Request("http://localhost/"))
+
+    assert({
+      given: "no session cookie on GET /",
+      should: "return HTTP 401",
+      actual: response.status,
+      expected: 401,
+    })
+  } finally {
+    cleanup()
+  }
+})

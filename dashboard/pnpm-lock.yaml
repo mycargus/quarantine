@@ -8,6 +8,18 @@ importers:
 
   .:
     dependencies:
+      '@remix-run/auth':
+        specifier: 0.1.0
+        version: 0.1.0
+      '@remix-run/auth-middleware':
+        specifier: 0.1.0
+        version: 0.1.0
+      '@remix-run/session':
+        specifier: 0.4.1
+        version: 0.4.1
+      '@remix-run/session-middleware':
+        specifier: 0.2.0
+        version: 0.2.0
       adm-zip:
         specifier: ^0.5.17
         version: 0.5.17

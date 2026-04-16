@@ -10,10 +10,19 @@ import { describe } from "riteway"
 import { bodyText } from "../app/test-helpers.js"
 import { createTestApp, seedTestDb } from "./helpers.js"
 
+function authedRequest(url: string, cookie: string): Request {
+  return new Request(url, { headers: { Cookie: cookie } })
+}
+
 describe("GET /projects/:owner/:repo — unknown project", async (assert) => {
-  const { router, cleanup } = createTestApp({ repos: [{ owner: "acme", repo: "missing" }] })
+  const { router, sessionCookie, cleanup } = createTestApp({
+    repos: [{ owner: "acme", repo: "missing" }],
+  })
+  const cookie = await sessionCookie()
   try {
-    const response = await router.fetch(new Request("http://localhost/projects/acme/missing"))
+    const response = await router.fetch(
+      authedRequest("http://localhost/projects/acme/missing", cookie),
+    )
     const html = await bodyText(response)
 
     assert({
@@ -36,12 +45,15 @@ describe("GET /projects/:owner/:repo — unknown project", async (assert) => {
 
 describe("GET /projects/:owner/:repo — known project, no test results", async (assert) => {
   const repos = [{ owner: "acme", repo: "empty-repo" }]
-  const { router, dbPath, cleanup } = createTestApp({ repos })
+  const { router, dbPath, sessionCookie, cleanup } = createTestApp({ repos })
+  const cookie = await sessionCookie()
 
   seedTestDb(dbPath, [{ owner: "acme", repo: "empty-repo" }])
 
   try {
-    const response = await router.fetch(new Request("http://localhost/projects/acme/empty-repo"))
+    const response = await router.fetch(
+      authedRequest("http://localhost/projects/acme/empty-repo", cookie),
+    )
     const html = await bodyText(response)
 
     assert({
@@ -71,7 +83,8 @@ describe("GET /projects/:owner/:repo — known project, no test results", async 
 
 describe("GET /projects/:owner/:repo — known project with quarantined tests", async (assert) => {
   const repos = [{ owner: "acme", repo: "payments" }]
-  const { router, dbPath, cleanup } = createTestApp({ repos })
+  const { router, dbPath, sessionCookie, cleanup } = createTestApp({ repos })
+  const cookie = await sessionCookie()
 
   seedTestDb(dbPath, [
     {
@@ -94,7 +107,9 @@ describe("GET /projects/:owner/:repo — known project with quarantined tests", 
   ])
 
   try {
-    const response = await router.fetch(new Request("http://localhost/projects/acme/payments"))
+    const response = await router.fetch(
+      authedRequest("http://localhost/projects/acme/payments", cookie),
+    )
     const html = await bodyText(response)
 
     assert({
@@ -131,12 +146,15 @@ describe("GET /projects/:owner/:repo — known project with quarantined tests", 
 
 describe("GET /projects/:owner/:repo — route parameter extraction", async (assert) => {
   const repos = [{ owner: "my-org", repo: "my-service" }]
-  const { router, dbPath, cleanup } = createTestApp({ repos })
+  const { router, dbPath, sessionCookie, cleanup } = createTestApp({ repos })
+  const cookie = await sessionCookie()
 
   seedTestDb(dbPath, [{ owner: "my-org", repo: "my-service" }])
 
   try {
-    const response = await router.fetch(new Request("http://localhost/projects/my-org/my-service"))
+    const response = await router.fetch(
+      authedRequest("http://localhost/projects/my-org/my-service", cookie),
+    )
     const html = await bodyText(response)
 
     assert({
@@ -159,7 +177,8 @@ describe("GET /projects/:owner/:repo — route parameter extraction", async (ass
 
 describe("GET /projects/:owner/:repo?search= — query parameter filtering", async (assert) => {
   const repos = [{ owner: "acme", repo: "search-test" }]
-  const { router, dbPath, cleanup } = createTestApp({ repos })
+  const { router, dbPath, sessionCookie, cleanup } = createTestApp({ repos })
+  const cookie = await sessionCookie()
 
   seedTestDb(dbPath, [
     {
@@ -182,7 +201,7 @@ describe("GET /projects/:owner/:repo?search= — query parameter filtering", asy
 
   try {
     const response = await router.fetch(
-      new Request("http://localhost/projects/acme/search-test?search=checkout"),
+      authedRequest("http://localhost/projects/acme/search-test?search=checkout", cookie),
     )
     const html = await bodyText(response)
 
