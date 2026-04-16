@@ -58,6 +58,7 @@ export function createTestApp(
     oauthClientId?: string
     oauthClientSecret?: string
     oauthOrigin?: string
+    clock?: () => number
   } = {},
 ): TestApp {
   const configPath = writeTempConfig(opts.repos ?? [])
@@ -70,6 +71,7 @@ export function createTestApp(
     oauthClientId: opts.oauthClientId,
     oauthClientSecret: opts.oauthClientSecret,
     oauthOrigin: opts.oauthOrigin,
+    clock: opts.clock,
   })
   return {
     router,

@@ -228,3 +228,57 @@ describe("GET /auth/logout — no session cookie (expired or absent)", async (as
     cleanup()
   }
 })
+
+describe("IP rate limit — 21st request returns 429 with Retry-After", async (assert) => {
+  const fixedNow = 1_000_000
+  const { router, cleanup } = createTestApp({
+    repos: [],
+    clock: () => fixedNow,
+  })
+  try {
+    const clientIp = "203.0.113.42"
+
+    // Send 20 requests — all should succeed (not 429)
+    for (let i = 0; i < 20; i++) {
+      const res = await router.fetch(
+        new Request("http://localhost/health", {
+          headers: { "X-Forwarded-For": clientIp },
+        }),
+      )
+      if (res.status === 429) {
+        assert({
+          given: `request ${i + 1} of 20 within the rate limit`,
+          should: "not be rate limited",
+          actual: res.status,
+          expected: 200,
+        })
+        return
+      }
+    }
+
+    // Request #21 should be rate limited
+    const response = await router.fetch(
+      new Request("http://localhost/health", {
+        headers: { "X-Forwarded-For": clientIp },
+      }),
+    )
+
+    assert({
+      given: "21st request from the same IP within 1-minute window",
+      should: "return HTTP 429",
+      actual: response.status,
+      expected: 429,
+    })
+
+    const retryAfter = response.headers.get("Retry-After")
+
+    assert({
+      given: "21st request from the same IP within 1-minute window",
+      should: "include a Retry-After header with seconds until window resets",
+      actual: retryAfter !== null && Number(retryAfter) > 0,
+      expected: true,
+    })
+  } finally {
+    cleanup()
+  }
+})

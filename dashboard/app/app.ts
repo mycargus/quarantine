@@ -4,6 +4,7 @@ import { Session } from "@remix-run/session"
 import { createRouter } from "remix/fetch-router"
 import { home } from "./controllers/home.js"
 import { project } from "./controllers/project.js"
+import { createIpRateLimiter } from "./lib/rate-limit-middleware.server.js"
 import { createSessionMiddleware } from "./lib/session.server.js"
 import { routes } from "./routes.js"
 
@@ -16,12 +17,14 @@ export interface AppOptions {
   oauthClientId?: string
   oauthClientSecret?: string
   oauthOrigin?: string
+  clock?: () => number
 }
 
 const DEFAULT_SECRET = "dev-secret-change-in-production"
 
 export function createApp(opts: AppOptions = {}) {
   const { session, auth } = createSessionMiddleware(opts.sessionSecret ?? DEFAULT_SECRET)
+  const ipRateLimiter = createIpRateLimiter(opts.clock)
 
   const githubProvider =
     opts.oauthClientId && opts.oauthClientSecret && opts.oauthOrigin
@@ -32,7 +35,7 @@ export function createApp(opts: AppOptions = {}) {
         })
       : null
 
-  const router = createRouter({ middleware: [session, auth] })
+  const router = createRouter({ middleware: [ipRateLimiter, session, auth] })
   router.map(routes, {
     actions: {
       home: {
