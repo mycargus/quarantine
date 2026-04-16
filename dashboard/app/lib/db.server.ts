@@ -19,6 +19,7 @@ export const projects = table({
     last_synced: c.text(),
     last_etag: c.text(),
     last_pulled_at: c.text(),
+    installation_id: c.integer(),
   },
 })
 
@@ -176,6 +177,24 @@ function runMigrations(raw: RawDatabase): void {
       UNIQUE(project_id, suite_name)
     );
   `)
+
+  raw.exec(`
+    CREATE TABLE IF NOT EXISTS installations (
+      id INTEGER PRIMARY KEY,
+      account_login TEXT NOT NULL,
+      suspended_at TEXT,
+      removed_at TEXT,
+      UNIQUE(id)
+    );
+  `)
+
+  try {
+    raw.exec(
+      "ALTER TABLE projects ADD COLUMN installation_id INTEGER REFERENCES installations(id)",
+    )
+  } catch {
+    // Column already exists — ignore
+  }
 }
 
 /**

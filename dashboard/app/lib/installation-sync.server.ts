@@ -54,3 +54,147 @@ export function shouldSyncInstallations(
   if (lastSyncedAt === null) return true
   return now.getTime() - lastSyncedAt.getTime() > intervalMs
 }
+
+export interface SyncDeps {
+  fetchFn: typeof fetch
+  baseUrl: string
+  jwtToken: string
+  getInstallationToken: (installationId: number) => Promise<string>
+  log: (msg: string) => void
+}
+
+interface GitHubInstallation {
+  id: number
+  account: { login: string }
+  suspended_at: string | null
+}
+
+interface GitHubRepo {
+  owner: { login: string }
+  name: string
+}
+
+interface GitHubReposResponse {
+  total_count: number
+  repositories: GitHubRepo[]
+}
+
+import type { Database as RawDatabase } from "better-sqlite3"
+import { parseLinkHeader } from "./github-client.server.js"
+
+export async function syncInstallations(
+  raw: RawDatabase,
+  deps: SyncDeps,
+): Promise<void> {
+  try {
+    // 1. Fetch all installations (with pagination)
+    const allInstallations: GitHubInstallation[] = []
+    let installationsUrl: string | null = `${deps.baseUrl}/app/installations?per_page=100`
+
+    while (installationsUrl) {
+      const response = await deps.fetchFn(installationsUrl, {
+        headers: {
+          Authorization: `Bearer ${deps.jwtToken}`,
+          Accept: "application/vnd.github+json",
+        },
+      })
+
+      const pageInstallations = (await response.json()) as GitHubInstallation[]
+      allInstallations.push(...pageInstallations)
+
+      const linkHeader = response.headers.get("link")
+      installationsUrl = parseLinkHeader(linkHeader)
+    }
+
+    deps.log(`Discovered ${allInstallations.length} installations`)
+
+    // 2. For each installation, fetch repos
+    const installationRepos = new Map<number, GitHubRepo[]>()
+    for (const inst of allInstallations) {
+      const token = await deps.getInstallationToken(inst.id)
+      const repos: GitHubRepo[] = []
+      let reposUrl: string | null = `${deps.baseUrl}/installation/repositories?per_page=100`
+
+      while (reposUrl) {
+        const repoResponse = await deps.fetchFn(reposUrl, {
+          headers: {
+            Authorization: `token ${token}`,
+            Accept: "application/vnd.github+json",
+          },
+        })
+
+        const repoData = (await repoResponse.json()) as GitHubReposResponse
+        repos.push(...repoData.repositories)
+
+        const linkHeader = repoResponse.headers.get("link")
+        reposUrl = parseLinkHeader(linkHeader)
+      }
+
+      installationRepos.set(inst.id, repos)
+    }
+
+    // 3. Wrap all DB operations in a single transaction
+    raw.exec("BEGIN")
+    try {
+      const seenInstallationIds = new Set<number>()
+
+      // Upsert installations
+      const upsertInstallation = raw.prepare(
+        `INSERT INTO installations (id, account_login, suspended_at, removed_at)
+         VALUES (?, ?, ?, NULL)
+         ON CONFLICT(id) DO UPDATE SET
+           account_login = excluded.account_login,
+           suspended_at = excluded.suspended_at,
+           removed_at = NULL`,
+      )
+
+      for (const inst of allInstallations) {
+        upsertInstallation.run(inst.id, inst.account.login, inst.suspended_at)
+        seenInstallationIds.add(inst.id)
+      }
+
+      // Upsert repos
+      const upsertProject = raw.prepare(
+        `INSERT INTO projects (owner, repo, installation_id)
+         VALUES (?, ?, ?)
+         ON CONFLICT(owner, repo) DO UPDATE SET
+           installation_id = excluded.installation_id`,
+      )
+
+      for (const [installationId, repos] of installationRepos) {
+        for (const repo of repos) {
+          upsertProject.run(repo.owner.login, repo.name, installationId)
+        }
+      }
+
+      // Mark removed installations
+      const existingInstallations = raw
+        .prepare("SELECT id FROM installations WHERE removed_at IS NULL")
+        .all() as Array<{ id: number }>
+
+      const now = new Date().toISOString()
+      const markRemoved = raw.prepare(
+        "UPDATE installations SET removed_at = ? WHERE id = ?",
+      )
+      const clearInstallationId = raw.prepare(
+        "UPDATE projects SET installation_id = NULL WHERE installation_id = ?",
+      )
+
+      for (const existing of existingInstallations) {
+        if (!seenInstallationIds.has(existing.id)) {
+          markRemoved.run(now, existing.id)
+          clearInstallationId.run(existing.id)
+        }
+      }
+
+      raw.exec("COMMIT")
+    } catch (txErr) {
+      raw.exec("ROLLBACK")
+      throw txErr
+    }
+
+    deps.log("Installation sync complete")
+  } catch (err) {
+    deps.log(`Installation sync error: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
