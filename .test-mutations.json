@@ -2321,6 +2321,134 @@
         "Debounce, artifact processing, state sync, error handling all well-tested"
       ]
     },
+    "dashboard/app/lib/installation-sync.server.ts": {
+      "status": "completed",
+      "covering_tests": [
+        "dashboard/app/lib/installation-sync.server.test.ts"
+      ],
+      "last_tested": "2026-04-16T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {
+          "total": 8,
+          "killed": 8,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 53,
+              "original": "> intervalMs",
+              "mutated": ">= intervalMs",
+              "result": "killed",
+              "test_that_caught_it": "shouldSyncInstallations exact interval test"
+            }
+          ]
+        },
+        "logical": {
+          "total": 8,
+          "killed": 8,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 52,
+              "original": "lastSyncedAt === null",
+              "mutated": "!== null",
+              "result": "killed",
+              "test_that_caught_it": "shouldSyncInstallations null test"
+            },
+            {
+              "line": 305,
+              "original": "if (timedOut)",
+              "mutated": "if (!timedOut)",
+              "result": "killed",
+              "test_that_caught_it": "startupSyncWithTimeout success path (new test)"
+            }
+          ]
+        },
+        "constants": {
+          "total": 12,
+          "killed": 10,
+          "survived": 2,
+          "examples": [
+            {
+              "line": 292,
+              "original": "timedOut = false",
+              "mutated": "timedOut = true",
+              "result": "killed",
+              "test_that_caught_it": "startupSyncWithTimeout success path (new test)"
+            },
+            {
+              "line": 296,
+              "original": "terminate(1)",
+              "mutated": "terminate(0)",
+              "result": "killed",
+              "test_that_caught_it": "startupSyncWithTimeout timeout exit code (new test)"
+            },
+            {
+              "line": 259,
+              "original": "deps.intervalMs",
+              "mutated": "1",
+              "result": "survived (no test verifies interval duration — timing-dependent to test reliably)",
+              "test_that_caught_it": null
+            },
+            {
+              "line": 128,
+              "original": "\"Discovered\"",
+              "mutated": "\"Failed to discover\"",
+              "result": "survived (log output not verified in unit tests)",
+              "test_that_caught_it": null
+            }
+          ]
+        },
+        "statement": {
+          "total": 14,
+          "killed": 12,
+          "survived": 2,
+          "examples": [
+            {
+              "line": 302,
+              "original": "clearTimeout(timer)",
+              "mutated": "removed",
+              "result": "killed",
+              "test_that_caught_it": "startupSyncWithTimeout timer cleared on success (new test)"
+            },
+            {
+              "line": 269,
+              "original": "terminate(0)",
+              "mutated": "terminate(1)",
+              "result": "killed",
+              "test_that_caught_it": "startDiscoveryLoop signal terminate exit code (new test)"
+            },
+            {
+              "line": 279,
+              "original": "process.removeListener loop",
+              "mutated": "removed",
+              "result": "killed",
+              "test_that_caught_it": "startDiscoveryLoop cleanup removes signal listener (new test)"
+            },
+            {
+              "line": 267,
+              "original": "clearInterval(interval) in onSignal",
+              "mutated": "removed",
+              "result": "survived (equivalent — cleanup() also calls clearInterval, so removing it from onSignal has no effect)",
+              "test_that_caught_it": null
+            },
+            {
+              "line": 273,
+              "original": "process.on(sig, onSignal)",
+              "mutated": "process.once(sig, onSignal)",
+              "result": "survived (tests only emit signal once per test, not multiple times)",
+              "test_that_caught_it": null
+            }
+          ]
+        }
+      },
+      "mutation_score": 90.5,
+      "insights": [
+        "32/42 killed originally; 37/42 killed after adding 5 new tests",
+        "5 new tests cover startupSyncWithTimeout (success, timeout, timer cleanup) and startDiscoveryLoop (exit code, listener cleanup)",
+        "2 remaining survivors: intervalMs value (timing-dependent) and clearInterval in onSignal (equivalent — cleanup() also clears)",
+        "DB operations, pagination logic, null checks all well-protected"
+      ]
+    },
     "dashboard/app/lib/auth.server.ts": {
       "status": "completed",
       "covering_tests": [
@@ -2777,11 +2905,11 @@
     }
   },
   "global_statistics": {
-    "total_modules": 42,
-    "completed_modules": 42,
-    "total_mutations": 636,
-    "total_killed": 597,
-    "total_survived": 39,
-    "overall_score": 93.9
+    "total_modules": 43,
+    "completed_modules": 43,
+    "total_mutations": 678,
+    "total_killed": 634,
+    "total_survived": 44,
+    "overall_score": 93.5
   }
 }

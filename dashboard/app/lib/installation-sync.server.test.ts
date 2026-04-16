@@ -1,5 +1,10 @@
 import { describe } from "riteway"
-import { shouldSyncInstallations, validateAppCredentials } from "./installation-sync.server.js"
+import {
+  shouldSyncInstallations,
+  startDiscoveryLoop,
+  startupSyncWithTimeout,
+  validateAppCredentials,
+} from "./installation-sync.server.js"
 
 const throws = (fn: () => unknown): string | null => {
   try {
@@ -125,5 +130,123 @@ describe("validateAppCredentials()", async (assert) => {
       }),
     ),
     expected: "QUARANTINE_APP_PRIVATE_KEY is set but blank",
+  })
+})
+
+describe("startupSyncWithTimeout() — success path", async (assert) => {
+  const logs: string[] = []
+  const terminateCalls: number[] = []
+
+  await startupSyncWithTimeout(
+    () => Promise.resolve(),
+    60_000,
+    (msg) => logs.push(msg),
+    (code) => terminateCalls.push(code),
+  )
+
+  assert({
+    given: "syncFn resolves quickly and timeoutMs is very large",
+    should: "not call terminate",
+    actual: terminateCalls.length,
+    expected: 0,
+  })
+})
+
+describe("startupSyncWithTimeout() — timeout exit code", async (assert) => {
+  const logs: string[] = []
+  const terminateCalls: number[] = []
+
+  let resolveTerminate!: () => void
+  const terminateCalled = new Promise<void>((resolve) => {
+    resolveTerminate = resolve
+  })
+
+  const neverResolves = new Promise<void>(() => {
+    // intentionally never resolves
+  })
+
+  startupSyncWithTimeout(
+    () => neverResolves,
+    0,
+    (msg) => logs.push(msg),
+    (code) => {
+      terminateCalls.push(code)
+      resolveTerminate()
+    },
+  ).catch(() => {
+    // timeout throws after terminate — ignore
+  })
+
+  await terminateCalled
+
+  assert({
+    given: "syncFn never resolves and timeoutMs is 0",
+    should: "call terminate with exit code 1",
+    actual: terminateCalls[0],
+    expected: 1,
+  })
+})
+
+describe("startupSyncWithTimeout() — timer cleared on success", async (assert) => {
+  const terminateCalls: number[] = []
+
+  await startupSyncWithTimeout(
+    () => Promise.resolve(),
+    1,
+    () => {},
+    (code) => terminateCalls.push(code),
+  )
+
+  // Wait longer than the timeout to confirm timer was cleared
+  await new Promise((r) => setTimeout(r, 20))
+
+  assert({
+    given: "syncFn resolves before a 1ms timeout and we wait 20ms afterward",
+    should: "not call terminate (timer was cleared)",
+    actual: terminateCalls.length,
+    expected: 0,
+  })
+})
+
+describe("startDiscoveryLoop() — signal terminate exit code", async (assert) => {
+  const terminateCalls: number[] = []
+
+  startDiscoveryLoop({
+    syncFn: () => Promise.resolve(),
+    intervalMs: 60_000,
+    shutdownSignals: ["SIGUSR2"],
+    log: () => {},
+    terminate: (code) => terminateCalls.push(code),
+  })
+
+  process.emit("SIGUSR2")
+
+  assert({
+    given: "a shutdown signal is received",
+    should: "call terminate with exit code 0",
+    actual: terminateCalls[0],
+    expected: 0,
+  })
+})
+
+describe("startDiscoveryLoop() — cleanup removes signal listener", async (assert) => {
+  const terminateCalls: number[] = []
+
+  const { cleanup } = startDiscoveryLoop({
+    syncFn: () => Promise.resolve(),
+    intervalMs: 60_000,
+    shutdownSignals: ["SIGUSR2"],
+    log: () => {},
+    terminate: (code) => terminateCalls.push(code),
+  })
+
+  cleanup()
+  process.emit("SIGUSR2")
+
+  assert({
+    given: "cleanup is called before the signal fires",
+    should: "not call terminate",
+    actual: terminateCalls.length,
+    expected: 0,
   })
 })
