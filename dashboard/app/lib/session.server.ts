@@ -9,7 +9,9 @@ const SESSION_KEY = "userId"
 export function createSessionMiddleware(secret: string) {
   const cookie = createCookie("__session", {
     httpOnly: true,
+    secure: true,
     sameSite: "Lax" as const,
+    maxAge: 28800,
     secrets: [secret],
   })
 

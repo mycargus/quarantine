@@ -159,6 +159,53 @@ describe("GET /auth/logout — authenticated user", async (assert) => {
   }
 })
 
+describe("Session cookie — secure attributes", async (assert) => {
+  const { router, sessionCookie, cleanup } = createTestApp({
+    repos: [],
+    oauthClientId: "test-client-id",
+    oauthClientSecret: "test-secret",
+    oauthOrigin: "http://localhost:3000",
+  })
+  const cookie = await sessionCookie()
+  try {
+    const response = await router.fetch(
+      new Request("http://localhost/auth/logout", { headers: { Cookie: cookie } }),
+    )
+    const setCookie = response.headers.get("Set-Cookie") ?? ""
+    const lower = setCookie.toLowerCase()
+
+    assert({
+      given: "a response that sets the session cookie",
+      should: "include the HttpOnly attribute",
+      actual: lower.includes("httponly"),
+      expected: true,
+    })
+
+    assert({
+      given: "a response that sets the session cookie",
+      should: "include the Secure attribute",
+      actual: lower.includes("secure"),
+      expected: true,
+    })
+
+    assert({
+      given: "a response that sets the session cookie",
+      should: "include SameSite=Lax",
+      actual: lower.includes("samesite=lax"),
+      expected: true,
+    })
+
+    assert({
+      given: "a response that sets the session cookie",
+      should: "include Max-Age=28800",
+      actual: lower.includes("max-age=28800"),
+      expected: true,
+    })
+  } finally {
+    cleanup()
+  }
+})
+
 describe("GET /auth/logout — no session cookie (expired or absent)", async (assert) => {
   const { router, cleanup } = createTestApp({ repos: [] })
   try {

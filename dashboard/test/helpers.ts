@@ -41,7 +41,9 @@ export interface TestApp {
 async function buildSessionCookie(): Promise<string> {
   const cookie = createCookie("__session", {
     httpOnly: true,
+    secure: true,
     sameSite: "Lax" as const,
+    maxAge: 28800,
     secrets: [TEST_SESSION_SECRET],
   })
   const session = createSession()
