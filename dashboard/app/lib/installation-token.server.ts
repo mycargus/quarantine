@@ -24,8 +24,9 @@ export class InstallationTokenProvider {
   }
 
   async getToken(installationId: number): Promise<InstallationToken> {
+    const REFRESH_THRESHOLD_MS = 5 * 60 * 1000
     const cached = this.cache.get(installationId)
-    if (cached && cached.expiresAt > new Date()) {
+    if (cached && cached.expiresAt.getTime() - Date.now() > REFRESH_THRESHOLD_MS) {
       return cached
     }
 

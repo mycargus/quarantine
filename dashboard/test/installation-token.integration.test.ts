@@ -59,6 +59,55 @@ function startMockGitHub(options: { expiresAt?: string } = {}): Promise<{
   })
 }
 
+interface MockResponse {
+  token: string
+  expires_at: string
+}
+
+function startMockGitHubSequence(responses: MockResponse[]): Promise<{
+  server: Server
+  port: number
+  captured: CapturedRequest[]
+}> {
+  return new Promise((resolve) => {
+    const captured: CapturedRequest[] = []
+    let callIndex = 0
+
+    const server = createServer((req: IncomingMessage, res) => {
+      let body = ""
+      req.on("data", (chunk: Buffer) => {
+        body += chunk.toString()
+      })
+      req.on("end", () => {
+        captured.push({
+          method: req.method,
+          url: req.url,
+          headers: req.headers,
+          body,
+        })
+
+        const response = responses[callIndex] ?? responses[responses.length - 1]
+        callIndex++
+
+        res.writeHead(200, { "Content-Type": "application/json" })
+        res.end(
+          JSON.stringify({
+            token: response.token,
+            expires_at: response.expires_at,
+            permissions: {},
+          }),
+        )
+      })
+    })
+
+    server.listen(0, "127.0.0.1", () => {
+      const addr = server.address()
+      const port = typeof addr === "object" && addr !== null ? addr.port : 0
+      resolve({ server, port, captured })
+    })
+  })
+}
+
 function closeServer(server: Server): Promise<void> {
   return new Promise((resolve) => {
     server.close(() => resolve())
@@ -161,6 +210,53 @@ describe("InstallationTokenProvider.getToken() — caching", async (assert) => {
       should: "return the same token from both calls",
       actual: second.token,
       expected: first.token,
+    })
+  } finally {
+    await closeServer(server)
+  }
+})
+
+describe("InstallationTokenProvider.getToken() — near-expiry refresh", async (assert) => {
+  const { privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  })
+
+  // First response: token that expires in 4 minutes (below 5-minute threshold)
+  const nearExpiry = new Date(Date.now() + 4 * 60 * 1000).toISOString()
+  // Second response: token with far-future expiry
+  const farFutureExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+
+  const { server, port, captured } = await startMockGitHubSequence([
+    { token: "ghs_near_expiry", expires_at: nearExpiry },
+    { token: "ghs_refreshed", expires_at: farFutureExpiry },
+  ])
+
+  try {
+    const provider = new InstallationTokenProvider({
+      clientID: "Iv1.abc123",
+      privateKeyPEM: privateKey as string,
+      baseUrl: `http://127.0.0.1:${port}`,
+    })
+
+    // First call populates cache with near-expiry token
+    await provider.getToken(12345)
+    // Second call should refresh because token expires in < 5 minutes
+    const refreshed = await provider.getToken(12345)
+
+    assert({
+      given: "a cached token expiring in 4 minutes (below 5-minute threshold)",
+      should: "make two HTTP requests (initial + refresh)",
+      actual: captured.length,
+      expected: 2,
+    })
+
+    assert({
+      given: "a cached token expiring in 4 minutes (below 5-minute threshold)",
+      should: "return the refreshed token",
+      actual: refreshed.token,
+      expected: "ghs_refreshed",
     })
   } finally {
     await closeServer(server)
