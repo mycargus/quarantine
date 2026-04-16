@@ -193,6 +193,29 @@ export async function syncInstallations(
         }
       }
 
+      // Detect repos removed from active installations
+      const selectLinkedProjects = raw.prepare(
+        "SELECT id, owner, repo FROM projects WHERE installation_id = ?",
+      )
+      const clearProjectInstallation = raw.prepare(
+        "UPDATE projects SET installation_id = NULL WHERE id = ?",
+      )
+
+      for (const [installationId, repos] of installationRepos) {
+        const repoNames = new Set(repos.map((r) => `${r.owner.login}/${r.name}`))
+        const linkedProjects = selectLinkedProjects.all(installationId) as Array<{
+          id: number
+          owner: string
+          repo: string
+        }>
+
+        for (const proj of linkedProjects) {
+          if (!repoNames.has(`${proj.owner}/${proj.repo}`)) {
+            clearProjectInstallation.run(proj.id)
+          }
+        }
+      }
+
       // Mark removed installations
       const existingInstallations = raw
         .prepare("SELECT id FROM installations WHERE removed_at IS NULL")
