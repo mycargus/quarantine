@@ -15,7 +15,7 @@
  *   QUARANTINE_TEST_REPO      — repo that has quarantine-results-* artifacts
  */
 
-import { spawnSync, spawn } from "node:child_process"
+import { spawn, spawnSync } from "node:child_process"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -56,15 +56,11 @@ function writeConfig(configPath) {
  * suitable for use in a Cookie request header.
  */
 function buildSessionCookie() {
-  const result = spawnSync(
-    "node",
-    ["--import", "tsx/esm", "scripts/e2e-session-cookie.ts"],
-    {
-      cwd: DASHBOARD_DIR,
-      env: { ...process.env, SESSION_SECRET: E2E_SESSION_SECRET },
-      encoding: "utf8",
-    },
-  )
+  const result = spawnSync("node", ["--import", "tsx/esm", "scripts/e2e-session-cookie.ts"], {
+    cwd: DASHBOARD_DIR,
+    env: { ...process.env, SESSION_SECRET: E2E_SESSION_SECRET },
+    encoding: "utf8",
+  })
   if (result.status !== 0) {
     throw new Error(`Failed to build session cookie:\n${result.stderr}`)
   }
