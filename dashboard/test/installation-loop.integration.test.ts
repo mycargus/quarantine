@@ -7,10 +7,7 @@
  */
 
 import { describe } from "riteway"
-import {
-  startDiscoveryLoop,
-  startupSyncWithTimeout,
-} from "../app/lib/installation-sync.server.js"
+import { startDiscoveryLoop, startupSyncWithTimeout } from "../app/lib/installation-sync.server.js"
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))

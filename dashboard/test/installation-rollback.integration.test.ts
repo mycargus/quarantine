@@ -59,14 +59,10 @@ describe("syncInstallations() -- partial upsert failure triggers full transactio
 
   // Pre-seed: 1 existing installation and 1 existing project
   raw
-    .prepare(
-      "INSERT INTO installations (id, account_login, suspended_at) VALUES (?, ?, ?)",
-    )
+    .prepare("INSERT INTO installations (id, account_login, suspended_at) VALUES (?, ?, ?)")
     .run(99, "pre-existing", null)
   raw
-    .prepare(
-      "INSERT INTO projects (owner, repo, installation_id) VALUES (?, ?, ?)",
-    )
+    .prepare("INSERT INTO projects (owner, repo, installation_id) VALUES (?, ?, ?)")
     .run("pre-existing", "old-repo", 99)
 
   // Create a SQLite trigger that raises an error when installation id=2 is inserted.
@@ -153,9 +149,7 @@ describe("syncInstallations() -- partial upsert failure triggers full transactio
 
     // Pre-existing project should still have installation_id=99 (unchanged)
     const preExistingProject = raw
-      .prepare(
-        "SELECT owner, repo, installation_id FROM projects WHERE owner = ? AND repo = ?",
-      )
+      .prepare("SELECT owner, repo, installation_id FROM projects WHERE owner = ? AND repo = ?")
       .get("pre-existing", "old-repo") as {
       owner: string
       repo: string
