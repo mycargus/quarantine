@@ -395,3 +395,91 @@ describe("startGitHubAppMode() — startup sync", async (assert) => {
     await closeServer(server)
   }
 })
+
+describe("syncInstallations() — API returns 500", async (assert) => {
+  const routes: Record<string, MockRoute> = {
+    "/app/installations?per_page=100": {
+      status: 500,
+      body: { message: "Internal Server Error" },
+    },
+  }
+
+  const { url, server } = await startMockServer(routes)
+  const { raw } = initDb(":memory:")
+
+  try {
+    // Seed pre-existing data to verify it survives the failure
+    raw
+      .prepare(
+        "INSERT INTO installations (id, account_login, suspended_at) VALUES (?, ?, ?)",
+      )
+      .run(99, "existing-org", null)
+    raw
+      .prepare(
+        "INSERT INTO projects (owner, repo, installation_id) VALUES (?, ?, ?)",
+      )
+      .run("existing-org", "existing-repo", 99)
+
+    const logs: string[] = []
+    const deps: SyncDeps = {
+      fetchFn: fetch,
+      baseUrl: url,
+      jwtToken: "mock-jwt-token",
+      getInstallationToken: async (id: number) => `mock-token-${id}`,
+      log: (msg: string) => logs.push(msg),
+    }
+
+    let thrownError: Error | null = null
+    try {
+      await syncInstallations(raw, deps)
+    } catch (err) {
+      thrownError = err instanceof Error ? err : new Error(String(err))
+    }
+
+    assert({
+      given: "GET /app/installations returns 500",
+      should: "not throw an error",
+      actual: thrownError,
+      expected: null,
+    })
+
+    // Verify installations table still has the pre-existing row
+    const installationRows = raw
+      .prepare("SELECT id, account_login FROM installations")
+      .all() as Array<{ id: number; account_login: string }>
+
+    assert({
+      given: "GET /app/installations returns 500",
+      should: "leave the pre-existing installation unchanged",
+      actual: installationRows,
+      expected: [{ id: 99, account_login: "existing-org" }],
+    })
+
+    // Verify projects table still has the pre-existing row
+    const projectRows = raw
+      .prepare("SELECT owner, repo, installation_id FROM projects")
+      .all() as Array<{ owner: string; repo: string; installation_id: number }>
+
+    assert({
+      given: "GET /app/installations returns 500",
+      should: "leave the pre-existing project unchanged",
+      actual: projectRows,
+      expected: [
+        { owner: "existing-org", repo: "existing-repo", installation_id: 99 },
+      ],
+    })
+
+    // Verify the error was logged
+    const hasErrorLog = logs.some((msg) => /error/i.test(msg))
+
+    assert({
+      given: "GET /app/installations returns 500",
+      should: "log an error message",
+      actual: hasErrorLog,
+      expected: true,
+    })
+  } finally {
+    raw.close()
+    await closeServer(server)
+  }
+})
