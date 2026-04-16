@@ -222,6 +222,75 @@ describe("startGitHubAppMode() — zero installations at startup", async (assert
   }
 })
 
+describe("syncInstallations() — installation with zero repositories", async (assert) => {
+  const installations = [
+    { id: 1, account: { login: "acme", id: 100 }, suspended_at: null, app_id: 10 },
+  ]
+
+  const emptyRepos = { total_count: 0, repositories: [] }
+
+  const routes: Record<string, MockRoute> = {
+    "/app/installations?per_page=100": {
+      status: 200,
+      body: installations,
+    },
+    "/installation/repositories?per_page=100": {
+      status: 200,
+      body: emptyRepos,
+    },
+  }
+
+  const { url, server } = await startMockServer(routes)
+  const { raw } = initDb(":memory:")
+
+  try {
+    const logs: string[] = []
+    const deps: SyncDeps = {
+      fetchFn: fetch,
+      baseUrl: url,
+      jwtToken: "mock-jwt-token",
+      getInstallationToken: async (id: number) => `mock-token-${id}`,
+      log: (msg: string) => logs.push(msg),
+    }
+
+    await syncInstallations(raw, deps)
+
+    // Verify the installation is upserted
+    const installationRows = raw
+      .prepare("SELECT id, account_login FROM installations ORDER BY id")
+      .all() as Array<{ id: number; account_login: string }>
+
+    assert({
+      given: "one installation with zero repositories",
+      should: "upsert the installation into the installations table",
+      actual: installationRows.length,
+      expected: 1,
+    })
+
+    assert({
+      given: "one installation with account login 'acme'",
+      should: "store the correct account login",
+      actual: installationRows[0]?.account_login,
+      expected: "acme",
+    })
+
+    // Verify no projects are linked to that installation
+    const projectRows = raw
+      .prepare("SELECT owner, repo FROM projects WHERE installation_id = ?")
+      .all(1) as Array<{ owner: string; repo: string }>
+
+    assert({
+      given: "an installation whose repo list is empty",
+      should: "have zero project rows linked to that installation",
+      actual: projectRows.length,
+      expected: 0,
+    })
+  } finally {
+    raw.close()
+    await closeServer(server)
+  }
+})
+
 describe("startGitHubAppMode() — startup sync", async (assert) => {
   const installations = [
     { id: 1, account: { login: "acme", id: 100 }, suspended_at: null, app_id: 10 },
