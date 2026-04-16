@@ -29,6 +29,7 @@ Each v1 scenario is tagged with the milestone where it first becomes testable.
 
 ## v2+ Scenarios
 
-See [v2/01-v2-scenarios.md](v2/01-v2-scenarios.md) for post-v1 scenarios including:
-GitHub App, OAuth, Jira, Slack notifications, Jenkins CI, `--base-branch` for
-non-GHA CI (ADR-023), and adaptive polling.
+| File | Topics | Milestones |
+|------|--------|------------|
+| [v2/01-v2-scenarios.md](v2/01-v2-scenarios.md) | GitHub App install, OAuth, Jira, Slack, Jenkins, `--base-branch`, adaptive polling | v2+ future |
+| [v2/02-github-app-auth.md](v2/02-github-app-auth.md) | JWT, installation tokens, OAuth login, installation discovery, rate limiting | M12–M16 |

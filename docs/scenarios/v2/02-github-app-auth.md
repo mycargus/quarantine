@@ -524,3 +524,105 @@ Removed: no refresh tokens. Session cookie expires after 8 hours. No concurrent 
 **Given** an unauthenticated client has exceeded 20 requests in the current 1-minute window (receiving HTTP 429 responses), and the injectable clock is advanced past the 60-second window boundary
 **When** the client sends a new request
 **Then** the request is processed normally (HTTP status is not 429) because the fixed-window counter has reset for the new window
+
+---
+
+## Installation Discovery Edge Cases (M14)
+
+### Scenario 157: Zero installations at startup [M14]
+
+**Risk:** A newly registered App with no org installations causes the dashboard to panic on an empty API response or leave the HTTP server in an unstarted state, blocking all traffic.
+
+**Given** the dashboard is configured with `source: github-app` and valid App credentials, and `GET /app/installations` returns an empty array
+**When** the dashboard process starts
+**Then** it completes startup with empty `installations` and `projects` tables and begins serving HTTP traffic normally
+
+---
+
+### Scenario 158: Installation with zero repositories [M14]
+
+**Risk:** An installation that has no repos assigned causes a panic when iterating an empty repos response, or produces a stale entry for an installation that contributed no projects.
+
+**Given** `GET /app/installations` returns one installation; `GET /installation/repositories` for that installation returns an empty array
+**When** `syncInstallations()` runs
+**Then** the installation is upserted into `installations` with zero associated projects; no rows in `projects` are linked to that installation
+
+---
+
+### Scenario 159: shouldSyncInstallations returns true when no sync has ever occurred [M14]
+
+**Risk:** A null `lastSyncedAt` on first startup is misinterpreted as a zero-epoch timestamp, causing the function to return false and skip the initial sync entirely.
+
+**Given** `lastSyncedAt` is null, `now` is any timestamp, and `intervalMs` is 900000 (15 min)
+**When** `shouldSyncInstallations(null, now, intervalMs)` is called
+**Then** it returns true
+
+---
+
+### Scenario 160: shouldSyncInstallations returns false when last sync is recent [M14]
+
+**Risk:** The background loop re-syncs immediately after startup (before 15 min has elapsed), wasting rate limit budget on redundant discovery calls.
+
+**Given** `lastSyncedAt` is 5 minutes ago, `intervalMs` is 900000 (15 min)
+**When** `shouldSyncInstallations(lastSyncedAt, now, intervalMs)` is called
+**Then** it returns false
+
+---
+
+### Scenario 161: shouldSyncInstallations returns false at the exact interval boundary [M14]
+
+**Risk:** An off-by-one error causes a sync to fire at exactly the interval boundary before the next cycle is truly due, producing a phantom sync every interval instead of one per interval.
+
+**Given** `now - lastSyncedAt` equals `intervalMs` exactly (e.g., both 900000 ms apart), with `intervalMs` = 900000
+**When** `shouldSyncInstallations(lastSyncedAt, now, intervalMs)` is called
+**Then** it returns false (stale means strictly greater than the interval, not equal)
+
+---
+
+### Scenario 162: Suspended installation becomes active again [M14]
+
+**Risk:** Once an installation is suspended, the dashboard never resumes polling its repos even after the operator reactivates it, permanently blocking artifact discovery for those repos.
+
+**Given** the `installations` table has an installation with a non-null `suspended_at` timestamp; the next `GET /app/installations` response returns the same installation with `suspended_at: null`
+**When** `syncInstallations()` runs
+**Then** the installation's `suspended_at` is updated to NULL in the database; artifact polling resumes for repos linked to that installation on the next polling cycle
+
+---
+
+### Scenario 163: Previously removed installation reappears after reinstall [M14]
+
+**Risk:** After an org admin uninstalls and then reinstalls the App, the dashboard still treats the installation as removed (non-null `removed_at`), causing artifact polling to skip all its repos indefinitely.
+
+**Given** the `installations` table has an installation with a non-null `removed_at` timestamp; the next `GET /app/installations` response includes that installation (it was reinstalled)
+**When** `syncInstallations()` runs
+**Then** the installation's `removed_at` is set to NULL; its repos are re-linked to the installation in `projects`; artifact polling resumes for those repos
+
+---
+
+### Scenario 164: Partial sync failure triggers full transaction rollback [M14]
+
+**Risk:** If the upsert for one installation succeeds but a subsequent upsert fails mid-transaction, the database is left in a partially updated state that mixes old and new data, violating the transaction invariant.
+
+**Given** `GET /app/installations` returns 2 installations; the first installation upserts successfully; the second upsert fails (e.g., a simulated constraint violation)
+**When** `syncInstallations()` runs
+**Then** the entire transaction is rolled back; the `installations` and `projects` tables retain their pre-sync state; the error is logged; `syncInstallations()` does not throw
+
+---
+
+### Scenario 165: Blank App credentials at startup fail fast [M14]
+
+**Risk:** An operator sets `QUARANTINE_APP_CLIENT_ID` to an empty string instead of omitting it, and the dashboard silently treats it as unconfigured, starting in an undefined state that produces cryptic downstream API errors.
+
+**Given** `dashboard.yml` has `source: github-app` and `QUARANTINE_APP_CLIENT_ID` is set to an empty string `""`
+**When** the dashboard process starts
+**Then** startup fails immediately with a descriptive error identifying that the credential is present but blank; the HTTP server does not start
+
+---
+
+### Scenario 166: Single-page installation response requires no further page fetch [M14]
+
+**Risk:** Pagination logic always attempts to fetch page 2 even when the first response has fewer than 100 items and no `Link` header, making a spurious API call on every sync for small installations.
+
+**Given** `GET /app/installations?per_page=100` returns 3 installations with no `Link` response header
+**When** `syncInstallations()` runs
+**Then** no additional page request is made; all 3 installations are discovered and upserted; `GET /app/installations` is called exactly once
