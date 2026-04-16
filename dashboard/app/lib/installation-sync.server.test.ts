@@ -1,5 +1,17 @@
 import { describe } from "riteway"
-import { shouldSyncInstallations } from "./installation-sync.server.js"
+import {
+  shouldSyncInstallations,
+  validateAppCredentials,
+} from "./installation-sync.server.js"
+
+const throws = (fn: () => unknown): string | null => {
+  try {
+    fn()
+    return null
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e)
+  }
+}
 
 const now = new Date("2026-04-16T12:00:00.000Z")
 const FIFTEEN_MIN = 900_000
@@ -41,4 +53,56 @@ describe("shouldSyncInstallations()", async (assert) => {
       expected: true,
     })
   }
+})
+
+describe("validateAppCredentials()", async (assert) => {
+  assert({
+    given: "both clientId and privateKey are present",
+    should: "return validated credentials",
+    actual: validateAppCredentials({
+      clientId: "Iv1.abc123",
+      privateKey: "-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----",
+    }),
+    expected: {
+      clientId: "Iv1.abc123",
+      privateKey: "-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----",
+    },
+  })
+
+  assert({
+    given: "clientId is missing",
+    should: "throw an error naming QUARANTINE_APP_CLIENT_ID",
+    actual: throws(() =>
+      validateAppCredentials({
+        clientId: undefined,
+        privateKey: "-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----",
+      }),
+    ),
+    expected: "Missing required environment variable: QUARANTINE_APP_CLIENT_ID",
+  })
+
+  assert({
+    given: "privateKey is missing",
+    should: "throw an error naming QUARANTINE_APP_PRIVATE_KEY",
+    actual: throws(() =>
+      validateAppCredentials({
+        clientId: "Iv1.abc123",
+        privateKey: undefined,
+      }),
+    ),
+    expected: "Missing required environment variable: QUARANTINE_APP_PRIVATE_KEY",
+  })
+
+  assert({
+    given: "both clientId and privateKey are missing",
+    should: "throw an error naming both missing variables",
+    actual: throws(() =>
+      validateAppCredentials({
+        clientId: undefined,
+        privateKey: undefined,
+      }),
+    ),
+    expected:
+      "Missing required environment variables: QUARANTINE_APP_CLIENT_ID, QUARANTINE_APP_PRIVATE_KEY",
+  })
 })
