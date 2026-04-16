@@ -31,6 +31,22 @@ describe("resolvePrivateKey()", async (assert) => {
   }
 
   {
+    const envPEM = "-----BEGIN RSA PRIVATE KEY-----\nenv-key-data\n-----END RSA PRIVATE KEY-----"
+    const pathPEM = "-----BEGIN RSA PRIVATE KEY-----\npath-key-data\n-----END RSA PRIVATE KEY-----"
+    const pathReader = (path: string): string => {
+      if (path === "/mounted/secret.pem") return pathPEM
+      throw new Error(`Unexpected path: ${path}`)
+    }
+
+    assert({
+      given: "both QUARANTINE_APP_PRIVATE_KEY and QUARANTINE_APP_PRIVATE_KEY_PATH are set",
+      should: "use the file path value (file path takes precedence)",
+      actual: resolvePrivateKey(envPEM, "/mounted/secret.pem", pathReader),
+      expected: pathPEM,
+    })
+  }
+
+  {
     const missingFileReader = (_path: string): string => {
       throw Object.assign(new Error("ENOENT: no such file or directory"), {
         code: "ENOENT",
