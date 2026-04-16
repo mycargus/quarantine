@@ -436,3 +436,91 @@ Removed: no refresh tokens. Session cookie expires after 8 hours. No concurrent 
 **Given** a user has no active session (cookie expired or never set)
 **When** they request `GET /auth/logout`
 **Then** the dashboard redirects to `/auth/login` without returning an error (clearing the cookie is a no-op when the session is already expired)
+
+---
+
+## OAuth Callback (M13)
+
+### Scenario 60: OAuth callback completes login and sets session cookie [v2]
+
+**Risk:** A broken callback handler leaves users stranded after authorizing on GitHub — they are redirected to the callback URL but receive no session, forcing them to repeat the OAuth flow indefinitely.
+
+**Given** a user has authorized the Quarantine App on GitHub and GitHub has redirected them to `/auth/github/callback` with a valid authorization code and CSRF state parameter
+**When** the dashboard processes the `GET /auth/github/callback?code={code}&state={state}` request
+**Then** `@remix-run/auth` validates the state parameter and PKCE challenge, exchanges the code for a GitHub access token, stores the access token and user profile in an encrypted session cookie with `httpOnly`, `secure`, `SameSite=Lax`, and `Max-Age=28800` attributes, and responds with HTTP 302 redirecting the user to `/`
+
+---
+
+### Scenario 61: Authenticated user accesses protected route successfully [v2]
+
+**Risk:** The `requireAuth()` middleware incorrectly challenges valid sessions, causing a login loop for users who are already authenticated.
+
+**Given** a user has a valid, non-expired encrypted session cookie containing their access token and user profile
+**When** they request `GET /` (or any protected route)
+**Then** the dashboard returns HTTP 200
+
+---
+
+### Scenario 64: OAuth callback with invalid authorization code returns an error [v2]
+
+**Risk:** An invalid or expired authorization code (e.g., replayed redirect, stale tab) silently succeeds or panics, creating a security vulnerability or an unhandled exception.
+
+**Given** GitHub has redirected the user to `/auth/github/callback` but the authorization code is invalid or has already been consumed (GitHub returns an error on the token exchange)
+**When** the dashboard processes the callback request
+**Then** the dashboard responds with an HTTP error status (4xx) and does NOT set a session cookie
+
+---
+
+## Auth Event Logging (M13)
+
+### Scenario 62: Login event is logged with timestamp and user ID [v2]
+
+**Risk:** Without auth audit logs, security incidents (account takeover, unexpected logins) are invisible to operators with no way to reconstruct who logged in and when.
+
+**Given** a user successfully completes OAuth login via `/auth/github/callback`
+**When** the dashboard stores the session
+**Then** a log entry is written that includes the event type, an ISO 8601 timestamp, and the user's GitHub user ID; the access token value (matching the `ghu_` prefix format) does NOT appear anywhere in the log output
+
+---
+
+### Scenario 63: Logout event is logged with timestamp and user ID [v2]
+
+**Risk:** Logout events are not audited, making it impossible to reconstruct session termination during a security incident response.
+
+**Given** a user with an active authenticated session requests `GET /auth/logout`
+**When** the dashboard clears the session cookie
+**Then** a log entry is written that includes the event type, an ISO 8601 timestamp, and the user's GitHub user ID; the access token value does NOT appear anywhere in the log output
+
+---
+
+### Scenario 65: Token values never appear in any auth-related log output [v2]
+
+**Risk:** Auth middleware or session serialization code inadvertently logs the session object or request headers verbatim, exposing bearer tokens to anyone with log read access.
+
+**Given** the dashboard processes any auth-related operation (login callback, logout, session validation on a protected route)
+**When** the operation writes to the application log
+**Then** the log output does not contain any substring matching a GitHub user-to-server token format (the `ghu_` prefix); this holds for both success paths and error paths
+
+---
+
+## OAuth Configuration (M13)
+
+### Scenario 66: Dashboard fails fast when OAuth environment variables are missing [v2]
+
+**Risk:** The dashboard starts without required OAuth credentials and silently fails on every login attempt with cryptic internal errors, rather than giving operators an immediate, actionable startup message.
+
+**Given** any one of `QUARANTINE_APP_CLIENT_ID`, `QUARANTINE_APP_CLIENT_SECRET`, or `QUARANTINE_APP_ORIGIN` is not set in the environment
+**When** the dashboard process starts
+**Then** startup fails immediately with a descriptive error message identifying which variable is missing; the HTTP server does not start
+
+---
+
+## Rate Limit Window Reset (M13)
+
+### Scenario 67: Rate limit counter resets after the window expires [v2]
+
+**Risk:** A fixed-window counter that never resets permanently blocks clients after a burst, making the dashboard unusable beyond the first rate-limited minute.
+
+**Given** an unauthenticated client has exceeded 20 requests in the current 1-minute window (receiving HTTP 429 responses), and the injectable clock is advanced past the 60-second window boundary
+**When** the client sends a new request
+**Then** the request is processed normally (HTTP status is not 429) because the fixed-window counter has reset for the new window
