@@ -238,3 +238,71 @@ export async function syncInstallations(raw: RawDatabase, deps: SyncDeps): Promi
     deps.log(`Installation sync error: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
+
+export interface DiscoveryLoopDeps {
+  syncFn: () => Promise<void>
+  intervalMs: number
+  shutdownSignals?: string[]
+  log?: (msg: string) => void
+  terminate?: (code: number) => void
+}
+
+export interface DiscoveryLoopResult {
+  cleanup: () => void
+}
+
+export function startDiscoveryLoop(deps: DiscoveryLoopDeps): DiscoveryLoopResult {
+  const log = deps.log ?? console.log
+  const terminate = deps.terminate ?? process.exit
+  const signals = deps.shutdownSignals ?? ["SIGTERM", "SIGINT"]
+
+  const interval = setInterval(async () => {
+    log("Discovery loop: starting sync")
+    await deps.syncFn()
+    log("Discovery loop: sync complete")
+  }, deps.intervalMs)
+
+  const onSignal = () => {
+    log("Discovery loop: received shutdown signal, clearing interval")
+    clearInterval(interval)
+    cleanup()
+    terminate(0)
+  }
+
+  for (const sig of signals) {
+    process.on(sig, onSignal)
+  }
+
+  function cleanup() {
+    clearInterval(interval)
+    for (const sig of signals) {
+      process.removeListener(sig, onSignal)
+    }
+  }
+
+  return { cleanup }
+}
+
+export async function startupSyncWithTimeout(
+  syncFn: () => Promise<void>,
+  timeoutMs: number,
+  log: (msg: string) => void,
+  terminate: (code: number) => void,
+): Promise<void> {
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    log(`Startup sync timed out after ${timeoutMs}ms`)
+    terminate(1)
+  }, timeoutMs)
+
+  try {
+    await syncFn()
+  } finally {
+    clearTimeout(timer)
+  }
+
+  if (timedOut) {
+    throw new Error("Startup sync timed out")
+  }
+}
