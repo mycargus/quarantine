@@ -18,6 +18,7 @@ export class InstallationTokenProvider {
   private baseUrl: string
   private warn: (message: string) => void
   private cache: Map<number, InstallationToken> = new Map()
+  private pending: Map<number, Promise<InstallationToken>> = new Map()
 
   constructor(options: TokenProviderOptions) {
     this.clientID = options.clientID
@@ -33,6 +34,22 @@ export class InstallationTokenProvider {
       return cached
     }
 
+    const inflight = this.pending.get(installationId)
+    if (inflight) {
+      return inflight
+    }
+
+    const exchangePromise = this.exchange(installationId)
+    this.pending.set(installationId, exchangePromise)
+    try {
+      const token = await exchangePromise
+      return token
+    } finally {
+      this.pending.delete(installationId)
+    }
+  }
+
+  private async exchange(installationId: number): Promise<InstallationToken> {
     try {
       const jwt = generateJWT(this.clientID, this.privateKeyPEM, new Date())
       const url = `${this.baseUrl}/app/installations/${installationId}/access_tokens`
