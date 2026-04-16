@@ -284,3 +284,80 @@ func TestBuildAtWithRetries_OriginalStatusSetOnRetry(t *testing.T) {
 		Expected: "failed",
 	})
 }
+
+func TestBuildAtWithRetries_UnresolvedClassification(t *testing.T) {
+	// MEDIUM #1: The Unresolved=true branch (result.go:156-158) had no direct unit
+	// test. This verifies that a rerun command crash classifies the test as
+	// "unresolved" and increments Summary.Unresolved.
+	failMsg := "assertion failed"
+	tests := []parser.TestResult{
+		{TestID: "t-unresolved", Status: "failed", FailureMessage: &failMsg},
+	}
+	retries := map[string]result.RetryOutcome{
+		"t-unresolved": {Unresolved: true},
+	}
+
+	res := result.BuildAtWithRetries(tests, retries, result.Metadata{}, "2026-01-15T10:00:00Z")
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a failed test whose rerun command crashed (Unresolved=true, no Attempts)",
+		Should:   "classify the test as unresolved",
+		Actual:   res.Tests[0].Status,
+		Expected: "unresolved",
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a failed test whose rerun command crashed (Unresolved=true, no Attempts)",
+		Should:   "increment Summary.Unresolved to 1",
+		Actual:   res.Summary.Unresolved,
+		Expected: 1,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a failed test whose rerun command crashed (Unresolved=true, no Attempts)",
+		Should:   "set OriginalStatus to the initial failed status",
+		Actual:   res.Tests[0].OriginalStatus != nil && *res.Tests[0].OriginalStatus == "failed",
+		Expected: true,
+	})
+}
+
+func TestBuildAtWithRetries_UnresolvedTakesPrecedenceOverAttempts(t *testing.T) {
+	// LOW #4: When both Unresolved=true and Attempts are non-empty, the Unresolved
+	// branch must take precedence — the test is classified as "unresolved", not
+	// "flaky" (even though one attempt passed).
+	failMsg := "assertion failed"
+	tests := []parser.TestResult{
+		{TestID: "t-precedence", Status: "failed", FailureMessage: &failMsg},
+	}
+	retries := map[string]result.RetryOutcome{
+		"t-precedence": {
+			Unresolved: true,
+			Attempts: []result.RetryEntry{
+				{Attempt: 1, Status: "passed", DurationMs: 50},
+			},
+		},
+	}
+
+	res := result.BuildAtWithRetries(tests, retries, result.Metadata{}, "2026-01-15T10:00:00Z")
+
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "a test with Unresolved=true AND a passing retry attempt",
+		Should:   "classify as unresolved (Unresolved takes precedence over Attempts)",
+		Actual:   res.Tests[0].Status,
+		Expected: "unresolved",
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a test with Unresolved=true AND a passing retry attempt",
+		Should:   "count as unresolved in summary (not flaky)",
+		Actual:   res.Summary.Unresolved,
+		Expected: 1,
+	})
+
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "a test with Unresolved=true AND a passing retry attempt",
+		Should:   "not count as flaky",
+		Actual:   res.Summary.FlakyDetected,
+		Expected: 0,
+	})
+}

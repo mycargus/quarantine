@@ -366,3 +366,39 @@ func TestRerunFailureWarning(t *testing.T) {
 		Expected: true,
 	})
 }
+
+// LOW #2: allTestsQuarantined is a pure function with three branches.
+// Direct unit tests guard against mutations (e.g., removing the Total==0 check).
+
+func TestAllTestsQuarantined_ZeroTotal(t *testing.T) {
+	res := result.Result{Summary: result.Summary{Total: 0, Quarantined: 0}}
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a result with zero total tests",
+		Should:   "return true (vacuously — no tests means nothing ran)",
+		Actual:   allTestsQuarantined(res),
+		Expected: true,
+	})
+}
+
+func TestAllTestsQuarantined_AllQuarantined(t *testing.T) {
+	res := result.Result{Summary: result.Summary{Total: 3, Quarantined: 3}}
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a result where quarantined count equals total",
+		Should:   "return true",
+		Actual:   allTestsQuarantined(res),
+		Expected: true,
+	})
+}
+
+func TestAllTestsQuarantined_SomeNotQuarantined(t *testing.T) {
+	res := result.Result{Summary: result.Summary{Total: 5, Quarantined: 3, Passed: 2}}
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "a result where quarantined count is less than total",
+		Should:   "return false",
+		Actual:   allTestsQuarantined(res),
+		Expected: false,
+	})
+}

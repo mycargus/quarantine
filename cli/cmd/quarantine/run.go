@@ -261,6 +261,17 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 	// Skip PR scope checks (will be wired in a later scenario).
 	skipReasons := map[string]string{}
 
+	// Snapshot the quarantined test IDs before addNewFlakyTests modifies the state.
+	// Reclassification uses this pre-run set so that newly detected flaky tests in
+	// this run are NOT reclassified — their first-detection status ("flaky") is
+	// preserved in the results for this run.
+	preRunQuarantinedIDs := make(map[string]bool)
+	if qState != nil {
+		for id := range qState.Tests {
+			preRunQuarantinedIDs[id] = true
+		}
+	}
+
 	// Write quarantine state.
 	if qState != nil && !dryRun {
 		flakyAdded := addNewFlakyTests(qState, res, skipReasons)
@@ -269,6 +280,12 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 			writeUpdatedQuarantineState(ctx, cmd, cfg, qState, qStateContent, qStateSHA, ghClient, removedTestIDs, statePath)
 		}
 	}
+
+	// Reclassify tests that were quarantined before this run. Any test in the
+	// pre-run quarantine state has its execution-derived status ("failed", "flaky",
+	// or "passed") replaced with "quarantined", suppressing its failures from the
+	// exit code. Skipped and unresolved tests are left unchanged.
+	result.ReclassifyQuarantinedTests(preRunQuarantinedIDs, &res)
 
 	// Create GitHub issues and post PR comment.
 	if !dryRun && ghClient != nil {

@@ -157,9 +157,9 @@ func TestRunJestWithQuarantinedTestExcluded(t *testing.T) {
 // --- Scenario 22: RSpec-style — quarantine state loaded correctly ---
 
 func TestRunRSpecWithQuarantinedTestFailureSuppressed(t *testing.T) {
-	// In suite mode, post-execution RSpec filtering is not applied.
-	// This test verifies that when quarantine state is loaded, the run
-	// still completes even when a quarantined test appears failed in XML.
+	// In suite mode, post-execution reclassification suppresses quarantined failures.
+	// XML has one quarantined test that failed and one non-quarantined test that passed.
+	// The quarantined failure is suppressed → exit 0.
 	dir := t.TempDir()
 
 	qs := quarantine.NewEmptyState()
@@ -196,12 +196,12 @@ func TestRunRSpecWithQuarantinedTestFailureSuppressed(t *testing.T) {
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
 	})
 
-	// In suite mode, failures exit 1 (not suppressed post-execution).
+	// Quarantined failure is suppressed → exit 0.
 	riteway.Assert(t, riteway.Case[int]{
-		Given:    "suite run where one test fails (quarantine state loaded)",
-		Should:   "exit with code 1 (genuine failure)",
+		Given:    "suite run where the only failure is a quarantined test (quarantine state loaded)",
+		Should:   "exit 0 (quarantined failure suppressed)",
 		Actual:   exitCode,
-		Expected: 1,
+		Expected: 0,
 	})
 }
 

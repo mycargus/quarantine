@@ -99,3 +99,44 @@ func TestWriteUpdatedQuarantineState422EmitsWarning(t *testing.T) {
 		Expected: true,
 	})
 }
+
+// --- writeUpdatedQuarantineState: CAS exhausted after 409 conflicts ---
+
+func TestWriteUpdatedQuarantineStateCASExhaustedEmitsWarning(t *testing.T) {
+	// Server always returns 409 on PUT and serves empty state on GET (for CAS retries).
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.Method {
+		case "PUT":
+			w.WriteHeader(http.StatusConflict) // 409
+		case "GET":
+			// CAS retry reads the remote state after a conflict.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"content":"eyJ2ZXJzaW9uIjoxLCJ1cGRhdGVkX2F0IjoiMjAyNi0wMS0wMVQwMDowMDowMFoiLCJ0ZXN0cyI6e319","sha":"remote-sha"}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	cmd, buf := newCaptureCmd(t)
+	client := newWriteStateClient(t, server)
+	state, originalContent := dirtyState(t)
+	cfg := &config.Config{Storage: config.StorageConfig{Branch: "quarantine/state"}}
+
+	writeUpdatedQuarantineState(context.Background(), cmd, cfg, state, originalContent, "old-sha", client, nil, "quarantine.json")
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "PUT /contents always returns 409 (CAS conflict exhausted)",
+		Should:   "emit a warning mentioning the 3 attempts",
+		Actual:   strings.Contains(buf.String(), "3 attempts"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "PUT /contents always returns 409 (CAS conflict exhausted)",
+		Should:   "emit a warning mentioning concurrent write conflicts",
+		Actual:   strings.Contains(buf.String(), "concurrent write conflicts"),
+		Expected: true,
+	})
+}

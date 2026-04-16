@@ -21,7 +21,7 @@ Each v1 scenario is tagged with the milestone where it first becomes testable.
 | [Schema Validation](v1/12-schema-validation.md) | M8 |
 | [Parameterized Tests](v1/13-parameterized-tests.md) | M8 |
 | [Multi-Suite Initialization](v1/14-multi-suite-init.md) | M9 |
-| [Multi-Suite Run & Errors](v1/15-multi-suite-run.md) | M9 |
+| [Multi-Suite Run & Errors](v1/15-multi-suite-run.md) | M9 (incl. post-execution reclassification 148–152) |
 | [Suite Management](v1/17-suite-management.md) | M10 |
 | [Quarantine Status](v1/18-quarantine-status.md) | M10 |
 | [Timeout Enforcement](v1/19-timeouts.md) | M10 |

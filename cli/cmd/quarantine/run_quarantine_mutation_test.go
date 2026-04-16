@@ -98,10 +98,11 @@ func TestRunRSpecFilteringSkippedWhenQStateNil(t *testing.T) {
 	})
 }
 
-// TestRunJestFilteringSkippedEvenWhenQStateNonNil: in suite mode, there is no
-// post-execution filtering for any framework. A failing test that happens to be
-// in quarantine state still causes exit 1.
-func TestRunJestFilteringSkippedEvenWhenQStateNonNil(t *testing.T) {
+// TestRunQuarantinedFailureSuppressedWhenQStateNonNil: in suite mode, post-execution
+// reclassification suppresses quarantined failures. A failing test in the quarantine
+// state exits 0 (failure suppressed). This kills the mutation of removing the
+// ReclassifyQuarantinedTests call when qState is non-nil.
+func TestRunQuarantinedFailureSuppressedWhenQStateNonNil(t *testing.T) {
 	dir := t.TempDir()
 
 	qs := quarantine.NewEmptyState()
@@ -137,11 +138,11 @@ func TestRunJestFilteringSkippedEvenWhenQStateNonNil(t *testing.T) {
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
 	})
 
-	// In suite mode, no post-execution filtering. Failure stands → exit 1.
+	// In suite mode, post-execution reclassification suppresses quarantined failures → exit 0.
 	riteway.Assert(t, riteway.Case[int]{
-		Given:    "suite with failing test that is in quarantine state (no post-filtering in suite mode)",
-		Should:   "exit 1 (failure not suppressed)",
+		Given:    "suite with failing test that is in quarantine state",
+		Should:   "exit 0 (quarantined failure suppressed)",
 		Actual:   exitCode,
-		Expected: 1,
+		Expected: 0,
 	})
 }

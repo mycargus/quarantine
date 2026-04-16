@@ -345,3 +345,310 @@ The CLI prints a warning and exits 0:
 Warning: no JUnit XML files found at 'rspec.xml'.
 Run your test suite first to produce JUnit XML output, then re-run with --dry-run.
 ```
+
+---
+
+### Scenario 148: previously quarantined test executes and fails all retries — failure suppressed, exit 0 [M9]
+
+**Risk:** A test that was quarantined before this run fails deterministically, breaks the build with exit 1, and defeats the purpose of quarantine — which is to prevent known-flaky tests from blocking CI.
+
+**Given** `.quarantine/config.yml` with a `jest-tests` suite
+
+**And** `.quarantine/jest-tests/state.json` on the `quarantine/state` branch contains:
+```json
+{
+  "tests": {
+    "src/payment.test.js::PaymentService::should handle charge timeout": {
+      "test_id": "src/payment.test.js::PaymentService::should handle charge timeout",
+      "issue_number": 42,
+      "quarantined_by": "auto"
+    }
+  }
+}
+```
+
+**And** GitHub Issue #42 is still open
+
+**When** CI executes `quarantine run jest-tests` and `should handle charge timeout` fails on the initial run and on all 3 retries (it is consistently failing today)
+
+**Then** quarantine:
+1. Reads state — finds `should handle charge timeout` quarantined with issue #42 open.
+2. Executes the suite command unmodified.
+3. Parses JUnit XML — `should handle charge timeout` has `status: "failed"`.
+4. Retries the failing test 3 times — it fails every attempt.
+5. After retries, **reclassifies** `should handle charge timeout` from `"failed"` to
+   `"quarantined"` in the result, setting `original_status: "failed"`.
+6. Updates `last_failure_at` and increments `flaky_count` in the state entry.
+7. Writes `.quarantine/jest-tests/results.json` with:
+   - `status: "quarantined"`, `original_status: "failed"` for the reclassified test
+   - `summary.quarantined: 1`, `summary.failed: 0`
+8. Posts or updates the PR comment showing the quarantined test.
+9. Exits with code **0** — the quarantined failure does not break the build.
+
+**Note:** This replaces the RSpec-specific Scenario 22 behavior. In suite mode, all frameworks use post-execution reclassification rather than framework-specific exclusion flags.
+
+---
+
+### Scenario 149: previously quarantined test executes and passes — reclassified quarantined with original_status: passed [M9]
+
+**Risk:** A quarantined test that happens to pass in this run is silently treated as a clean non-quarantined pass, misrepresenting that the test is still under quarantine management and still has an open issue to resolve.
+
+**Given** `.quarantine/config.yml` with a `jest-tests` suite
+
+**And** `.quarantine/jest-tests/state.json` contains an entry for
+`src/auth.test.js::AuthService::should validate expired token` with
+`issue_number: 43` (issue open)
+
+**When** CI executes `quarantine run jest-tests` and `should validate expired token`
+passes on the initial run (no retries triggered)
+
+**Then** quarantine:
+1. Reads state — finds the test quarantined with issue #43 open.
+2. Executes the suite command unmodified.
+3. Parses JUnit XML — `should validate expired token` has `status: "passed"`.
+4. No retries triggered (test passed).
+5. **Reclassifies** `should validate expired token` from `"passed"` to
+   `"quarantined"` in the result, setting `original_status: "passed"`.
+6. Writes `.quarantine/jest-tests/results.json` with:
+   - `status: "quarantined"`, `original_status: "passed"` for the test
+   - `summary.quarantined: 1`, `summary.passed: 0` (the pass is absorbed into quarantined)
+7. Exits with code **0**.
+
+The test remains quarantined until a human closes Issue #43. The `original_status: "passed"` signal informs the developer that the test is stable now and the issue can be reviewed for closure.
+
+---
+
+### Scenario 150: previously quarantined test is flaky again — reclassified quarantined with original_status: flaky [M9]
+
+**Risk:** A quarantined test that fails initially but passes on retry is double-counted as both a newly detected flaky test and a quarantined one, creating a duplicate GitHub Issue and overcounting in the summary.
+
+**Given** `.quarantine/config.yml` with a `jest-tests` suite
+
+**And** `.quarantine/jest-tests/state.json` contains an entry for
+`src/cache.test.js::CacheService::should handle eviction under load` with
+`issue_number: 44` (issue open) and `flaky_count: 2`
+
+**When** CI executes `quarantine run jest-tests` and `should handle eviction under load`
+fails on the initial run but passes on retry 1
+
+**Then** quarantine:
+1. Reads state — finds the test quarantined with issue #44 open.
+2. Executes the suite command unmodified.
+3. Parses JUnit XML — the test has `status: "failed"`.
+4. Retries — passes on attempt 1. `BuildWithRetries` classifies the test as `"flaky"`.
+5. `addNewFlakyTests` recognizes the test is **already in state**, increments its
+   `flaky_count` to 3, and updates `last_failure_at`. It does NOT create a new
+   state entry (no duplicate).
+6. **Reclassifies** the test from `"flaky"` to `"quarantined"` in the result,
+   setting `original_status: "flaky"`.
+7. Writes `.quarantine/jest-tests/results.json` with:
+   - `status: "quarantined"`, `original_status: "flaky"` for the test
+   - `summary.quarantined: 1`, `summary.flaky_detected: 0`
+8. Does NOT create a duplicate GitHub Issue (test already has issue #44).
+9. Exits with code **0**.
+
+---
+
+### Scenario 151: quarantined failure and genuine failure in the same run — genuine failure drives exit 1 [M9]
+
+**Risk:** A quarantined test failure masks a genuine failure: the quarantine suppression exits 0 when there is also a real broken test, hiding the regression from the developer.
+
+**Given** `.quarantine/config.yml` with a `jest-tests` suite
+
+**And** `.quarantine/jest-tests/state.json` contains an entry for
+`src/payment.test.js::PaymentService::should process refund` with
+`issue_number: 45` (issue open)
+
+**And** `src/checkout.test.js::CheckoutService::should apply discount` is NOT
+quarantined and has a genuine bug
+
+**When** CI executes `quarantine run jest-tests` and:
+- `should process refund` fails all 3 retries (quarantined, known flaky)
+- `should apply discount` fails all 3 retries (genuine failure, not quarantined)
+
+**Then** quarantine:
+1. Reads state — `should process refund` is quarantined (issue #45 open).
+   `should apply discount` is not in state.
+2. Executes the suite command unmodified. Both tests fail.
+3. Retries both. Both fail all retries.
+4. `BuildWithRetries` classifies both as `"failed"`.
+5. Reclassifies `should process refund` to `"quarantined"` (original_status: "failed").
+   `should apply discount` remains `"failed"`.
+6. Writes `.quarantine/jest-tests/results.json` with:
+   - `summary.quarantined: 1`, `summary.failed: 1`
+7. Creates a GitHub Issue for `should apply discount` (newly detected genuine failure
+   that may become flaky on a future run — but that's handled by retry logic separately).
+   Actually: `should apply discount` failed all retries so it is a genuine failure,
+   NOT classified as flaky. No issue is created for genuine failures.
+8. Posts PR comment showing 1 quarantined test and 1 genuine failure.
+9. Exits with code **1** — the genuine failure drives the exit code.
+
+---
+
+### Scenario 152: quarantined test is skipped — skipped status is preserved, not reclassified [M9]
+
+**Risk:** A quarantined test that is skipped (e.g., marked `xit` or `pending` in the test file) is reclassified to `"quarantined"` and removed from the skipped count, producing inaccurate summary totals and masking that the test runner skipped it.
+
+**Given** `.quarantine/config.yml` with a `jest-tests` suite
+
+**And** `.quarantine/jest-tests/state.json` contains an entry for
+`src/migration.test.js::MigrationService::should migrate v2 schema` with
+`issue_number: 46` (issue open)
+
+**And** the test is marked `xit(...)` (pending) in the source file, so Jest
+reports it as skipped in JUnit XML
+
+**When** CI executes `quarantine run jest-tests`
+
+**Then** quarantine:
+1. Reads state — test is quarantined with issue #46 open.
+2. Executes the suite command unmodified.
+3. Parses JUnit XML — `should migrate v2 schema` has `status: "skipped"`.
+4. **Does NOT reclassify** the test — `"skipped"` is preserved as-is.
+   Only `"failed"`, `"flaky"`, and `"passed"` outcomes are reclassified to
+   `"quarantined"` when the test is in the quarantine state.
+5. Writes `.quarantine/jest-tests/results.json` with:
+   - `status: "skipped"` (unchanged) for the test
+   - `summary.skipped: 1`, `summary.quarantined: 0` (the quarantined count reflects
+     tests that actually ran and were reclassified)
+6. Exits with code **0**.
+
+---
+
+### Scenario 153: all tests in the suite are quarantined and all fail — exit 0 with warning [M9]
+
+**Risk:** When every test in a run is quarantined and fails, reclassification correctly exits 0, but without a warning the developer has no signal that the entire suite was silently suppressed — a quarantine state that has grown to cover all tests is itself a problem worth surfacing.
+
+**Given** `.quarantine/config.yml` with a `jest-tests` suite
+
+**And** `.quarantine/jest-tests/state.json` contains entries for all three tests in
+the suite: `src/a.test.js::A::test1`, `src/b.test.js::B::test2`,
+`src/c.test.js::C::test3` — all with open issues
+
+**When** CI executes `quarantine run jest-tests` and all three tests fail on the
+initial run and fail all 3 retries
+
+**Then** quarantine:
+1. Reads state — all three tests are quarantined.
+2. Executes suite command. All three tests fail.
+3. Parses JUnit XML — three failures.
+4. Retries all three — all fail every retry. `BuildWithRetries` classifies all as
+   `"failed"`.
+5. Reclassifies all three to `"quarantined"` (original_status: "failed" for each).
+6. Detects that `summary.quarantined == summary.total` (all tests are quarantined).
+7. Prints warning to stderr:
+   ```
+   [quarantine] WARNING: All tests are quarantined. The entire test suite was skipped. Review and close resolved quarantine issues.
+   ```
+8. Writes `.quarantine/jest-tests/results.json` with `summary.quarantined: 3`,
+   `summary.failed: 0`.
+9. Exits with code **0** (all failures were suppressed — no genuine failures remain).
+
+---
+
+### Scenario 154: quarantined failure and unresolved test with no genuine failure — exit 2 [M9]
+
+**Risk:** Reclassifying a quarantined failure to `"quarantined"` accidentally masks a concurrent infrastructure error (unresolved rerun), causing the CI step to exit 0 when it should exit 2 to signal that the rerun command is broken.
+
+**Given** `.quarantine/config.yml` with a `backend` suite
+
+**And** `.quarantine/backend/state.json` contains an entry for
+`spec/models/user_spec.rb::User::validates email` with `issue_number: 50` (issue open)
+
+**And** the rerun command (`bundle exec rspec -e "{name}"`) crashes with exit 127
+(binary not found) for every retry
+
+**When** CI executes `quarantine run backend` and two tests fail initially:
+- `spec/models/user_spec.rb::User::validates email` (quarantined) — fails initial
+  run, rerun crashes → `"unresolved"`
+- `spec/services/order_spec.rb::Order::calculates total` (not quarantined) — fails
+  initial run, rerun crashes → `"unresolved"`
+
+**Then** quarantine:
+1. Reads state — `validates email` is quarantined (issue #50 open).
+   `calculates total` is not quarantined.
+2. Executes suite command. Both tests fail.
+3. Retries both — rerun crashes for both. Both classified as `"unresolved"`.
+4. `ReclassifyQuarantinedTests` checks `validates email` — status is `"unresolved"`,
+   which is **not reclassified** (only `"failed"`, `"flaky"`, `"passed"` are
+   reclassified). Leaves it as `"unresolved"`.
+5. Writes `.quarantine/backend/results.json` with:
+   - `summary.unresolved: 2`, `summary.quarantined: 0`, `summary.failed: 0`
+6. Exits with code **2** — unresolved tests drive exit 2; reclassification does not
+   suppress infrastructure errors.
+
+---
+
+### Scenario 155: newly detected flaky test and pre-existing quarantined test in the same run [M9]
+
+**Risk:** The pre-run snapshot that prevents newly detected flaky tests from being reclassified is missed or applied incorrectly, causing a new flaky test to silently become `"quarantined"` on its first detection rather than `"flaky"` — hiding the new discovery from the developer.
+
+**Given** `.quarantine/config.yml` with a `jest-tests` suite
+
+**And** `.quarantine/jest-tests/state.json` contains an entry for
+`src/payment.test.js::PaymentService::should process refund` with
+`issue_number: 51` (issue open, quarantined before this run)
+
+**And** `src/auth.test.js::AuthService::should validate session` is NOT in the
+quarantine state (first time it has been observed as flaky)
+
+**When** CI executes `quarantine run jest-tests` and:
+- `should process refund` (pre-existing quarantined) fails all 3 retries
+- `should validate session` (newly flaky) fails the initial run but passes on retry 1
+
+**Then** quarantine:
+1. Reads state — `should process refund` is quarantined. Snapshots pre-run IDs:
+   `{"src/payment.test.js::PaymentService::should process refund": true}`.
+2. Executes suite command.
+3. Parses JUnit XML — both tests show `"failed"`.
+4. Retries both. `should process refund` fails all 3 retries (classified `"failed"`).
+   `should validate session` passes on retry 1 (classified `"flaky"`).
+5. `addNewFlakyTests` adds `should validate session` to the quarantine state (it is
+   newly flaky). `should process refund` is already in state — its `flaky_count` and
+   `last_failure_at` are updated.
+6. `ReclassifyQuarantinedTests` uses the **pre-run snapshot**:
+   - `should process refund` is in the snapshot → reclassified to `"quarantined"`
+     (original_status: "failed").
+   - `should validate session` is **NOT** in the snapshot (it was added to state
+     during step 5, after the snapshot was taken) → stays `"flaky"`.
+7. Writes `.quarantine/jest-tests/results.json` with:
+   - `should process refund`: `status: "quarantined"`, `original_status: "failed"`
+   - `should validate session`: `status: "flaky"` (visible as a new discovery)
+   - `summary.quarantined: 1`, `summary.flaky_detected: 1`, `summary.failed: 0`
+8. Creates a GitHub Issue for `should validate session` (newly detected flaky).
+   Does NOT create a duplicate issue for `should process refund` (already quarantined).
+9. Exits with code **0**.
+
+---
+
+### Scenario 156: multiple quarantined tests with mixed execution outcomes — all reclassified, exit 0 [M9]
+
+**Risk:** Reclassification only handles one execution outcome (e.g., `"failed"`) and silently leaves quarantined tests with `"passed"` or `"flaky"` outcomes with incorrect statuses and summary counts, producing misleading results.
+
+**Given** `.quarantine/config.yml` with a `jest-tests` suite
+
+**And** `.quarantine/jest-tests/state.json` contains entries for three tests, all
+with open issues:
+- `src/a.test.js::A::test1` (quarantined)
+- `src/b.test.js::B::test2` (quarantined)
+- `src/c.test.js::C::test3` (quarantined)
+
+**When** CI executes `quarantine run jest-tests` and:
+- `test1` passes on the initial run (no retry)
+- `test2` fails the initial run but passes on retry 1 (flaky)
+- `test3` fails the initial run and all 3 retries (consistently failing today)
+
+**Then** quarantine:
+1. Reads state — all three tests are quarantined.
+2. Executes suite command.
+3. `BuildWithRetries` classifies: `test1` → `"passed"`, `test2` → `"flaky"`,
+   `test3` → `"failed"`.
+4. `ReclassifyQuarantinedTests` reclassifies all three:
+   - `test1`: `status: "quarantined"`, `original_status: "passed"`
+   - `test2`: `status: "quarantined"`, `original_status: "flaky"`
+   - `test3`: `status: "quarantined"`, `original_status: "failed"`
+5. Writes `.quarantine/jest-tests/results.json` with:
+   - `summary.quarantined: 3`, `summary.passed: 0`, `summary.flaky_detected: 0`,
+     `summary.failed: 0`
+6. Exits with code **0** — all three failures/outcomes are suppressed because all
+   three tests are known-quarantined.
