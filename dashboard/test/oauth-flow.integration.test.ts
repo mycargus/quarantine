@@ -104,3 +104,57 @@ describe("GET /auth/login — redirects to GitHub OAuth", async (assert) => {
     cleanup()
   }
 })
+
+describe("GET /auth/logout — authenticated user", async (assert) => {
+  const { router, sessionCookie, cleanup } = createTestApp({
+    repos: [],
+    oauthClientId: "test-client-id",
+    oauthClientSecret: "test-secret",
+    oauthOrigin: "http://localhost:3000",
+  })
+  const cookie = await sessionCookie()
+  try {
+    // Step 1: Logout with a valid session cookie
+    const logoutResponse = await router.fetch(
+      new Request("http://localhost/auth/logout", { headers: { Cookie: cookie } }),
+    )
+
+    assert({
+      given: "an authenticated user requesting GET /auth/logout",
+      should: "return HTTP 302 redirect",
+      actual: logoutResponse.status,
+      expected: 302,
+    })
+
+    assert({
+      given: "an authenticated user requesting GET /auth/logout",
+      should: "redirect to /auth/login",
+      actual: new URL(logoutResponse.headers.get("Location") ?? "", "http://localhost").pathname,
+      expected: "/auth/login",
+    })
+
+    // Step 2: Use the Set-Cookie from logout response for next request
+    const clearedCookie = logoutResponse.headers.get("Set-Cookie") ?? ""
+
+    assert({
+      given: "an authenticated user requesting GET /auth/logout",
+      should: "return a Set-Cookie header to clear the session",
+      actual: clearedCookie !== "",
+      expected: true,
+    })
+
+    // Step 3: Try accessing a protected route with the cleared cookie
+    const protectedResponse = await router.fetch(
+      new Request("http://localhost/", { headers: { Cookie: clearedCookie } }),
+    )
+
+    assert({
+      given: "a request to a protected route after logout",
+      should: "return HTTP 401",
+      actual: protectedResponse.status,
+      expected: 401,
+    })
+  } finally {
+    cleanup()
+  }
+})

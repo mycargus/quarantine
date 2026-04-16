@@ -1,5 +1,6 @@
 import { createGitHubAuthProvider, startExternalAuth } from "@remix-run/auth"
 import { requireAuth } from "@remix-run/auth-middleware"
+import { Session } from "@remix-run/session"
 import { createRouter } from "remix/fetch-router"
 import { home } from "./controllers/home.js"
 import { project } from "./controllers/project.js"
@@ -40,6 +41,14 @@ export function createApp(opts: AppOptions = {}) {
       },
       health: () => new Response("ok", { status: 200 }),
       authLogin: (ctx) => startExternalAuth(githubProvider!, ctx),
+      authLogout: (ctx) => {
+        const s = ctx.get(Session)
+        s.destroy()
+        return new Response(null, {
+          status: 302,
+          headers: { Location: "/auth/login" },
+        })
+      },
       projectDetail: {
         middleware: [requireAuth()],
         handler: (ctx) => project(ctx.params.owner, ctx.params.repo, ctx.request.url, opts.dbPath),

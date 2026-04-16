@@ -4,5 +4,6 @@ export const routes = route({
   home: "/",
   health: "/health",
   authLogin: "/auth/login",
+  authLogout: "/auth/logout",
   projectDetail: "/projects/:owner/:repo",
 })
