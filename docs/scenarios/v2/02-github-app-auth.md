@@ -291,6 +291,102 @@ Removed: no refresh tokens. Session expiry is handled by cookie `Max-Age`.
 
 ---
 
+## Rate Limit Monitoring (M12)
+
+### Scenario 50: GitHub HTTP client logs warning when rate limit drops below 20% [v2]
+
+**Risk:** Without monitoring, the dashboard silently exhausts its rate limit budget and starts getting 403s across all API calls.
+
+**Given** a GitHub API response includes `X-RateLimit-Remaining: 150` and `X-RateLimit-Limit: 1000` (15% remaining)
+**When** the GitHub HTTP client processes the response
+**Then** a warning is logged including the remaining count, limit, and resource
+
+### Scenario 51: No rate limit warning when above 20% threshold [v2]
+
+**Risk:** False-positive warnings cause alert fatigue and mask real rate limit issues.
+
+**Given** a GitHub API response includes `X-RateLimit-Remaining: 800` and `X-RateLimit-Limit: 1000` (80% remaining)
+**When** the GitHub HTTP client processes the response
+**Then** no rate limit warning is logged
+
+### Scenario 52: Missing rate limit headers handled gracefully [v2]
+
+**Risk:** Some GitHub endpoints omit rate limit headers; crashing on missing headers breaks the entire polling loop.
+
+**Given** a GitHub API response does not include `X-RateLimit-Remaining` or `X-RateLimit-Limit` headers
+**When** the GitHub HTTP client processes the response
+**Then** no error occurs and no warning is logged
+
+---
+
+## JWT Edge Cases (M12)
+
+### Scenario 53: JWT generation rejects empty client ID [v2]
+
+**Risk:** An empty client ID produces a JWT with an empty `iss` claim that GitHub silently rejects with 401, making the root cause hard to diagnose.
+
+**Given** `generateJWT` is called with an empty string as the client ID and a valid private key
+**When** the function validates its inputs
+**Then** it throws a descriptive error identifying the problem (e.g., "Client ID must not be empty")
+
+---
+
+## Private Key Resolution (M12)
+
+### Scenario 54: Private key resolved from environment variable value [v2]
+
+**Risk:** If env var resolution is broken, the dashboard can't authenticate even when credentials are correctly configured.
+
+**Given** `QUARANTINE_APP_PRIVATE_KEY` is set to a valid PEM-encoded RSA private key and `QUARANTINE_APP_PRIVATE_KEY_PATH` is not set
+**When** the private key is resolved for JWT generation
+**Then** the PEM value from `QUARANTINE_APP_PRIVATE_KEY` is used
+
+### Scenario 55: Private key resolved from file path [v2]
+
+**Risk:** File-based key resolution is the preferred production pattern (mounted secrets); a broken file reader silently falls through.
+
+**Given** `QUARANTINE_APP_PRIVATE_KEY_PATH` is set to a path containing a valid PEM file and `QUARANTINE_APP_PRIVATE_KEY` is not set
+**When** the private key is resolved for JWT generation
+**Then** the PEM content is read from the file at the specified path
+
+### Scenario 56: Private key file path does not exist [v2]
+
+**Risk:** A misconfigured path causes a cryptic JWT error later instead of a clear error at initialization.
+
+**Given** `QUARANTINE_APP_PRIVATE_KEY_PATH` is set to `/nonexistent/key.pem`
+**When** the private key resolution runs
+**Then** it throws a descriptive error identifying the missing file path
+
+### Scenario 57: Both key sources set — file path takes precedence [v2]
+
+**Risk:** Ambiguous precedence causes the wrong key to be used, leading to silent 401 failures that are hard to diagnose because "the key is set."
+
+**Given** both `QUARANTINE_APP_PRIVATE_KEY` and `QUARANTINE_APP_PRIVATE_KEY_PATH` are set to valid but different keys
+**When** the private key is resolved for JWT generation
+**Then** the file at `QUARANTINE_APP_PRIVATE_KEY_PATH` is read and used (file path takes precedence, matching the Kubernetes mounted-secret pattern)
+
+---
+
+## Concurrent Token Exchange Edge Cases (M12)
+
+### Scenario 58: Concurrent token exchange failure returns error to all waiters [v2]
+
+**Risk:** If the coalesced exchange fails, only the first caller gets the error; the second hangs indefinitely.
+
+**Given** the `InstallationTokenProvider` has no cached token and two callers request `getToken(installationId)` simultaneously
+**When** the single `POST /access_tokens` exchange fails (e.g., 500)
+**Then** both callers receive the same error; neither hangs or returns stale data
+
+### Scenario 59: Concurrent exchanges for different installations run independently [v2]
+
+**Risk:** A global mutex blocks all installations when only one is exchanging, adding unnecessary latency.
+
+**Given** the `InstallationTokenProvider` has no cached tokens for installation A or installation B
+**When** caller 1 requests `getToken(installationA)` and caller 2 requests `getToken(installationB)` simultaneously
+**Then** two independent `POST /access_tokens` calls are made (one per installation); neither blocks the other
+
+---
+
 ## ~~Concurrent Token Refresh (M13)~~ REMOVED
 
 ### ~~Scenario 45: Concurrent requests coalesce into a single token refresh [v2]~~ REMOVED
