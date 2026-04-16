@@ -637,6 +637,208 @@
         }
       }
     },
+    "/app/installations/{installation_id}/access_tokens": {
+      "post": {
+        "summary": "Create an installation access token",
+        "description": "Creates an installation access token for a GitHub App. Used by the dashboard to get short-lived tokens for artifact polling.",
+        "tags": ["apps"],
+        "operationId": "apps/create-installation-access-token",
+        "parameters": [
+          { "$ref": "#/components/parameters/installation-id" }
+        ],
+        "responses": {
+          "201": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/installation-token" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/installation-token" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/installation-token" },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/installation-token" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/basic-error" },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "message": "Requires authentication",
+                      "documentation_url": "https://docs.github.com/rest"
+                    }
+                  }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/basic-error" },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "message": "Requires authentication",
+                      "documentation_url": "https://docs.github.com/rest"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/basic-error" },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "message": "Resource not accessible by integration",
+                      "documentation_url": "https://docs.github.com/rest"
+                    }
+                  }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/basic-error" },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "message": "Resource not accessible by integration",
+                      "documentation_url": "https://docs.github.com/rest"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/validation-error" },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "message": "Validation Failed",
+                      "documentation_url": "https://docs.github.com/rest"
+                    }
+                  }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": { "$ref": "#/components/schemas/validation-error" },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "message": "Validation Failed",
+                      "documentation_url": "https://docs.github.com/rest"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/app/installations": {
+      "get": {
+        "summary": "List installations for the authenticated app",
+        "description": "Lists installations of the GitHub App. Used by dashboard startup sync and background discovery.",
+        "tags": ["apps"],
+        "operationId": "apps/list-installations",
+        "parameters": [
+          { "$ref": "#/components/parameters/per-page" },
+          { "$ref": "#/components/parameters/page" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/installation" }
+                },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/installations-list" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/installation" }
+                },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/installations-list" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/installation/repositories": {
+      "get": {
+        "summary": "List repositories accessible to the app installation",
+        "description": "Lists repositories accessible to the installation token. Used by dashboard discovery to find repos per installation.",
+        "tags": ["apps"],
+        "operationId": "apps/list-installation-repos-for-authenticated-app",
+        "parameters": [
+          { "$ref": "#/components/parameters/per-page" },
+          { "$ref": "#/components/parameters/page" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["total_count", "repositories"],
+                  "properties": {
+                    "total_count": { "type": "integer" },
+                    "repositories": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/repository" }
+                    }
+                  }
+                },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/installation-repos" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["total_count", "repositories"],
+                  "properties": {
+                    "total_count": { "type": "integer" },
+                    "repositories": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/repository" }
+                    }
+                  }
+                },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/installation-repos" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/repos/{owner}/{repo}/actions/artifacts": {
       "get": {
         "summary": "List artifacts for a repository",
@@ -756,6 +958,13 @@
         "description": "The page number of the results to fetch.",
         "in": "query",
         "schema": { "type": "integer", "default": 1 }
+      },
+      "installation-id": {
+        "name": "installation_id",
+        "description": "The unique identifier of the installation.",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "integer" }
       },
       "artifact-id": {
         "name": "artifact_id",
@@ -1069,6 +1278,54 @@
           }
         }
       },
+      "installation-token": {
+        "title": "Installation Token",
+        "type": "object",
+        "required": ["token", "expires_at"],
+        "properties": {
+          "token": { "type": "string", "example": "ghs_16C7e42F292c6912E7710c838347Ae178B4a" },
+          "expires_at": { "type": "string", "format": "date-time", "example": "2016-07-11T22:14:10Z" },
+          "permissions": {
+            "type": "object",
+            "properties": {
+              "issues": { "type": "string", "example": "write" },
+              "contents": { "type": "string", "example": "read" }
+            }
+          }
+        }
+      },
+      "installation": {
+        "title": "Installation",
+        "type": "object",
+        "required": ["id", "app_id", "target_type", "account"],
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "account": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "login": { "type": "string", "example": "octocat" },
+              "id": { "type": "integer", "example": 1 },
+              "type": { "type": "string", "example": "Organization" }
+            }
+          },
+          "app_id": { "type": "integer", "example": 1 },
+          "target_type": { "type": "string", "example": "Organization" },
+          "permissions": {
+            "type": "object",
+            "properties": {
+              "issues": { "type": "string", "example": "write" },
+              "contents": { "type": "string", "example": "read" }
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": ["push", "pull_request"]
+          },
+          "suspended_at": { "type": "string", "format": "date-time", "nullable": true, "example": null }
+        }
+      },
       "basic-error": {
         "title": "Basic Error",
         "description": "Basic Error",
@@ -1207,6 +1464,53 @@
             "body": "<!-- quarantine-bot -->\n## Quarantine Summary"
           }
         ]
+      },
+      "installation-token": {
+        "value": {
+          "token": "ghs_16C7e42F292c6912E7710c838347Ae178B4a",
+          "expires_at": "2016-07-11T22:14:10Z",
+          "permissions": { "issues": "write", "contents": "read" }
+        }
+      },
+      "installation": {
+        "value": {
+          "id": 1,
+          "account": { "login": "octocat", "id": 1, "type": "Organization" },
+          "app_id": 1,
+          "target_type": "Organization",
+          "permissions": { "issues": "write", "contents": "read" },
+          "events": ["push", "pull_request"],
+          "suspended_at": null
+        }
+      },
+      "installations-list": {
+        "value": [
+          {
+            "id": 1,
+            "account": { "login": "octocat", "id": 1, "type": "Organization" },
+            "app_id": 1,
+            "target_type": "Organization",
+            "permissions": { "issues": "write", "contents": "read" },
+            "events": ["push", "pull_request"],
+            "suspended_at": null
+          }
+        ]
+      },
+      "installation-repos": {
+        "value": {
+          "total_count": 1,
+          "repositories": [
+            {
+              "id": 1296269,
+              "node_id": "MDEwOlJlcG9zaXRvcnkxMjk2MjY5",
+              "name": "Hello-World",
+              "full_name": "octocat/Hello-World",
+              "private": false,
+              "default_branch": "main",
+              "description": "This your first repo!"
+            }
+          ]
+        }
       },
       "artifact-paginated": {
         "value": {
