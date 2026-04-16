@@ -11,4 +11,14 @@ describe("shouldSyncInstallations()", async (assert) => {
     actual: shouldSyncInstallations(null, now, FIFTEEN_MIN),
     expected: true,
   })
+
+  {
+    const fiveMinAgo = new Date(now.getTime() - 5 * 60_000)
+    assert({
+      given: "lastSyncedAt is 5 minutes ago (within 15 min interval)",
+      should: "return false",
+      actual: shouldSyncInstallations(fiveMinAgo, now, FIFTEEN_MIN),
+      expected: false,
+    })
+  }
 })
