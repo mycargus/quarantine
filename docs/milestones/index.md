@@ -947,6 +947,13 @@ provides.
 
 ### M11: Init UX Improvements
 
+**Status: Superseded.** M9's implementation of `quarantine init` is already
+non-interactive — it auto-detects frameworks, creates config with defaults,
+and the user edits YAML afterward. The flags (`--yes`, `--retries`,
+`--junitxml`) and TTY detection proposed here were solutions to interactive
+prompts that no longer exist. Per-suite retries validation (1–10) was
+implemented as part of M9's config validation.
+
 **Owner:** `cli-dev`
 
 **Dependencies:** M9 (multi-suite init + framework detection foundation).
@@ -1014,7 +1021,7 @@ M9 (core conversion: config, run, state, notifications)
 M10 (additive: suite commands, timeouts, dashboard, schemas)
   |
   v
-M11 (init UX: --yes flag, TTY detection)
+M11 (init UX: --yes flag, TTY detection) — SUPERSEDED (init is already non-interactive)
 
 --- v2 begins after multi-suite is stable ---
 
