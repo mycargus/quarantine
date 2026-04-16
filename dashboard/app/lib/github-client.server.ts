@@ -15,3 +15,10 @@ export function checkRateLimit(
   }
   return null
 }
+
+export function parseLinkHeader(header: string | null): string | null {
+  if (!header) return null
+
+  const match = header.match(/<([^>]+)>;\s*rel="next"/)
+  return match ? match[1] : null
+}

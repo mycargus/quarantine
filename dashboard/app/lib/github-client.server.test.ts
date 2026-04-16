@@ -1,5 +1,5 @@
 import { describe } from "riteway"
-import { checkRateLimit } from "./github-client.server.js"
+import { checkRateLimit, parseLinkHeader } from "./github-client.server.js"
 
 describe("checkRateLimit()", async (assert) => {
   const result = checkRateLimit(150, 1000, "core")
@@ -57,6 +57,48 @@ describe("checkRateLimit()", async (assert) => {
     given: "only X-RateLimit-Limit is missing (150, null)",
     should: "return null (no warning, no error)",
     actual: checkRateLimit(150, null, "core"),
+    expected: null,
+  })
+})
+
+describe("parseLinkHeader()", async (assert) => {
+  assert({
+    given: 'a header with next and last links',
+    should: 'return the next URL',
+    actual: parseLinkHeader(
+      '<https://api.github.com/app/installations?page=2&per_page=100>; rel="next", <https://api.github.com/app/installations?page=5&per_page=100>; rel="last"',
+    ),
+    expected: 'https://api.github.com/app/installations?page=2&per_page=100',
+  })
+
+  assert({
+    given: 'a header with only a next link',
+    should: 'return the next URL',
+    actual: parseLinkHeader(
+      '<https://api.github.com/repos/owner/repo/actions/artifacts?page=3&per_page=30>; rel="next"',
+    ),
+    expected:
+      'https://api.github.com/repos/owner/repo/actions/artifacts?page=3&per_page=30',
+  })
+
+  assert({
+    given: 'a null header',
+    should: 'return null',
+    actual: parseLinkHeader(null),
+    expected: null,
+  })
+
+  assert({
+    given: 'an empty string header',
+    should: 'return null',
+    actual: parseLinkHeader(''),
+    expected: null,
+  })
+
+  assert({
+    given: 'a malformed header with no angle brackets or rel',
+    should: 'return null',
+    actual: parseLinkHeader('this is not a valid link header'),
     expected: null,
   })
 })
