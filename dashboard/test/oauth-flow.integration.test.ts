@@ -282,3 +282,63 @@ describe("IP rate limit — 21st request returns 429 with Retry-After", async (a
     cleanup()
   }
 })
+
+describe("User rate limit — 301st authenticated request returns 429 with Retry-After", async (assert) => {
+  const fixedNow = 1_000_000
+  const { router, sessionCookie, cleanup } = createTestApp({
+    repos: [],
+    clock: () => fixedNow,
+  })
+  const cookie = await sessionCookie()
+  try {
+    // Send 300 authenticated requests — cycle through IPs to avoid IP rate limit (20/min)
+    for (let i = 0; i < 300; i++) {
+      const ip = `10.0.0.${i % 16}`
+      const res = await router.fetch(
+        new Request("http://localhost/health", {
+          headers: {
+            Cookie: cookie,
+            "X-Forwarded-For": ip,
+          },
+        }),
+      )
+      if (res.status === 429) {
+        assert({
+          given: `authenticated request ${i + 1} of 300 within the user rate limit`,
+          should: "not be rate limited",
+          actual: res.status,
+          expected: 200,
+        })
+        return
+      }
+    }
+
+    // Request #301 should be rate limited by the user limiter
+    const response = await router.fetch(
+      new Request("http://localhost/health", {
+        headers: {
+          Cookie: cookie,
+          "X-Forwarded-For": "10.0.0.0",
+        },
+      }),
+    )
+
+    assert({
+      given: "301st authenticated request from the same user within 1-minute window",
+      should: "return HTTP 429",
+      actual: response.status,
+      expected: 429,
+    })
+
+    const retryAfter = response.headers.get("Retry-After")
+
+    assert({
+      given: "301st authenticated request from the same user within 1-minute window",
+      should: "include a Retry-After header with seconds until window resets",
+      actual: retryAfter !== null && Number(retryAfter) > 0,
+      expected: true,
+    })
+  } finally {
+    cleanup()
+  }
+})
