@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs"
 import { load } from "js-yaml"
-import { array, object, parseSafe, string } from "remix/data-schema"
+import { array, object, optional, parseSafe, string } from "remix/data-schema"
 
 const RepoConfigSchema = object({ owner: string() }, { unknownKeys: "passthrough" })
 
 const DashboardConfigSchema = object(
   {
     source: string(),
-    repos: array(RepoConfigSchema),
+    repos: optional(array(RepoConfigSchema)),
   },
   { unknownKeys: "passthrough" },
 )
@@ -17,11 +17,18 @@ export type RepoConfig = {
   repo: string
 }
 
-export type DashboardConfig = {
+export type ManualConfig = {
   source: "manual"
   repos: RepoConfig[]
   poll_interval: number
 }
+
+export type GitHubAppConfig = {
+  source: "github-app"
+  poll_interval: number
+}
+
+export type DashboardConfig = ManualConfig | GitHubAppConfig
 
 export function parseConfig(yaml: string): DashboardConfig {
   const raw = load(yaml)
@@ -35,15 +42,27 @@ export function parseConfig(yaml: string): DashboardConfig {
 
   const { source, repos } = result.value
   const poll_interval = (raw as Record<string, unknown>)?.poll_interval
+  const resolvedPollInterval = typeof poll_interval === "number" ? poll_interval : 300
 
   if (!source) {
     throw new Error('Invalid config: missing or invalid field "source"')
   }
 
+  if (source === "github-app") {
+    return {
+      source: "github-app",
+      poll_interval: resolvedPollInterval,
+    }
+  }
+
+  if (!repos) {
+    throw new Error('Invalid config: missing or invalid field "repos"')
+  }
+
   return {
     source: source as "manual",
     repos: repos as RepoConfig[],
-    poll_interval: typeof poll_interval === "number" ? poll_interval : 300,
+    poll_interval: resolvedPollInterval,
   }
 }
 

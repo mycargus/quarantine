@@ -177,19 +177,20 @@ export async function home(options: HomeOptions = {}): Promise<Response> {
 
   try {
     const handle = initDb(dbPath)
+    const repos = config.source === "manual" ? config.repos : []
     const token = options.token ?? process.env.QUARANTINE_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN
 
     if (token) {
       const now = new Date()
       const fetchFn = options.fetchFn ?? fetch
-      for (const { owner, repo } of config.repos) {
+      for (const { owner, repo } of repos) {
         await syncRepo(owner, repo, token, handle, now, fetchFn, console.warn)
       }
     }
 
     const [projects, overview] = await Promise.all([
-      getProjects(handle.db, config.repos),
-      getOrgOverview(handle, config.repos),
+      getProjects(handle.db, repos),
+      getOrgOverview(handle, repos),
     ])
 
     const stream = renderToStream(<ProjectsPage setup={{ projects, overview }} />)
