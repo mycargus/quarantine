@@ -105,4 +105,28 @@ describe("validateAppCredentials()", async (assert) => {
     expected:
       "Missing required environment variables: QUARANTINE_APP_CLIENT_ID, QUARANTINE_APP_PRIVATE_KEY",
   })
+
+  assert({
+    given: "clientId is an empty string",
+    should: "throw an error identifying QUARANTINE_APP_CLIENT_ID as present but blank",
+    actual: throws(() =>
+      validateAppCredentials({
+        clientId: "",
+        privateKey: "-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----",
+      }),
+    ),
+    expected: "QUARANTINE_APP_CLIENT_ID is set but blank",
+  })
+
+  assert({
+    given: "privateKey is an empty string",
+    should: "throw an error identifying QUARANTINE_APP_PRIVATE_KEY as present but blank",
+    actual: throws(() =>
+      validateAppCredentials({
+        clientId: "Iv1.abc123",
+        privateKey: "",
+      }),
+    ),
+    expected: "QUARANTINE_APP_PRIVATE_KEY is set but blank",
+  })
 })
