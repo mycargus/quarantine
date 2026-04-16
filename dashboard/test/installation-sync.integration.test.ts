@@ -160,6 +160,68 @@ describe("syncInstallations() — single page, no Link header", async (assert) =
   }
 })
 
+describe("startGitHubAppMode() — zero installations at startup", async (assert) => {
+  const routes: Record<string, MockRoute> = {
+    "/app/installations?per_page=100": {
+      status: 200,
+      body: [],
+      // No Link header — empty single page
+    },
+  }
+
+  const { url, server } = await startMockServer(routes)
+
+  try {
+    const logs: string[] = []
+
+    const { raw } = await startGitHubAppMode({
+      dbPath: ":memory:",
+      baseUrl: url,
+      jwtToken: "mock-jwt-token",
+      getInstallationToken: async () => "mock-installation-token",
+      log: (msg: string) => logs.push(msg),
+    })
+
+    try {
+      // Verify installations table has 0 rows
+      const installationRows = raw
+        .prepare("SELECT id FROM installations")
+        .all()
+
+      assert({
+        given: "zero installations returned by the API",
+        should: "leave the installations table empty",
+        actual: installationRows.length,
+        expected: 0,
+      })
+
+      // Verify projects table has 0 rows with installation_id IS NOT NULL
+      const projectRows = raw
+        .prepare("SELECT owner, repo FROM projects WHERE installation_id IS NOT NULL")
+        .all()
+
+      assert({
+        given: "zero installations returned by the API",
+        should: "leave the projects table empty",
+        actual: projectRows.length,
+        expected: 0,
+      })
+
+      // Verify function completed without error (reaching here is the proof)
+      assert({
+        given: "zero installations returned by the API",
+        should: "complete startup without error",
+        actual: true,
+        expected: true,
+      })
+    } finally {
+      raw.close()
+    }
+  } finally {
+    await closeServer(server)
+  }
+})
+
 describe("startGitHubAppMode() — startup sync", async (assert) => {
   const installations = [
     { id: 1, account: { login: "acme", id: 100 }, suspended_at: null, app_id: 10 },
