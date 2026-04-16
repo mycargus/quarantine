@@ -158,3 +158,26 @@ describe("GET /auth/logout — authenticated user", async (assert) => {
     cleanup()
   }
 })
+
+describe("GET /auth/logout — no session cookie (expired or absent)", async (assert) => {
+  const { router, cleanup } = createTestApp({ repos: [] })
+  try {
+    const response = await router.fetch(new Request("http://localhost/auth/logout"))
+
+    assert({
+      given: "no session cookie on GET /auth/logout",
+      should: "return HTTP 302 redirect",
+      actual: response.status,
+      expected: 302,
+    })
+
+    assert({
+      given: "no session cookie on GET /auth/logout",
+      should: "redirect to /auth/login",
+      actual: new URL(response.headers.get("Location") ?? "", "http://localhost").pathname,
+      expected: "/auth/login",
+    })
+  } finally {
+    cleanup()
+  }
+})
