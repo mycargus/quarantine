@@ -50,7 +50,14 @@ async function buildSessionCookie(): Promise<string> {
   return cookie.serialize(serializedData)
 }
 
-export function createTestApp(opts: { repos?: RepoEntry[] } = {}): TestApp {
+export function createTestApp(
+  opts: {
+    repos?: RepoEntry[]
+    oauthClientId?: string
+    oauthClientSecret?: string
+    oauthOrigin?: string
+  } = {},
+): TestApp {
   const configPath = writeTempConfig(opts.repos ?? [])
   const dbPath = createTempDbPath()
   const router = createApp({
@@ -58,6 +65,9 @@ export function createTestApp(opts: { repos?: RepoEntry[] } = {}): TestApp {
     dbPath,
     token: "",
     sessionSecret: TEST_SESSION_SECRET,
+    oauthClientId: opts.oauthClientId,
+    oauthClientSecret: opts.oauthClientSecret,
+    oauthOrigin: opts.oauthOrigin,
   })
   return {
     router,

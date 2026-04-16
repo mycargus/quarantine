@@ -58,3 +58,49 @@ describe("GET / — valid session cookie (authenticated)", async (assert) => {
     cleanup()
   }
 })
+
+describe("GET /auth/login — redirects to GitHub OAuth", async (assert) => {
+  const { router, cleanup } = createTestApp({
+    repos: [],
+    oauthClientId: "test-client-id",
+    oauthClientSecret: "test-secret",
+    oauthOrigin: "http://localhost:3000",
+  })
+  try {
+    const response = await router.fetch(new Request("http://localhost/auth/login"))
+
+    assert({
+      given: "a GET /auth/login request",
+      should: "return HTTP 302 redirect",
+      actual: response.status,
+      expected: 302,
+    })
+
+    const location = response.headers.get("Location") ?? ""
+    const locationUrl = new URL(location)
+
+    assert({
+      given: "a GET /auth/login request",
+      should: "redirect to GitHub OAuth authorize endpoint",
+      actual: locationUrl.origin + locationUrl.pathname,
+      expected: "https://github.com/login/oauth/authorize",
+    })
+
+    assert({
+      given: "a GET /auth/login request",
+      should: "include client_id=test-client-id in redirect URL",
+      actual: locationUrl.searchParams.get("client_id"),
+      expected: "test-client-id",
+    })
+
+    assert({
+      given: "a GET /auth/login request",
+      should: "include redirect_uri containing /auth/github/callback",
+      actual:
+        locationUrl.searchParams.get("redirect_uri")?.includes("/auth/github/callback") ?? false,
+      expected: true,
+    })
+  } finally {
+    cleanup()
+  }
+})
