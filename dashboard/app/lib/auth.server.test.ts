@@ -66,6 +66,20 @@ describe("validateOAuthEnv()", async (assert) => {
   })
 
   assert({
+    given: "two env vars are missing (clientId and clientSecret)",
+    should: "throw a plural error naming both missing variables",
+    actual: throws(() =>
+      validateOAuthEnv({
+        clientId: undefined,
+        clientSecret: undefined,
+        origin: "https://example.com",
+      }),
+    ),
+    expected:
+      "Missing required environment variables: QUARANTINE_APP_CLIENT_ID, QUARANTINE_APP_CLIENT_SECRET",
+  })
+
+  assert({
     given: "multiple env vars are missing",
     should: "throw an error naming all missing variables",
     actual: throws(() =>

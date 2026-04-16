@@ -33,6 +33,20 @@ describe("checkRateLimit()", async (assert) => {
   })
 
   assert({
+    given: "remaining is 200 of 1000 (exactly 20%, at the threshold)",
+    should: "return null (threshold is exclusive: < 0.2, not <= 0.2)",
+    actual: checkRateLimit(200, 1000, "core"),
+    expected: null,
+  })
+
+  assert({
+    given: "remaining is 250 of 1000 (25%, above 20% threshold)",
+    should: "return null (no warning)",
+    actual: checkRateLimit(250, 1000, "core"),
+    expected: null,
+  })
+
+  assert({
     given: "remaining is 800 of 1000 (80%, above 20% threshold)",
     should: "return null (no warning)",
     actual: checkRateLimit(800, 1000, "core"),
@@ -78,6 +92,15 @@ describe("parseLinkHeader()", async (assert) => {
       '<https://api.github.com/repos/owner/repo/actions/artifacts?page=3&per_page=30>; rel="next"',
     ),
     expected: "https://api.github.com/repos/owner/repo/actions/artifacts?page=3&per_page=30",
+  })
+
+  assert({
+    given: "a header with only a rel=last link (no next)",
+    should: "return null",
+    actual: parseLinkHeader(
+      '<https://api.github.com/app/installations?page=5&per_page=100>; rel="last"',
+    ),
+    expected: null,
   })
 
   assert({

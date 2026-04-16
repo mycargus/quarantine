@@ -2320,8 +2320,165 @@
         "All 8 mutations killed \u2014 perfect score after adding etag header verification",
         "Debounce, artifact processing, state sync, error handling all well-tested"
       ]
-    }
-  },
+    },
+    "dashboard/app/lib/auth.server.ts": {
+      "status": "completed",
+      "covering_tests": [
+        "dashboard/app/lib/auth.server.test.ts"
+      ],
+      "last_tested": "2026-04-16T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {
+          "total": 17,
+          "killed": 17,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 36,
+              "original": "missing.length > 1",
+              "mutated": "missing.length > 2",
+              "result": "killed",
+              "test_that_caught_it": "two vars missing (new test)"
+            }
+          ]
+        },
+        "constants": {
+          "total": 8,
+          "killed": 8,
+          "survived": 0,
+          "examples": [
+            {
+              "line": "13-16",
+              "original": "ENV_NAMES values",
+              "mutated": "wrong var name",
+              "result": "killed",
+              "test_that_caught_it": "single missing var tests"
+            }
+          ]
+        },
+        "statement": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": []
+        },
+        "field_swap": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": []
+        },
+        "equivalent": {
+          "total": 3,
+          "killed": 0,
+          "survived": 3,
+          "examples": [
+            {
+              "line": 36,
+              "original": "missing.length > 1",
+              "mutated": "missing.length >= 1",
+              "result": "survived (equivalent — length===1 throws at line 32 before reaching 36)",
+              "test_that_caught_it": null
+            },
+            {
+              "line": 27,
+              "original": "env[key] === undefined",
+              "mutated": "env[key] == undefined",
+              "result": "survived (equivalent — inputs are typed string | undefined, never null)",
+              "test_that_caught_it": null
+            }
+          ]
+        }
+      },
+      "mutation_score": 100.0,
+      "insights": [
+        "All 28 real mutations killed after adding two-vars-missing boundary test",
+        "3 equivalent mutants: >= vs > (line 36), == vs === (line 27), > 0 vs > 1 (line 36)",
+        "ENV_NAMES constants, field swap ordering, error message text all well protected"
+      ]
+    },
+    "dashboard/app/lib/github-client.server.ts": {
+      "status": "completed",
+      "covering_tests": [
+        "dashboard/app/lib/github-client.server.test.ts"
+      ],
+      "last_tested": "2026-04-16T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {
+          "total": 5,
+          "killed": 5,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 13,
+              "original": "< 0.2",
+              "mutated": "<= 0.2",
+              "result": "killed",
+              "test_that_caught_it": "exactly 20% boundary test (new test)"
+            }
+          ]
+        },
+        "logical": {
+          "total": 4,
+          "killed": 4,
+          "survived": 0,
+          "examples": []
+        },
+        "arithmetic": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": []
+        },
+        "constants": {
+          "total": 6,
+          "killed": 6,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 13,
+              "original": "0.2",
+              "mutated": "0.3",
+              "result": "killed",
+              "test_that_caught_it": "25% above threshold test (new test)"
+            },
+            {
+              "line": 22,
+              "original": "rel=\"next\"",
+              "mutated": "removed rel check",
+              "result": "killed",
+              "test_that_caught_it": "rel=last only header test (new test)"
+            }
+          ]
+        },
+        "statement": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": []
+        },
+        "equivalent": {
+          "total": 1,
+          "killed": 0,
+          "survived": 1,
+          "examples": [
+            {
+              "line": 22,
+              "original": "[^>]+",
+              "mutated": "[^>]*",
+              "result": "survived (equivalent — URLs never contain > character, so + and * behave identically)",
+              "test_that_caught_it": null
+            }
+          ]
+        }
+      },
+      "mutation_score": 95.0,
+      "insights": [
+        "19/20 mutations killed after adding boundary, threshold, and rel-filter tests",
+        "[^>]+ vs [^>]* is equivalent for all valid URLs",
+        "Rate limit threshold boundary (< vs <=, 0.2 constant) now fully protected"
+      ]
+    },
     "dashboard/app/lib/jwt.server.ts": {
       "status": "completed",
       "covering_tests": [
@@ -2620,11 +2777,11 @@
     }
   },
   "global_statistics": {
-    "total_modules": 40,
-    "completed_modules": 40,
-    "total_mutations": 587,
-    "total_killed": 550,
-    "total_survived": 37,
-    "overall_score": 93.7
+    "total_modules": 42,
+    "completed_modules": 42,
+    "total_mutations": 636,
+    "total_killed": 597,
+    "total_survived": 39,
+    "overall_score": 93.9
   }
 }
