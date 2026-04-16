@@ -5,6 +5,13 @@ function base64url(data: string): string {
 }
 
 export function generateJWT(clientID: string, privateKeyPEM: string, now: Date): string {
+  if (privateKeyPEM === "") {
+    throw new Error("Private key must not be empty")
+  }
+  if (privateKeyPEM.includes("PUBLIC KEY")) {
+    throw new Error("Expected an RSA private key, got a public key")
+  }
+
   const header = JSON.stringify({ alg: "RS256", typ: "JWT" })
   const nowSeconds = Math.floor(now.getTime() / 1000)
   const payload = JSON.stringify({
@@ -17,7 +24,11 @@ export function generateJWT(clientID: string, privateKeyPEM: string, now: Date):
 
   const signer = createSign("RSA-SHA256")
   signer.update(signingInput)
-  const signature = signer.sign(privateKeyPEM, "base64url")
 
-  return `${signingInput}.${signature}`
+  try {
+    const signature = signer.sign(privateKeyPEM, "base64url")
+    return `${signingInput}.${signature}`
+  } catch {
+    throw new Error("Invalid private key: not a valid PEM-encoded RSA private key")
+  }
 }

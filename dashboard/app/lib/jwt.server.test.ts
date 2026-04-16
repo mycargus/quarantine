@@ -79,3 +79,35 @@ describe("generateJWT()", async (assert) => {
     expected: true,
   })
 })
+
+const thrownMessage = (fn: () => unknown): string | null => {
+  try {
+    fn()
+    return null
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e)
+  }
+}
+
+describe("generateJWT() — invalid private key", async (assert) => {
+  assert({
+    given: "a public key instead of a private key",
+    should: "throw an error mentioning public key",
+    actual: thrownMessage(() => generateJWT(clientID, publicKey, now)),
+    expected: "Expected an RSA private key, got a public key",
+  })
+
+  assert({
+    given: "a malformed string that is not a PEM key",
+    should: "throw a descriptive error about the invalid key",
+    actual: thrownMessage(() => generateJWT(clientID, "not-a-pem", now)),
+    expected: "Invalid private key: not a valid PEM-encoded RSA private key",
+  })
+
+  assert({
+    given: "an empty string as the private key",
+    should: "throw an error that the key must not be empty",
+    actual: thrownMessage(() => generateJWT(clientID, "", now)),
+    expected: "Private key must not be empty",
+  })
+})
