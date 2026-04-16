@@ -9,7 +9,11 @@
 import { createServer, type IncomingMessage, type Server } from "node:http"
 import { describe } from "riteway"
 import { initDb } from "../app/lib/db.server.js"
-import { syncInstallations, type SyncDeps } from "../app/lib/installation-sync.server.js"
+import {
+  syncInstallations,
+  startGitHubAppMode,
+  type SyncDeps,
+} from "../app/lib/installation-sync.server.js"
 
 interface RequestEntry {
   method: string
@@ -152,6 +156,111 @@ describe("syncInstallations() — single page, no Link header", async (assert) =
     })
   } finally {
     raw.close()
+    await closeServer(server)
+  }
+})
+
+describe("startGitHubAppMode() — startup sync", async (assert) => {
+  const installations = [
+    { id: 1, account: { login: "acme", id: 100 }, suspended_at: null, app_id: 10 },
+  ]
+
+  const repoPayload = {
+    total_count: 2,
+    repositories: [
+      { owner: { login: "acme" }, name: "api", full_name: "acme/api" },
+      { owner: { login: "acme" }, name: "web", full_name: "acme/web" },
+    ],
+  }
+
+  const routes: Record<string, MockRoute> = {
+    "/app/installations?per_page=100": {
+      status: 200,
+      body: installations,
+    },
+    "/installation/repositories?per_page=100": {
+      status: 200,
+      body: repoPayload,
+    },
+  }
+
+  const { url, server, requestLog } = await startMockServer(routes)
+
+  try {
+    const logs: string[] = []
+
+    const { raw } = await startGitHubAppMode({
+      dbPath: ":memory:",
+      baseUrl: url,
+      jwtToken: "mock-jwt-token",
+      getInstallationToken: async () => "mock-installation-token",
+      log: (msg: string) => logs.push(msg),
+    })
+
+    try {
+      // Verify installations table has 1 row
+      const installationRows = raw
+        .prepare("SELECT id, account_login FROM installations ORDER BY id")
+        .all() as Array<{ id: number; account_login: string }>
+
+      assert({
+        given: "1 installation in the API response",
+        should: "populate the installations table with 1 row",
+        actual: installationRows.length,
+        expected: 1,
+      })
+
+      assert({
+        given: "an installation with account login 'acme'",
+        should: "store the correct account login",
+        actual: installationRows[0]?.account_login,
+        expected: "acme",
+      })
+
+      // Verify projects table has 2 rows with correct installation_id
+      const projectRows = raw
+        .prepare(
+          "SELECT owner, repo, installation_id FROM projects ORDER BY repo",
+        )
+        .all() as Array<{ owner: string; repo: string; installation_id: number }>
+
+      assert({
+        given: "2 repos for the installation",
+        should: "populate the projects table with 2 rows",
+        actual: projectRows.length,
+        expected: 2,
+      })
+
+      assert({
+        given: "2 repos for installation id 1",
+        should: "set installation_id on each project row",
+        actual: projectRows.map((r) => r.installation_id),
+        expected: [1, 1],
+      })
+
+      assert({
+        given: "repos named 'api' and 'web'",
+        should: "store the correct repo names",
+        actual: projectRows.map((r) => `${r.owner}/${r.repo}`),
+        expected: ["acme/api", "acme/web"],
+      })
+
+      // Verify request order: installations first, then repos
+      const relevantRequests = requestLog.map((r) => r.path)
+
+      assert({
+        given: "startup sync completing",
+        should: "call /app/installations before /installation/repositories",
+        actual: relevantRequests,
+        expected: [
+          "/app/installations?per_page=100",
+          "/installation/repositories?per_page=100",
+        ],
+      })
+    } finally {
+      raw.close()
+    }
+  } finally {
     await closeServer(server)
   }
 })

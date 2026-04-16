@@ -80,7 +80,33 @@ interface GitHubReposResponse {
 }
 
 import type { Database as RawDatabase } from "better-sqlite3"
+import { initDb } from "./db.server.js"
 import { parseLinkHeader } from "./github-client.server.js"
+
+export interface StartupDeps {
+  dbPath: string
+  baseUrl: string
+  jwtToken: string
+  getInstallationToken: (installationId: number) => Promise<string>
+  fetchFn?: typeof fetch
+  log?: (msg: string) => void
+}
+
+export async function startGitHubAppMode(
+  deps: StartupDeps,
+): Promise<{ raw: RawDatabase }> {
+  const { raw } = initDb(deps.dbPath)
+
+  await syncInstallations(raw, {
+    fetchFn: deps.fetchFn ?? fetch,
+    baseUrl: deps.baseUrl,
+    jwtToken: deps.jwtToken,
+    getInstallationToken: deps.getInstallationToken,
+    log: deps.log ?? console.log,
+  })
+
+  return { raw }
+}
 
 export async function syncInstallations(
   raw: RawDatabase,
