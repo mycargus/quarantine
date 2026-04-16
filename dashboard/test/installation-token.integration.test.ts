@@ -18,11 +18,12 @@ interface CapturedRequest {
   body: string
 }
 
-function startMockGitHub(): Promise<{
+function startMockGitHub(options: { expiresAt?: string } = {}): Promise<{
   server: Server
   port: number
   captured: CapturedRequest[]
 }> {
+  const expiresAt = options.expiresAt ?? "2026-03-15T13:00:00Z"
   return new Promise((resolve) => {
     const captured: CapturedRequest[] = []
 
@@ -43,7 +44,7 @@ function startMockGitHub(): Promise<{
         res.end(
           JSON.stringify({
             token: "ghs_test123",
-            expires_at: "2026-03-15T13:00:00Z",
+            expires_at: expiresAt,
             permissions: {},
           }),
         )
@@ -122,6 +123,44 @@ describe("InstallationTokenProvider.getToken()", async (assert) => {
       should: "not include a permissions field in the request body",
       actual: hasPermissions,
       expected: false,
+    })
+  } finally {
+    await closeServer(server)
+  }
+})
+
+describe("InstallationTokenProvider.getToken() — caching", async (assert) => {
+  const { privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  })
+
+  const futureExpiry = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+  const { server, port, captured } = await startMockGitHub({ expiresAt: futureExpiry })
+
+  try {
+    const provider = new InstallationTokenProvider({
+      clientID: "Iv1.abc123",
+      privateKeyPEM: privateKey as string,
+      baseUrl: `http://127.0.0.1:${port}`,
+    })
+
+    const first = await provider.getToken(12345)
+    const second = await provider.getToken(12345)
+
+    assert({
+      given: "two getToken calls for the same installation within validity window",
+      should: "make only one HTTP request to the server",
+      actual: captured.length,
+      expected: 1,
+    })
+
+    assert({
+      given: "two getToken calls for the same installation within validity window",
+      should: "return the same token from both calls",
+      actual: second.token,
+      expected: first.token,
     })
   } finally {
     await closeServer(server)
