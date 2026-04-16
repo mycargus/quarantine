@@ -66,6 +66,51 @@ function startMockGitHubWithDelay(delayMs: number): Promise<{
   })
 }
 
+function startMockGitHubPerInstallation(delayMs: number): Promise<{
+  server: Server
+  port: number
+  captured: CapturedRequest[]
+}> {
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+  return new Promise((resolve) => {
+    const captured: CapturedRequest[] = []
+
+    const server = createServer((req: IncomingMessage, res) => {
+      let body = ""
+      req.on("data", (chunk: Buffer) => {
+        body += chunk.toString()
+      })
+      req.on("end", () => {
+        captured.push({
+          method: req.method,
+          url: req.url,
+          headers: req.headers,
+          body,
+        })
+
+        const installId = req.url?.match(/installations\/(\d+)/)?.[1] ?? "unknown"
+
+        setTimeout(() => {
+          res.writeHead(200, { "Content-Type": "application/json" })
+          res.end(
+            JSON.stringify({
+              token: `ghs_token_${installId}`,
+              expires_at: expiresAt,
+              permissions: {},
+            }),
+          )
+        }, delayMs)
+      })
+    })
+
+    server.listen(0, "127.0.0.1", () => {
+      const addr = server.address()
+      const port = typeof addr === "object" && addr !== null ? addr.port : 0
+      resolve({ server, port, captured })
+    })
+  })
+}
+
 function startMockGitHubErrorWithDelay(
   statusCode: number,
   delayMs: number,
@@ -205,6 +250,72 @@ describe("InstallationTokenProvider.getToken() — concurrent error propagation"
       should: "make only one HTTP request (coalesced)",
       actual: captured.length,
       expected: 1,
+    })
+  } finally {
+    await closeServer(server)
+  }
+})
+
+describe("InstallationTokenProvider.getToken() — different installations run independently", async (assert) => {
+  const { privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  })
+
+  const { server, port, captured } = await startMockGitHubPerInstallation(50)
+
+  try {
+    const provider = new InstallationTokenProvider({
+      clientID: "Iv1.abc123",
+      privateKeyPEM: privateKey as string,
+      baseUrl: `http://127.0.0.1:${port}`,
+    })
+
+    const [tokenA, tokenB] = await Promise.all([provider.getToken(111), provider.getToken(222)])
+
+    assert({
+      given: "concurrent getToken calls for two different installation IDs",
+      should: "make two separate HTTP requests",
+      actual: captured.length,
+      expected: 2,
+    })
+
+    const requestUrls = captured.map((r) => r.url).sort()
+
+    assert({
+      given: "concurrent getToken calls for installation 111 and 222",
+      should: "send a request for installation 111",
+      actual: requestUrls.some((u) => u?.includes("/installations/111/")),
+      expected: true,
+    })
+
+    assert({
+      given: "concurrent getToken calls for installation 111 and 222",
+      should: "send a request for installation 222",
+      actual: requestUrls.some((u) => u?.includes("/installations/222/")),
+      expected: true,
+    })
+
+    assert({
+      given: "concurrent getToken calls for two different installation IDs",
+      should: "return a different token for each installation",
+      actual: tokenA.token !== tokenB.token,
+      expected: true,
+    })
+
+    assert({
+      given: "concurrent getToken calls for installation 111",
+      should: "return the token for installation 111",
+      actual: tokenA.token,
+      expected: "ghs_token_111",
+    })
+
+    assert({
+      given: "concurrent getToken calls for installation 222",
+      should: "return the token for installation 222",
+      actual: tokenB.token,
+      expected: "ghs_token_222",
     })
   } finally {
     await closeServer(server)
