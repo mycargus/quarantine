@@ -39,11 +39,29 @@ Answer these questions to the user before writing any code:
 
 Wait for user confirmation before proceeding.
 
+### Expand scenarios before implementation
+
+Before writing any code, expand the acceptance scenarios to cover gaps. For every acceptance criterion and each existing scenario, ask:
+
+1. **Edge cases** — zero items, empty collections, exact boundary values (n=0, n=1, n=100), null/blank inputs
+2. **Negative cases** — error paths, invalid inputs, missing credentials, partial failures, timeouts
+3. **Missing happy paths** — the positive counterpart to each negative case (e.g., if "X fails" exists, does "X recovers/succeeds" exist?), and the reverse of each state transition (e.g., if "suspended → skipped" exists, does "reactivated → resumed" exist?)
+
+**For each gap, invoke `/create-user-scenario <description>`** with enough context to write a well-formed scenario grounded in the spec. Create scenarios one at a time.
+
+After all new scenarios are created, commit them:
+```
+git add docs/scenarios/
+git commit -m "docs: add M$1 edge case and negative scenarios"
+```
+
+This ensures the implementation loop has complete coverage before any code is written.
+
 ### Detect already-committed work
 
-Run `git log --oneline --grep="milestone $1:" | head -20` to find previously committed scenarios.
+Run `git log --oneline --grep="milestone $1:" | head -20` to find previously committed implementation work. Scenario doc commits (e.g., `docs: add M$1 edge case...`) are NOT implementation commits — do not count them as completed scenarios.
 
-Cross-reference with the manifest's scenario list. Report which scenarios are done and which remain:
+Cross-reference with the manifest's scenario list plus any scenarios added in the Expansion step. Report which scenarios are done and which remain:
 
 ```
 Already committed:
@@ -53,6 +71,7 @@ Already committed:
 Remaining:
   - Scenario 72
   - Scenario 73
+  - Scenario 157  (added in expansion step)
 ```
 
 If a `--from` argument was provided, skip to that scenario number. Otherwise, start with the first remaining scenario.
