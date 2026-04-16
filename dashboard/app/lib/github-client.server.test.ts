@@ -38,4 +38,25 @@ describe("checkRateLimit()", async (assert) => {
     actual: checkRateLimit(800, 1000, "core"),
     expected: null,
   })
+
+  assert({
+    given: "both rate limit headers are missing (null, null)",
+    should: "return null (no warning, no error)",
+    actual: checkRateLimit(null, null, "core"),
+    expected: null,
+  })
+
+  assert({
+    given: "only X-RateLimit-Remaining is missing (null, 1000)",
+    should: "return null (no warning, no error)",
+    actual: checkRateLimit(null, 1000, "core"),
+    expected: null,
+  })
+
+  assert({
+    given: "only X-RateLimit-Limit is missing (150, null)",
+    should: "return null (no warning, no error)",
+    actual: checkRateLimit(150, null, "core"),
+    expected: null,
+  })
 })
