@@ -89,6 +89,15 @@ const thrownMessage = (fn: () => unknown): string | null => {
   }
 }
 
+describe("generateJWT() — invalid client ID", async (assert) => {
+  assert({
+    given: "an empty string as the client ID",
+    should: "throw an error that the client ID must not be empty",
+    actual: thrownMessage(() => generateJWT("", privateKey, now)),
+    expected: "Client ID must not be empty",
+  })
+})
+
 describe("generateJWT() — invalid private key", async (assert) => {
   assert({
     given: "a public key instead of a private key",

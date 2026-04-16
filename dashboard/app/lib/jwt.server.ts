@@ -5,6 +5,9 @@ function base64url(data: string): string {
 }
 
 export function generateJWT(clientID: string, privateKeyPEM: string, now: Date): string {
+  if (clientID === "") {
+    throw new Error("Client ID must not be empty")
+  }
   if (privateKeyPEM === "") {
     throw new Error("Private key must not be empty")
   }
