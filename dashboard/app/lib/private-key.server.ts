@@ -7,7 +7,11 @@ export function resolvePrivateKey(
     return envKey
   }
   if (envPath !== undefined) {
-    return readFile(envPath)
+    try {
+      return readFile(envPath)
+    } catch {
+      throw new Error(`Private key file not found: ${envPath}`)
+    }
   }
   throw new Error("No private key configured")
 }

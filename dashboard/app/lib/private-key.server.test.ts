@@ -29,4 +29,30 @@ describe("resolvePrivateKey()", async (assert) => {
       expected: filePEM,
     })
   }
+
+  {
+    const missingFileReader = (_path: string): string => {
+      throw Object.assign(new Error("ENOENT: no such file or directory"), {
+        code: "ENOENT",
+      })
+    }
+
+    const thrownMessage = (fn: () => unknown): string | null => {
+      try {
+        fn()
+        return null
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e)
+      }
+    }
+
+    assert({
+      given: "QUARANTINE_APP_PRIVATE_KEY_PATH points to a nonexistent file",
+      should: "throw an error identifying the missing file path",
+      actual: thrownMessage(() =>
+        resolvePrivateKey(undefined, "/nonexistent/key.pem", missingFileReader),
+      ),
+      expected: "Private key file not found: /nonexistent/key.pem",
+    })
+  }
 })
