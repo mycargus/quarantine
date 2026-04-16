@@ -794,3 +794,141 @@ describe("GET /auth/logout — logout event is logged with timestamp and user ID
     cleanup()
   }
 })
+
+describe("Auth cycle — token values never appear in any log output", async (assert) => {
+  const { router, cleanup } = createTestApp({
+    repos: [],
+    oauthClientId: "test-client-id",
+    oauthClientSecret: "test-secret",
+    oauthOrigin: "http://localhost:3000",
+  })
+
+  // Capture ALL console output channels
+  const allOutput: string[] = []
+  const originalLog = console.log
+  const originalWarn = console.warn
+  const originalError = console.error
+  const capture = (...args: unknown[]) => {
+    allOutput.push(args.map(String).join(" "))
+  }
+  console.log = capture
+  console.warn = capture
+  console.error = capture
+
+  const originalFetch = globalThis.fetch
+
+  try {
+    // --- (a) Successful login ---
+    const loginResponse = await router.fetch(new Request("http://localhost/auth/login"))
+    const location = loginResponse.headers.get("Location") ?? ""
+    const locationUrl = new URL(location)
+    const state = locationUrl.searchParams.get("state") ?? ""
+
+    // Mock GitHub to return a token with the ghu_ prefix
+    globalThis.fetch = async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
+      if (url.startsWith("https://github.com/login/oauth/access_token")) {
+        return new Response(
+          JSON.stringify({
+            access_token: "ghu_fake_token_abc123",
+            token_type: "bearer",
+            scope: "read:user,user:email",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      }
+      if (url.startsWith("https://api.github.com/user/emails")) {
+        return new Response(
+          JSON.stringify([
+            { email: "octocat@github.com", primary: true, verified: true, visibility: "public" },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      }
+      if (url.startsWith("https://api.github.com/user")) {
+        return new Response(
+          JSON.stringify({
+            id: 42,
+            login: "octocat",
+            name: "The Octocat",
+            email: null,
+            avatar_url: "https://github.com/images/error/octocat_happy.gif",
+            html_url: "https://github.com/octocat",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      }
+      return new Response("Not found", { status: 404 })
+    }
+
+    const loginCookies = loginResponse.headers
+      .getSetCookie()
+      .map((c) => c.split(";")[0])
+      .join("; ")
+    const callbackResponse = await router.fetch(
+      new Request(`http://localhost/auth/github/callback?code=fake-code&state=${state}`, {
+        headers: { Cookie: loginCookies },
+      }),
+    )
+
+    // --- (b) Authenticated route access ---
+    const callbackCookies = callbackResponse.headers
+      .getSetCookie()
+      .map((c) => c.split(";")[0])
+      .join("; ")
+    await router.fetch(new Request("http://localhost/", { headers: { Cookie: callbackCookies } }))
+
+    // --- (c) Failed login (error path) ---
+    const loginResponse2 = await router.fetch(new Request("http://localhost/auth/login"))
+    const location2 = loginResponse2.headers.get("Location") ?? ""
+    const locationUrl2 = new URL(location2)
+    const state2 = locationUrl2.searchParams.get("state") ?? ""
+
+    // Mock GitHub to return an error response for the token exchange
+    globalThis.fetch = async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
+      if (url.startsWith("https://github.com/login/oauth/access_token")) {
+        return new Response(
+          JSON.stringify({
+            error: "bad_verification_code",
+            error_description: "The code passed is incorrect or expired.",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      }
+      return new Response("Not found", { status: 404 })
+    }
+
+    const loginCookies2 = loginResponse2.headers
+      .getSetCookie()
+      .map((c) => c.split(";")[0])
+      .join("; ")
+    await router.fetch(
+      new Request(`http://localhost/auth/github/callback?code=invalid-code&state=${state2}`, {
+        headers: { Cookie: loginCookies2 },
+      }),
+    )
+
+    // --- (d) Logout ---
+    globalThis.fetch = originalFetch
+    await router.fetch(
+      new Request("http://localhost/auth/logout", { headers: { Cookie: callbackCookies } }),
+    )
+
+    // --- Assert: no ghu_ token leaked across ALL output ---
+    const combinedOutput = allOutput.join("\n")
+
+    assert({
+      given: "a complete auth cycle (login, route access, failed login, logout)",
+      should: "never include a GitHub user-to-server token (ghu_ prefix) in any log output",
+      actual: combinedOutput.includes("ghu_"),
+      expected: false,
+    })
+  } finally {
+    console.log = originalLog
+    console.warn = originalWarn
+    console.error = originalError
+    globalThis.fetch = originalFetch
+    cleanup()
+  }
+})
