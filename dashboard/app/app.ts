@@ -68,6 +68,9 @@ export function createApp(opts: AppOptions = {}) {
       },
       authLogout: (ctx) => {
         const s = ctx.get(Session)
+        const userId = s.get("userId" as never) as string
+        const timestamp = new Date().toISOString()
+        console.log(formatAuthEvent("logout", userId, timestamp))
         s.destroy()
         return new Response(null, {
           status: 302,

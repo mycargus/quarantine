@@ -738,3 +738,59 @@ describe("GET /auth/github/callback — successful login logs auth event", async
     cleanup()
   }
 })
+
+describe("GET /auth/logout — logout event is logged with timestamp and user ID", async (assert) => {
+  const { router, sessionCookie, cleanup } = createTestApp({
+    repos: [],
+    oauthClientId: "test-client-id",
+    oauthClientSecret: "test-secret",
+    oauthOrigin: "http://localhost:3000",
+  })
+  const cookie = await sessionCookie()
+
+  const logOutput: string[] = []
+  const originalLog = console.log
+  const restoreLog = () => {
+    console.log = originalLog
+  }
+  console.log = (...args: unknown[]) => {
+    logOutput.push(args.map(String).join(" "))
+  }
+
+  try {
+    await router.fetch(new Request("http://localhost/auth/logout", { headers: { Cookie: cookie } }))
+
+    const allLogs = logOutput.join("\n")
+
+    assert({
+      given: "an authenticated user requesting GET /auth/logout",
+      should: "log an auth event containing the event type 'logout'",
+      actual: allLogs.includes("logout"),
+      expected: true,
+    })
+
+    assert({
+      given: "an authenticated user requesting GET /auth/logout",
+      should: "log an auth event containing the user ID from the session",
+      actual: allLogs.includes("test-user"),
+      expected: true,
+    })
+
+    assert({
+      given: "an authenticated user requesting GET /auth/logout",
+      should: "log an auth event containing an ISO 8601 timestamp",
+      actual: /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(allLogs),
+      expected: true,
+    })
+
+    assert({
+      given: "an authenticated user requesting GET /auth/logout",
+      should: "not include any access token (ghu_ prefix) in log output",
+      actual: allLogs.includes("ghu_"),
+      expected: false,
+    })
+  } finally {
+    restoreLog()
+    cleanup()
+  }
+})
