@@ -31,4 +31,11 @@ describe("checkRateLimit()", async (assert) => {
     actual: result?.resource,
     expected: "core",
   })
+
+  assert({
+    given: "remaining is 800 of 1000 (80%, above 20% threshold)",
+    should: "return null (no warning)",
+    actual: checkRateLimit(800, 1000, "core"),
+    expected: null,
+  })
 })
