@@ -342,3 +342,64 @@ describe("User rate limit — 301st authenticated request returns 429 with Retry
     cleanup()
   }
 })
+
+describe("IP rate limit — counter resets after the 60-second window expires", async (assert) => {
+  let fakeNow = 1_000_000
+  const clock = () => fakeNow
+  const { router, cleanup } = createTestApp({
+    repos: [],
+    clock,
+  })
+  try {
+    const clientIp = "198.51.100.7"
+
+    // Exhaust the 20-request limit within the current window
+    for (let i = 0; i < 20; i++) {
+      await router.fetch(
+        new Request("http://localhost/health", {
+          headers: { "X-Forwarded-For": clientIp },
+        }),
+      )
+    }
+
+    // Confirm request #21 is rate limited
+    const blockedResponse = await router.fetch(
+      new Request("http://localhost/health", {
+        headers: { "X-Forwarded-For": clientIp },
+      }),
+    )
+
+    assert({
+      given: "21st request within the same 1-minute window",
+      should: "return HTTP 429",
+      actual: blockedResponse.status,
+      expected: 429,
+    })
+
+    // Advance the clock past the 60-second window boundary
+    fakeNow += 61_000
+
+    // Send a new request after the window has expired
+    const resetResponse = await router.fetch(
+      new Request("http://localhost/health", {
+        headers: { "X-Forwarded-For": clientIp },
+      }),
+    )
+
+    assert({
+      given: "a request after the 60-second rate limit window has expired",
+      should: "not return 429 because the counter has reset",
+      actual: resetResponse.status !== 429,
+      expected: true,
+    })
+
+    assert({
+      given: "a request after the 60-second rate limit window has expired",
+      should: "return HTTP 200",
+      actual: resetResponse.status,
+      expected: 200,
+    })
+  } finally {
+    cleanup()
+  }
+})
