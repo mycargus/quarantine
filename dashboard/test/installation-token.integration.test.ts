@@ -18,6 +18,40 @@ interface CapturedRequest {
   body: string
 }
 
+function startMockGitHubError(statusCode: number): Promise<{
+  server: Server
+  port: number
+  captured: CapturedRequest[]
+}> {
+  return new Promise((resolve) => {
+    const captured: CapturedRequest[] = []
+
+    const server = createServer((req: IncomingMessage, res) => {
+      let body = ""
+      req.on("data", (chunk: Buffer) => {
+        body += chunk.toString()
+      })
+      req.on("end", () => {
+        captured.push({
+          method: req.method,
+          url: req.url,
+          headers: req.headers,
+          body,
+        })
+
+        res.writeHead(statusCode, { "Content-Type": "application/json" })
+        res.end(JSON.stringify({ message: "Internal Server Error" }))
+      })
+    })
+
+    server.listen(0, "127.0.0.1", () => {
+      const addr = server.address()
+      const port = typeof addr === "object" && addr !== null ? addr.port : 0
+      resolve({ server, port, captured })
+    })
+  })
+}
+
 function startMockGitHub(options: { expiresAt?: string } = {}): Promise<{
   server: Server
   port: number
@@ -260,5 +294,103 @@ describe("InstallationTokenProvider.getToken() — near-expiry refresh", async (
     })
   } finally {
     await closeServer(server)
+  }
+})
+
+describe("InstallationTokenProvider.getToken() — error handling", async (assert) => {
+  const { privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  })
+
+  // --- 500 response: rejects with descriptive error ---
+  {
+    const { server, port } = await startMockGitHubError(500)
+    try {
+      const warnings: string[] = []
+      const provider = new InstallationTokenProvider({
+        clientID: "Iv1.abc123",
+        privateKeyPEM: privateKey as string,
+        baseUrl: `http://127.0.0.1:${port}`,
+        warn: (msg: string) => warnings.push(msg),
+      })
+
+      let caughtError: unknown = null
+      try {
+        await provider.getToken(12345)
+      } catch (err) {
+        caughtError = err
+      }
+
+      assert({
+        given: "a 500 response from the access_tokens endpoint",
+        should: "reject with an Error instance",
+        actual: caughtError instanceof Error,
+        expected: true,
+      })
+
+      assert({
+        given: "a 500 response from the access_tokens endpoint",
+        should: "include the status code in the error message",
+        actual: caughtError instanceof Error && caughtError.message.includes("500"),
+        expected: true,
+      })
+
+      assert({
+        given: "a 500 response from the access_tokens endpoint",
+        should: "log a warning with the error details",
+        actual: warnings.length,
+        expected: 1,
+      })
+
+      assert({
+        given: "a 500 response from the access_tokens endpoint",
+        should: "include the installation ID in the warning",
+        actual: warnings.length > 0 && warnings[0].includes("12345"),
+        expected: true,
+      })
+    } finally {
+      await closeServer(server)
+    }
+  }
+
+  // --- Network error (connection refused): rejects with descriptive error ---
+  {
+    const warnings: string[] = []
+    const provider = new InstallationTokenProvider({
+      clientID: "Iv1.abc123",
+      privateKeyPEM: privateKey as string,
+      baseUrl: "http://127.0.0.1:1",
+      warn: (msg: string) => warnings.push(msg),
+    })
+
+    let caughtError: unknown = null
+    try {
+      await provider.getToken(99999)
+    } catch (err) {
+      caughtError = err
+    }
+
+    assert({
+      given: "a network error (connection refused)",
+      should: "reject with an Error instance",
+      actual: caughtError instanceof Error,
+      expected: true,
+    })
+
+    assert({
+      given: "a network error (connection refused)",
+      should: "log a warning with the error details",
+      actual: warnings.length,
+      expected: 1,
+    })
+
+    assert({
+      given: "a network error (connection refused)",
+      should: "include the installation ID in the warning",
+      actual: warnings.length > 0 && warnings[0].includes("99999"),
+      expected: true,
+    })
   }
 })
