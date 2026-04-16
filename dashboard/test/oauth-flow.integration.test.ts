@@ -343,6 +343,151 @@ describe("User rate limit — 301st authenticated request returns 429 with Retry
   }
 })
 
+describe("GET /auth/github/callback — valid code and state completes login", async (assert) => {
+  const { router, cleanup } = createTestApp({
+    repos: [],
+    oauthClientId: "test-client-id",
+    oauthClientSecret: "test-secret",
+    oauthOrigin: "http://localhost:3000",
+  })
+  try {
+    // Step 1: Start the login flow to get PKCE state in the session
+    const loginResponse = await router.fetch(new Request("http://localhost/auth/login"))
+    const location = loginResponse.headers.get("Location") ?? ""
+    const locationUrl = new URL(location)
+    const state = locationUrl.searchParams.get("state") ?? ""
+
+    // Step 2: Mock GitHub's token exchange and user profile endpoints
+    const originalFetch = globalThis.fetch
+    const restoreFetch = () => {
+      globalThis.fetch = originalFetch
+    }
+    globalThis.fetch = async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
+      if (url.startsWith("https://github.com/login/oauth/access_token")) {
+        return new Response(
+          JSON.stringify({
+            access_token: "gho_fake_token_123",
+            token_type: "bearer",
+            scope: "read:user,user:email",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      }
+      if (url.startsWith("https://api.github.com/user/emails")) {
+        return new Response(
+          JSON.stringify([
+            { email: "octocat@github.com", primary: true, verified: true, visibility: "public" },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      }
+      if (url.startsWith("https://api.github.com/user")) {
+        return new Response(
+          JSON.stringify({
+            id: 42,
+            login: "octocat",
+            name: "The Octocat",
+            email: null,
+            avatar_url: "https://github.com/images/error/octocat_happy.gif",
+            html_url: "https://github.com/octocat",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      }
+      return new Response("Not found", { status: 404 })
+    }
+
+    try {
+      // Step 3: Call the callback endpoint with the session cookie from login
+      const loginCookies = loginResponse.headers
+        .getSetCookie()
+        .map((c) => c.split(";")[0])
+        .join("; ")
+      const callbackResponse = await router.fetch(
+        new Request(`http://localhost/auth/github/callback?code=fake-code&state=${state}`, {
+          headers: { Cookie: loginCookies },
+        }),
+      )
+
+      assert({
+        given: "a valid authorization code and state from GitHub OAuth",
+        should: "return HTTP 302 redirect",
+        actual: callbackResponse.status,
+        expected: 302,
+      })
+
+      const redirectLocation = callbackResponse.headers.get("Location") ?? ""
+
+      assert({
+        given: "a valid authorization code and state from GitHub OAuth",
+        should: "redirect to /",
+        actual: new URL(redirectLocation, "http://localhost").pathname,
+        expected: "/",
+      })
+
+      const setCookie = callbackResponse.headers.get("Set-Cookie") ?? ""
+
+      assert({
+        given: "a valid authorization code and state from GitHub OAuth",
+        should: "set a session cookie",
+        actual: setCookie !== "",
+        expected: true,
+      })
+
+      const lowerCookie = setCookie.toLowerCase()
+
+      assert({
+        given: "a valid authorization code and state from GitHub OAuth",
+        should: "set HttpOnly on the session cookie",
+        actual: lowerCookie.includes("httponly"),
+        expected: true,
+      })
+
+      assert({
+        given: "a valid authorization code and state from GitHub OAuth",
+        should: "set Secure on the session cookie",
+        actual: lowerCookie.includes("secure"),
+        expected: true,
+      })
+
+      assert({
+        given: "a valid authorization code and state from GitHub OAuth",
+        should: "set SameSite=Lax on the session cookie",
+        actual: lowerCookie.includes("samesite=lax"),
+        expected: true,
+      })
+
+      assert({
+        given: "a valid authorization code and state from GitHub OAuth",
+        should: "set Max-Age=28800 on the session cookie",
+        actual: lowerCookie.includes("max-age=28800"),
+        expected: true,
+      })
+
+      // Step 4: Verify the session cookie grants access to a protected route
+      const callbackCookies = callbackResponse.headers
+        .getSetCookie()
+        .map((c) => c.split(";")[0])
+        .join("; ")
+      const authenticatedResponse = await router.fetch(
+        new Request("http://localhost/", { headers: { Cookie: callbackCookies } }),
+      )
+
+      assert({
+        given: "the session cookie from a successful OAuth callback",
+        should: "grant access to the protected home route (HTTP 200)",
+        actual: authenticatedResponse.status,
+        expected: 200,
+      })
+    } finally {
+      restoreFetch()
+    }
+  } finally {
+    cleanup()
+  }
+})
+
 describe("IP rate limit — counter resets after the 60-second window expires", async (assert) => {
   let fakeNow = 1_000_000
   const clock = () => fakeNow

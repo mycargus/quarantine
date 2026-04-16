@@ -1,4 +1,9 @@
-import { createGitHubAuthProvider, startExternalAuth } from "@remix-run/auth"
+import {
+  completeAuth,
+  createGitHubAuthProvider,
+  finishExternalAuth,
+  startExternalAuth,
+} from "@remix-run/auth"
 import { requireAuth } from "@remix-run/auth-middleware"
 import { Session } from "@remix-run/session"
 import { createRouter } from "remix/fetch-router"
@@ -45,6 +50,15 @@ export function createApp(opts: AppOptions = {}) {
       },
       health: () => new Response("ok", { status: 200 }),
       authLogin: (ctx) => startExternalAuth(githubProvider!, ctx),
+      authCallback: async (ctx) => {
+        const { result } = await finishExternalAuth(githubProvider!, ctx)
+        const session = completeAuth(ctx)
+        session.set("userId" as never, result.profile.login as never)
+        return new Response(null, {
+          status: 302,
+          headers: { Location: "/" },
+        })
+      },
       authLogout: (ctx) => {
         const s = ctx.get(Session)
         s.destroy()
