@@ -15,6 +15,7 @@ export function createApp(opts: AppOptions = {}) {
   router.map(routes, {
     actions: {
       home: () => home(opts),
+      health: () => new Response("ok", { status: 200 }),
       projectDetail: (ctx) =>
         project(ctx.params.owner, ctx.params.repo, ctx.request.url, opts.dbPath),
     },
