@@ -51,13 +51,17 @@ export function createApp(opts: AppOptions = {}) {
       health: () => new Response("ok", { status: 200 }),
       authLogin: (ctx) => startExternalAuth(githubProvider!, ctx),
       authCallback: async (ctx) => {
-        const { result } = await finishExternalAuth(githubProvider!, ctx)
-        const session = completeAuth(ctx)
-        session.set("userId" as never, result.profile.login as never)
-        return new Response(null, {
-          status: 302,
-          headers: { Location: "/" },
-        })
+        try {
+          const { result } = await finishExternalAuth(githubProvider!, ctx)
+          const session = completeAuth(ctx)
+          session.set("userId" as never, result.profile.login as never)
+          return new Response(null, {
+            status: 302,
+            headers: { Location: "/" },
+          })
+        } catch {
+          return new Response("OAuth authentication failed", { status: 400 })
+        }
       },
       authLogout: (ctx) => {
         const s = ctx.get(Session)

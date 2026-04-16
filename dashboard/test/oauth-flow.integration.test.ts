@@ -488,6 +488,82 @@ describe("GET /auth/github/callback — valid code and state completes login", a
   }
 })
 
+describe("GET /auth/github/callback — invalid authorization code returns error", async (assert) => {
+  const { router, cleanup } = createTestApp({
+    repos: [],
+    oauthClientId: "test-client-id",
+    oauthClientSecret: "test-secret",
+    oauthOrigin: "http://localhost:3000",
+  })
+  try {
+    // Step 1: Start the login flow to get PKCE state in the session
+    const loginResponse = await router.fetch(new Request("http://localhost/auth/login"))
+    const location = loginResponse.headers.get("Location") ?? ""
+    const locationUrl = new URL(location)
+    const state = locationUrl.searchParams.get("state") ?? ""
+
+    // Step 2: Mock GitHub's token exchange to return an error (invalid code)
+    const originalFetch = globalThis.fetch
+    const restoreFetch = () => {
+      globalThis.fetch = originalFetch
+    }
+    globalThis.fetch = async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
+      if (url.startsWith("https://github.com/login/oauth/access_token")) {
+        return new Response(
+          JSON.stringify({
+            error: "bad_verification_code",
+            error_description: "The code passed is incorrect or expired.",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      }
+      return new Response("Not found", { status: 404 })
+    }
+
+    try {
+      // Step 3: Call the callback endpoint with the session cookie from login
+      const loginCookies = loginResponse.headers
+        .getSetCookie()
+        .map((c) => c.split(";")[0])
+        .join("; ")
+      const callbackResponse = await router.fetch(
+        new Request(`http://localhost/auth/github/callback?code=invalid-code&state=${state}`, {
+          headers: { Cookie: loginCookies },
+        }),
+      )
+
+      assert({
+        given: "an invalid authorization code on OAuth callback",
+        should: "return an HTTP error status (4xx)",
+        actual: callbackResponse.status >= 400 && callbackResponse.status < 500,
+        expected: true,
+      })
+
+      // Verify the session cookie from the error response does NOT grant
+      // access to protected routes (no userId was set in the session).
+      const callbackCookies = callbackResponse.headers
+        .getSetCookie()
+        .map((c) => c.split(";")[0])
+        .join("; ")
+      const protectedResponse = await router.fetch(
+        new Request("http://localhost/", { headers: { Cookie: callbackCookies } }),
+      )
+
+      assert({
+        given: "the session cookie from a failed OAuth callback",
+        should: "not grant access to protected routes (HTTP 401)",
+        actual: protectedResponse.status,
+        expected: 401,
+      })
+    } finally {
+      restoreFetch()
+    }
+  } finally {
+    cleanup()
+  }
+})
+
 describe("IP rate limit — counter resets after the 60-second window expires", async (assert) => {
   let fakeNow = 1_000_000
   const clock = () => fakeNow
