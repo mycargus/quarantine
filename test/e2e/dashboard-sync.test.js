@@ -15,7 +15,7 @@
  *   QUARANTINE_TEST_REPO      — repo that has quarantine-results-* artifacts
  */
 
-import { spawn } from "node:child_process"
+import { spawnSync, spawn } from "node:child_process"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -32,6 +32,10 @@ if (!repo) throw new Error("QUARANTINE_TEST_REPO is required")
 
 const DASHBOARD_DIR = resolve(new URL("../../dashboard", import.meta.url).pathname)
 
+// Fixed session secret for E2E tests. Passed to the spawned server so that
+// the cookie we build here will be accepted by requireAuth().
+const E2E_SESSION_SECRET = "e2e-test-session-secret"
+
 // --- Test infrastructure ---
 
 function pickPort() {
@@ -44,6 +48,27 @@ function writeConfig(configPath) {
     `source: manual\nrepos:\n  - owner: ${owner}\n    repo: ${repo}\n`,
     "utf8",
   )
+}
+
+/**
+ * Builds a valid signed session cookie for the E2E session secret by spawning
+ * the dashboard's cookie-builder script. Returns the "name=value" string
+ * suitable for use in a Cookie request header.
+ */
+function buildSessionCookie() {
+  const result = spawnSync(
+    "node",
+    ["--import", "tsx/esm", "scripts/e2e-session-cookie.ts"],
+    {
+      cwd: DASHBOARD_DIR,
+      env: { ...process.env, SESSION_SECRET: E2E_SESSION_SECRET },
+      encoding: "utf8",
+    },
+  )
+  if (result.status !== 0) {
+    throw new Error(`Failed to build session cookie:\n${result.stderr}`)
+  }
+  return result.stdout.trim()
 }
 
 /**
@@ -63,6 +88,7 @@ function startServer(tempDir, port) {
       DASHBOARD_CONFIG: configPath,
       DATABASE_URL: dbPath,
       QUARANTINE_GITHUB_TOKEN: token,
+      SESSION_SECRET: E2E_SESSION_SECRET,
     },
     stdio: ["ignore", "pipe", "pipe"],
   })
@@ -130,12 +156,14 @@ async function stopServer(handle) {
 describe("dashboard E2E — sync from real GitHub Artifacts", () => {
   let handle
   let baseUrl
+  let sessionCookie
 
   beforeEach(async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "dash-e2e-"))
     const port = pickPort()
     handle = startServer(tempDir, port)
     baseUrl = `http://localhost:${port}`
+    sessionCookie = buildSessionCookie()
     await waitForReady(port)
   })
 
@@ -162,7 +190,9 @@ describe("dashboard E2E — sync from real GitHub Artifacts", () => {
   }, async () => {
     // The first GET / triggers sync against the real GitHub Artifacts API.
     // The response is returned only after sync completes and the page renders.
-    const response = await fetch(`${baseUrl}/`)
+    const response = await fetch(`${baseUrl}/`, {
+      headers: { Cookie: sessionCookie },
+    })
     const html = await response.text()
 
     assert({
@@ -198,7 +228,9 @@ describe("dashboard E2E — sync from real GitHub Artifacts", () => {
     timeout: 120_000,
   }, async () => {
     // Trigger sync via the home route.
-    const homeRes = await fetch(`${baseUrl}/`)
+    const homeRes = await fetch(`${baseUrl}/`, {
+      headers: { Cookie: sessionCookie },
+    })
 
     assert({
       given: "a GET / to trigger sync before checking project detail",
@@ -208,7 +240,9 @@ describe("dashboard E2E — sync from real GitHub Artifacts", () => {
     })
 
     // Now request the project detail page.
-    const response = await fetch(`${baseUrl}/projects/${owner}/${repo}`)
+    const response = await fetch(`${baseUrl}/projects/${owner}/${repo}`, {
+      headers: { Cookie: sessionCookie },
+    })
     const html = await response.text()
 
     assert({
@@ -240,7 +274,9 @@ describe("dashboard E2E — sync from real GitHub Artifacts", () => {
     timeout: 120_000,
   }, async () => {
     // First request: triggers sync, ingests artifacts.
-    const first = await fetch(`${baseUrl}/`)
+    const first = await fetch(`${baseUrl}/`, {
+      headers: { Cookie: sessionCookie },
+    })
     const firstHtml = await first.text()
 
     assert({
@@ -253,7 +289,9 @@ describe("dashboard E2E — sync from real GitHub Artifacts", () => {
     // Second request: within the 5-minute debounce window, so sync is
     // skipped. The response should be rendered from the same SQLite data
     // that was ingested on the first request.
-    const second = await fetch(`${baseUrl}/`)
+    const second = await fetch(`${baseUrl}/`, {
+      headers: { Cookie: sessionCookie },
+    })
     const secondHtml = await second.text()
 
     assert({
