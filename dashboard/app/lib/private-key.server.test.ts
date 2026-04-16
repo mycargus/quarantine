@@ -71,4 +71,22 @@ describe("resolvePrivateKey()", async (assert) => {
       expected: "Private key file not found: /nonexistent/key.pem",
     })
   }
+
+  {
+    const thrownMessage = (fn: () => unknown): string | null => {
+      try {
+        fn()
+        return null
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e)
+      }
+    }
+
+    assert({
+      given: "neither QUARANTINE_APP_PRIVATE_KEY nor QUARANTINE_APP_PRIVATE_KEY_PATH is set",
+      should: "throw 'No private key configured'",
+      actual: thrownMessage(() => resolvePrivateKey(undefined, undefined, unusedReadFile)),
+      expected: "No private key configured",
+    })
+  }
 })

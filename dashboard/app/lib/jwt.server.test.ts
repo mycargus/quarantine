@@ -65,6 +65,27 @@ describe("generateJWT()", async (assert) => {
     expected: nowUnix + 540,
   })
 
+  assert({
+    given: "a valid client ID and RSA private key",
+    should: "encode all three JWT parts with URL-safe base64 (no +, /, or = padding characters)",
+    actual: parts.every((part) => !/[+/=]/.test(part)),
+    expected: true,
+  })
+
+  assert({
+    given: "a valid client ID and RSA private key",
+    should: "place only header keys (alg, typ) in parts[0], not payload keys",
+    actual: Object.keys(header).sort(),
+    expected: ["alg", "typ"],
+  })
+
+  assert({
+    given: "a valid client ID and RSA private key",
+    should: "place only payload keys (exp, iat, iss) in parts[1], not header keys",
+    actual: Object.keys(payload).sort(),
+    expected: ["exp", "iat", "iss"],
+  })
+
   // Verify the signature is valid using the public key
   const signatureInput = `${parts[0]}.${parts[1]}`
   const signature = Buffer.from(parts[2].replace(/-/g, "+").replace(/_/g, "/"), "base64")

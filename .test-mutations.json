@@ -2322,12 +2322,309 @@
       ]
     }
   },
+    "dashboard/app/lib/jwt.server.ts": {
+      "status": "completed",
+      "covering_tests": [
+        "dashboard/app/lib/jwt.server.test.ts"
+      ],
+      "last_tested": "2026-04-16T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 8,
+              "original": "clientID === \"\"",
+              "mutated": "clientID !== \"\"",
+              "result": "killed",
+              "test_that_caught_it": "generateJWT() — invalid client ID"
+            }
+          ]
+        },
+        "arithmetic": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 22,
+              "original": "- 60",
+              "mutated": "+ 60",
+              "result": "killed",
+              "test_that_caught_it": "set iat to now minus 60 seconds"
+            },
+            {
+              "line": 23,
+              "original": "+ 540",
+              "mutated": "- 540",
+              "result": "killed",
+              "test_that_caught_it": "set exp to now plus 9 minutes (540 seconds)"
+            }
+          ]
+        },
+        "constants": {
+          "total": 9,
+          "killed": 9,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 18,
+              "original": "\"RS256\"",
+              "mutated": "\"HS256\"",
+              "result": "killed",
+              "test_that_caught_it": "set the header alg to RS256"
+            },
+            {
+              "line": 32,
+              "original": "signer.sign(privateKeyPEM, \"base64url\")",
+              "mutated": "signer.sign(privateKeyPEM, \"base64\")",
+              "result": "killed",
+              "test_that_caught_it": "encode all three JWT parts with URL-safe base64 (new test)"
+            }
+          ]
+        },
+        "logical": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 14,
+              "original": ".includes(\"PUBLIC KEY\")",
+              "mutated": "!.includes(\"PUBLIC KEY\")",
+              "result": "killed",
+              "test_that_caught_it": "generateJWT() — invalid private key"
+            }
+          ]
+        },
+        "statement": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": []
+        },
+        "control_flow": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 26,
+              "original": "${base64url(header)}.${base64url(payload)}",
+              "mutated": "${base64url(payload)}.${base64url(header)}",
+              "result": "killed",
+              "test_that_caught_it": "set the header alg to RS256 (existing test)"
+            }
+          ]
+        },
+        "equivalent": {
+          "total": 1,
+          "killed": 0,
+          "survived": 1,
+          "examples": [
+            {
+              "line": 4,
+              "original": "Buffer.from(data).toString(\"base64url\")",
+              "mutated": "Buffer.from(data).toString(\"base64\")",
+              "result": "survived (equivalent mutant — test inputs produce identical base64/base64url output for these specific JSON strings)",
+              "test_that_caught_it": null
+            }
+          ]
+        }
+      },
+      "mutation_score": 95.2,
+      "insights": [
+        "20/21 mutations killed after adding base64url encoding and key-order assertions",
+        "Line 4 base64url helper is equivalent for test inputs — header (27 bytes) and payload (60 bytes) happen to produce identical base64 and base64url output",
+        "Signature encoding (line 32) now caught via = padding check on all JWT parts",
+        "Part ordering, header alg, payload fields all well protected"
+      ]
+    },
+    "dashboard/app/lib/private-key.server.ts": {
+      "status": "completed",
+      "covering_tests": [
+        "dashboard/app/lib/private-key.server.test.ts"
+      ],
+      "last_tested": "2026-04-16T00:00:00Z",
+      "mutations_by_type": {
+        "relational": {
+          "total": 4,
+          "killed": 4,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 6,
+              "original": "envPath !== undefined",
+              "mutated": "envPath === undefined",
+              "result": "killed",
+              "test_that_caught_it": "should return the PEM value from env var"
+            }
+          ]
+        },
+        "constants": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 10,
+              "original": "Private key file not found: ${envPath}",
+              "mutated": "MUTATED",
+              "result": "killed",
+              "test_that_caught_it": "should throw an error identifying the missing file path"
+            },
+            {
+              "line": 16,
+              "original": "No private key configured",
+              "mutated": "MUTATED",
+              "result": "killed",
+              "test_that_caught_it": "No private key configured (new test)"
+            }
+          ]
+        },
+        "statement": {
+          "total": 5,
+          "killed": 5,
+          "survived": 0,
+          "examples": []
+        },
+        "control_flow": {
+          "total": 3,
+          "killed": 3,
+          "survived": 0,
+          "examples": [
+            {
+              "line": "6-12",
+              "original": "path-first precedence",
+              "mutated": "key-first (swapped)",
+              "result": "killed",
+              "test_that_caught_it": "should use the file path value (file path takes precedence)"
+            }
+          ]
+        }
+      },
+      "mutation_score": 100.0,
+      "insights": [
+        "All 14 mutations killed after adding missing 'both undefined' error message test",
+        "Pure function with no I/O — highly testable",
+        "Precedence ordering (path > key > error) fully tested"
+      ]
+    },
+    "cli/internal/result/result_reclassify.go": {
+      "status": "completed",
+      "covering_tests": [
+        "cli/internal/result/result_reclassify_test.go"
+      ],
+      "last_tested": "2026-04-16T00:00:00Z",
+      "mutations_by_type": {
+        "logical": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 16,
+              "original": "!quarantinedIDs[t.TestID]",
+              "mutated": "quarantinedIDs[t.TestID]",
+              "result": "killed",
+              "test_that_caught_it": "TestReclassifyQuarantinedTests_MixedOutcomesAllReclassified"
+            }
+          ]
+        },
+        "arithmetic": {
+          "total": 8,
+          "killed": 8,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 25,
+              "original": "Failed--",
+              "mutated": "Failed++",
+              "result": "killed",
+              "test_that_caught_it": "TestReclassifyQuarantinedTests_FailedBecomesQuarantined"
+            },
+            {
+              "line": 32,
+              "original": "Quarantined++",
+              "mutated": "Quarantined--",
+              "result": "killed",
+              "test_that_caught_it": "TestReclassifyQuarantinedTests_FailedBecomesQuarantined"
+            }
+          ]
+        },
+        "constant": {
+          "total": 9,
+          "killed": 9,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 31,
+              "original": "t.Status = \"quarantined\"",
+              "mutated": "t.Status = \"failed\"",
+              "result": "killed",
+              "test_that_caught_it": "TestReclassifyQuarantinedTests_FailedBecomesQuarantined"
+            },
+            {
+              "line": 20,
+              "original": "case \"failed\", \"flaky\", \"passed\"",
+              "mutated": "case \"flaky\", \"passed\" (drop failed)",
+              "result": "killed",
+              "test_that_caught_it": "TestReclassifyQuarantinedTests_FailedBecomesQuarantined"
+            }
+          ]
+        },
+        "statement": {
+          "total": 6,
+          "killed": 6,
+          "survived": 0,
+          "examples": [
+            {
+              "line": 22,
+              "original": "t.OriginalStatus = &orig",
+              "mutated": "deleted",
+              "result": "killed",
+              "test_that_caught_it": "TestReclassifyQuarantinedTests_FailedBecomesQuarantined"
+            }
+          ]
+        },
+        "control_flow": {
+          "total": 2,
+          "killed": 0,
+          "survived": 2,
+          "examples": [
+            {
+              "line": 20,
+              "original": "switch case block",
+              "mutated": "added dead code branch (if t.Status == \"skipped\" inside case)",
+              "result": "survived (dead code — impossible condition inside switch case)",
+              "test_that_caught_it": null
+            },
+            {
+              "line": 25,
+              "original": "inner switch body",
+              "mutated": "added if false { return }",
+              "result": "survived (dead code — never executes)",
+              "test_that_caught_it": null
+            }
+          ]
+        }
+      },
+      "mutation_score": 92.6,
+      "insights": [
+        "All 25 real mutations killed — both survivors are dead code equivalent mutants",
+        "Comprehensive test suite: 9 scenarios covering all status transitions",
+        "Summary arithmetic (+/-) fully protected by per-status tests"
+      ]
+    }
+  },
   "global_statistics": {
-    "total_modules": 37,
-    "completed_modules": 37,
-    "total_mutations": 525,
-    "total_killed": 491,
-    "total_survived": 32,
-    "overall_score": 93.5
+    "total_modules": 40,
+    "completed_modules": 40,
+    "total_mutations": 587,
+    "total_killed": 550,
+    "total_survived": 37,
+    "overall_score": 93.7
   }
 }
