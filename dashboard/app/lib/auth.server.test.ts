@@ -1,5 +1,5 @@
 import { describe } from "riteway"
-import { validateOAuthEnv } from "./auth.server.js"
+import { formatAuthEvent, validateOAuthEnv } from "./auth.server.js"
 
 const throws = (fn: () => unknown): string | null => {
   try {
@@ -77,5 +77,14 @@ describe("validateOAuthEnv()", async (assert) => {
     ),
     expected:
       "Missing required environment variables: QUARANTINE_APP_CLIENT_ID, QUARANTINE_APP_CLIENT_SECRET, QUARANTINE_APP_ORIGIN",
+  })
+})
+
+describe("formatAuthEvent()", async (assert) => {
+  assert({
+    given: "a login event with userId and timestamp",
+    should: "return a formatted log string containing [auth], event, userId, and timestamp",
+    actual: formatAuthEvent("login", "octocat", "2026-04-15T12:00:00.000Z"),
+    expected: "[auth] login: userId=octocat at=2026-04-15T12:00:00.000Z",
   })
 })

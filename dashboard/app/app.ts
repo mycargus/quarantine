@@ -9,6 +9,7 @@ import { Session } from "@remix-run/session"
 import { createRouter } from "remix/fetch-router"
 import { home } from "./controllers/home.js"
 import { project } from "./controllers/project.js"
+import { formatAuthEvent } from "./lib/auth.server.js"
 import { createIpRateLimiter, createUserRateLimiter } from "./lib/rate-limit-middleware.server.js"
 import { createSessionMiddleware } from "./lib/session.server.js"
 import { routes } from "./routes.js"
@@ -55,6 +56,8 @@ export function createApp(opts: AppOptions = {}) {
           const { result } = await finishExternalAuth(githubProvider!, ctx)
           const session = completeAuth(ctx)
           session.set("userId" as never, result.profile.login as never)
+          const timestamp = new Date().toISOString()
+          console.log(formatAuthEvent("login", result.profile.login, timestamp))
           return new Response(null, {
             status: 302,
             headers: { Location: "/" },

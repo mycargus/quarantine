@@ -16,6 +16,10 @@ const ENV_NAMES: Record<keyof OAuthEnvInput, string> = {
   origin: "QUARANTINE_APP_ORIGIN",
 }
 
+export function formatAuthEvent(event: string, userId: string, timestamp: string): string {
+  return `[auth] ${event}: userId=${userId} at=${timestamp}`
+}
+
 export function validateOAuthEnv(env: OAuthEnvInput): OAuthConfig {
   const missing: string[] = []
 

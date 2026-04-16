@@ -624,3 +624,117 @@ describe("IP rate limit — counter resets after the 60-second window expires", 
     cleanup()
   }
 })
+
+describe("GET /auth/github/callback — successful login logs auth event", async (assert) => {
+  const { router, cleanup } = createTestApp({
+    repos: [],
+    oauthClientId: "test-client-id",
+    oauthClientSecret: "test-secret",
+    oauthOrigin: "http://localhost:3000",
+  })
+  try {
+    // Step 1: Start the login flow to get PKCE state in the session
+    const loginResponse = await router.fetch(new Request("http://localhost/auth/login"))
+    const location = loginResponse.headers.get("Location") ?? ""
+    const locationUrl = new URL(location)
+    const state = locationUrl.searchParams.get("state") ?? ""
+
+    // Step 2: Mock GitHub's token exchange and user profile endpoints
+    const originalFetch = globalThis.fetch
+    const restoreFetch = () => {
+      globalThis.fetch = originalFetch
+    }
+    globalThis.fetch = async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
+      if (url.startsWith("https://github.com/login/oauth/access_token")) {
+        return new Response(
+          JSON.stringify({
+            access_token: "ghu_mock_secret_token_abc123",
+            token_type: "bearer",
+            scope: "read:user,user:email",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      }
+      if (url.startsWith("https://api.github.com/user/emails")) {
+        return new Response(
+          JSON.stringify([
+            { email: "octocat@github.com", primary: true, verified: true, visibility: "public" },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      }
+      if (url.startsWith("https://api.github.com/user")) {
+        return new Response(
+          JSON.stringify({
+            id: 42,
+            login: "octocat",
+            name: "The Octocat",
+            email: null,
+            avatar_url: "https://github.com/images/error/octocat_happy.gif",
+            html_url: "https://github.com/octocat",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      }
+      return new Response("Not found", { status: 404 })
+    }
+
+    // Step 3: Capture console.log output during the callback
+    const logOutput: string[] = []
+    const originalLog = console.log
+    const restoreLog = () => {
+      console.log = originalLog
+    }
+    console.log = (...args: unknown[]) => {
+      logOutput.push(args.map(String).join(" "))
+    }
+
+    try {
+      const loginCookies = loginResponse.headers
+        .getSetCookie()
+        .map((c) => c.split(";")[0])
+        .join("; ")
+      await router.fetch(
+        new Request(`http://localhost/auth/github/callback?code=fake-code&state=${state}`, {
+          headers: { Cookie: loginCookies },
+        }),
+      )
+
+      const allLogs = logOutput.join("\n")
+
+      assert({
+        given: "a successful OAuth login callback",
+        should: "log an auth event containing the event type 'login'",
+        actual: allLogs.includes("login"),
+        expected: true,
+      })
+
+      assert({
+        given: "a successful OAuth login callback",
+        should: "log an auth event containing the GitHub user ID",
+        actual: allLogs.includes("octocat"),
+        expected: true,
+      })
+
+      assert({
+        given: "a successful OAuth login callback",
+        should: "log an auth event containing an ISO 8601 timestamp",
+        actual: /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(allLogs),
+        expected: true,
+      })
+
+      assert({
+        given: "a successful OAuth login callback",
+        should: "not include the access token (ghu_ prefix) in log output",
+        actual: allLogs.includes("ghu_"),
+        expected: false,
+      })
+    } finally {
+      restoreLog()
+      restoreFetch()
+    }
+  } finally {
+    cleanup()
+  }
+})
