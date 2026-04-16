@@ -39,3 +39,22 @@ describe("GET / — no session cookie (unauthenticated)", async (assert) => {
     cleanup()
   }
 })
+
+describe("GET / — valid session cookie (authenticated)", async (assert) => {
+  const { router, sessionCookie, cleanup } = createTestApp({ repos: [] })
+  const cookie = await sessionCookie()
+  try {
+    const response = await router.fetch(
+      new Request("http://localhost/", { headers: { Cookie: cookie } }),
+    )
+
+    assert({
+      given: "a valid session cookie on GET /",
+      should: "return HTTP 200",
+      actual: response.status,
+      expected: 200,
+    })
+  } finally {
+    cleanup()
+  }
+})
