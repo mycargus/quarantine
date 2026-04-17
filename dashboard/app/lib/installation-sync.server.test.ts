@@ -214,12 +214,12 @@ describe("startDiscoveryLoop() — signal terminate exit code", async (assert) =
   startDiscoveryLoop({
     syncFn: () => Promise.resolve(),
     intervalMs: 60_000,
-    shutdownSignals: ["SIGUSR2"],
+    shutdownSignals: ["SIGHUP"],
     log: () => {},
     terminate: (code) => terminateCalls.push(code),
   })
 
-  process.emit("SIGUSR2")
+  process.emit("SIGHUP")
 
   assert({
     given: "a shutdown signal is received",
@@ -235,13 +235,13 @@ describe("startDiscoveryLoop() — cleanup removes signal listener", async (asse
   const { cleanup } = startDiscoveryLoop({
     syncFn: () => Promise.resolve(),
     intervalMs: 60_000,
-    shutdownSignals: ["SIGUSR2"],
+    shutdownSignals: ["SIGHUP"],
     log: () => {},
     terminate: (code) => terminateCalls.push(code),
   })
 
   cleanup()
-  process.emit("SIGUSR2")
+  process.emit("SIGHUP")
 
   assert({
     given: "cleanup is called before the signal fires",
