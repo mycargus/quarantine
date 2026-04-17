@@ -3,6 +3,10 @@ import { renderToStream } from "remix/component/server"
 import { loadConfig } from "../lib/config.server.js"
 import type { OrgOverview, ProjectSummary } from "../lib/db.server.js"
 import { getAppDiscoveredProjects, getOrgOverview, getProjects, initDb } from "../lib/db.server.js"
+import {
+  fetchUserAccessibleRepoIds,
+  filterProjectsByUserAccess,
+} from "../lib/permissions.server.js"
 import { syncRepo } from "../lib/sync.server.js"
 
 function ProjectRow(_handle: Handle, project: ProjectSummary) {
@@ -154,6 +158,7 @@ interface HomeOptions {
   dbPath?: string
   token?: string
   getInstallationToken?: (installationId: number) => Promise<string>
+  userAccessToken?: string
 }
 
 export async function home(options: HomeOptions = {}): Promise<Response> {
@@ -178,7 +183,8 @@ export async function home(options: HomeOptions = {}): Promise<Response> {
 
   try {
     const handle = initDb(dbPath)
-    const repos = config.source === "manual" ? config.repos : []
+    let repos: Array<{ owner: string; repo: string }> =
+      config.source === "manual" ? config.repos : []
     const token = options.token ?? process.env.QUARANTINE_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN
 
     if (token) {
@@ -216,6 +222,28 @@ export async function home(options: HomeOptions = {}): Promise<Response> {
             )
           }
         }
+      }
+    }
+
+    if (config.source === "github-app") {
+      if (options.userAccessToken) {
+        try {
+          const fetchFnForPermissions = options.fetchFn ?? fetch
+          const appProjects = getAppDiscoveredProjects(handle.raw)
+          const userRepoIds = await fetchUserAccessibleRepoIds(
+            options.userAccessToken,
+            fetchFnForPermissions,
+            "https://api.github.com",
+          )
+          repos = filterProjectsByUserAccess(appProjects, userRepoIds)
+        } catch (permErr) {
+          console.warn(
+            `[sync] WARNING: failed to fetch user accessible repos: ${permErr instanceof Error ? permErr.message : String(permErr)}`,
+          )
+          repos = []
+        }
+      } else {
+        repos = []
       }
     }
 

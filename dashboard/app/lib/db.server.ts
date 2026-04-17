@@ -20,6 +20,7 @@ export const projects = table({
     last_etag: c.text(),
     last_pulled_at: c.text(),
     installation_id: c.integer(),
+    github_repo_id: c.integer(),
   },
 })
 
@@ -190,6 +191,12 @@ function runMigrations(raw: RawDatabase): void {
 
   try {
     raw.exec("ALTER TABLE projects ADD COLUMN installation_id INTEGER REFERENCES installations(id)")
+  } catch {
+    // Column already exists — ignore
+  }
+
+  try {
+    raw.exec("ALTER TABLE projects ADD COLUMN github_repo_id INTEGER")
   } catch {
     // Column already exists — ignore
   }
@@ -463,14 +470,24 @@ export async function getProjectTrend(
  * I/O: returns all projects that were discovered via GitHub App installation
  * (i.e., have a non-null installation_id).
  */
-export function getAppDiscoveredProjects(
-  raw: RawDatabase,
-): Array<{ id: number; owner: string; repo: string; installationId: number }> {
+export function getAppDiscoveredProjects(raw: RawDatabase): Array<{
+  id: number
+  owner: string
+  repo: string
+  installationId: number
+  githubRepoId: number | null
+}> {
   return raw
     .prepare(
-      "SELECT id, owner, repo, installation_id as installationId FROM projects WHERE installation_id IS NOT NULL",
+      "SELECT id, owner, repo, installation_id as installationId, github_repo_id as githubRepoId FROM projects WHERE installation_id IS NOT NULL",
     )
-    .all() as Array<{ id: number; owner: string; repo: string; installationId: number }>
+    .all() as Array<{
+    id: number
+    owner: string
+    repo: string
+    installationId: number
+    githubRepoId: number | null
+  }>
 }
 
 /**

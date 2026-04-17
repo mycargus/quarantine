@@ -68,6 +68,7 @@ interface GitHubInstallation {
 }
 
 interface GitHubRepo {
+  id: number
   owner: { login: string }
   name: string
 }
@@ -174,15 +175,16 @@ export async function syncInstallations(raw: RawDatabase, deps: SyncDeps): Promi
 
       // Upsert repos
       const upsertProject = raw.prepare(
-        `INSERT INTO projects (owner, repo, installation_id)
-         VALUES (?, ?, ?)
+        `INSERT INTO projects (owner, repo, installation_id, github_repo_id)
+         VALUES (?, ?, ?, ?)
          ON CONFLICT(owner, repo) DO UPDATE SET
-           installation_id = excluded.installation_id`,
+           installation_id = excluded.installation_id,
+           github_repo_id = excluded.github_repo_id`,
       )
 
       for (const [installationId, repos] of installationRepos) {
         for (const repo of repos) {
-          upsertProject.run(repo.owner.login, repo.name, installationId)
+          upsertProject.run(repo.owner.login, repo.name, installationId, repo.id)
         }
       }
 

@@ -25,6 +25,7 @@ export interface AppOptions {
   oauthOrigin?: string
   clock?: () => number
   getInstallationToken?: (installationId: number) => Promise<string>
+  userAccessToken?: string
 }
 
 const DEFAULT_SECRET = "dev-secret-change-in-production"
@@ -48,7 +49,11 @@ export function createApp(opts: AppOptions = {}) {
     actions: {
       home: {
         middleware: [requireAuth()],
-        handler: () => home(opts),
+        handler: (ctx) => {
+          const s = ctx.get(Session)
+          const userAccessToken = s.get("accessToken" as never) as string | undefined
+          return home({ ...opts, userAccessToken })
+        },
       },
       health: () => new Response("ok", { status: 200 }),
       authLogin: (ctx) => startExternalAuth(githubProvider!, ctx),
@@ -57,6 +62,7 @@ export function createApp(opts: AppOptions = {}) {
           const { result } = await finishExternalAuth(githubProvider!, ctx)
           const session = completeAuth(ctx)
           session.set("userId" as never, result.profile.login as never)
+          session.set("accessToken" as never, result.tokens.accessToken as never)
           const timestamp = new Date().toISOString()
           console.log(formatAuthEvent("login", result.profile.login, timestamp))
           return new Response(null, {
