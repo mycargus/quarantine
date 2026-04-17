@@ -37,7 +37,7 @@ function startCountingMockServer(): Promise<{
 
   return new Promise((resolve) => {
     const server = createServer((req, res) => {
-      const authHeader = req.headers["authorization"] ?? ""
+      const authHeader = req.headers.authorization ?? ""
       const token = authHeader.replace(/^Bearer /, "")
 
       if (req.url?.startsWith("/user/installations") && !req.url.includes("/repositories")) {
