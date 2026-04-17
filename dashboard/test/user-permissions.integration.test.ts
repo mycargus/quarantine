@@ -21,26 +21,9 @@ import { createCookie } from "remix/cookie"
 import { describe } from "riteway"
 import { createApp } from "../app/app.js"
 import { initDb } from "../app/lib/db.server.js"
+import { buildSessionCookieWithAccessToken } from "./helpers.js"
 
 const TEST_SESSION_SECRET = "test-secret"
-
-/**
- * Builds a signed session cookie that includes both userId and accessToken.
- */
-async function buildSessionCookieWithAccessToken(accessToken: string): Promise<string> {
-  const cookie = createCookie("__session", {
-    httpOnly: true,
-    secure: true,
-    sameSite: "Lax" as const,
-    maxAge: 28800,
-    secrets: [TEST_SESSION_SECRET],
-  })
-  const session = createSession()
-  session.set("userId" as never, "test-user" as never)
-  session.set("accessToken" as never, accessToken as never)
-  const serializedData = JSON.stringify({ i: session.id, d: session.data })
-  return cookie.serialize(serializedData)
-}
 
 /**
  * Starts a local mock HTTP server that handles user-permissions API calls.

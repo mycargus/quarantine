@@ -52,6 +52,25 @@ async function buildSessionCookie(): Promise<string> {
   return cookie.serialize(serializedData)
 }
 
+/**
+ * Builds a signed session cookie that includes both userId and an OAuth
+ * access token, for tests that exercise user-permission-aware routes.
+ */
+export async function buildSessionCookieWithAccessToken(accessToken: string): Promise<string> {
+  const cookie = createCookie("__session", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "Lax" as const,
+    maxAge: 28800,
+    secrets: [TEST_SESSION_SECRET],
+  })
+  const session = createSession()
+  session.set("userId" as never, "test-user" as never)
+  session.set("accessToken" as never, accessToken as never)
+  const serializedData = JSON.stringify({ i: session.id, d: session.data })
+  return cookie.serialize(serializedData)
+}
+
 export function createTestApp(
   opts: {
     repos?: RepoEntry[]
