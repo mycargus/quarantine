@@ -200,7 +200,7 @@ describe("GET / — empty installations from /user/installations shows empty pro
     getInstallationToken: async () => "ghs_token",
   })
 
-  const cookie = await buildSessionCookieWithAccessToken("ghu_test_token")
+  const cookie = await buildSessionCookieWithAccessToken("ghu_empty_installations_token")
   try {
     const response = await router.fetch(
       new Request("http://localhost/", { headers: { Cookie: cookie } }),

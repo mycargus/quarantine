@@ -24,6 +24,7 @@ export interface AppOptions {
   oauthClientSecret?: string
   oauthOrigin?: string
   clock?: () => number
+  now?: () => number
   getInstallationToken?: (installationId: number) => Promise<string>
   userAccessToken?: string
 }

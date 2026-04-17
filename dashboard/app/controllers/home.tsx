@@ -15,6 +15,7 @@ import {
   UserPermissionsAuthError,
 } from "../lib/permissions.server.js"
 import { syncRepo } from "../lib/sync.server.js"
+import { getCachedUserRepoIds, setCachedUserRepoIds } from "../lib/user-permissions-cache.server.js"
 
 function ProjectRow(_handle: Handle, project: ProjectSummary) {
   return () => (
@@ -166,6 +167,7 @@ interface HomeOptions {
   token?: string
   getInstallationToken?: (installationId: number) => Promise<string>
   userAccessToken?: string
+  now?: () => number
 }
 
 export async function home(options: HomeOptions = {}): Promise<Response> {
@@ -246,11 +248,16 @@ export async function home(options: HomeOptions = {}): Promise<Response> {
         try {
           const fetchFnForPermissions = options.fetchFn ?? fetch
           const appProjects = getAppDiscoveredProjects(handle.raw)
-          const userRepoIds = await fetchUserAccessibleRepoIds(
-            options.userAccessToken,
-            fetchFnForPermissions,
-            "https://api.github.com",
-          )
+          const nowMs = (options.now ?? Date.now)()
+          let userRepoIds = getCachedUserRepoIds(options.userAccessToken, nowMs)
+          if (userRepoIds === null) {
+            userRepoIds = await fetchUserAccessibleRepoIds(
+              options.userAccessToken,
+              fetchFnForPermissions,
+              "https://api.github.com",
+            )
+            setCachedUserRepoIds(options.userAccessToken, userRepoIds, nowMs)
+          }
           repos = filterProjectsByUserAccess(appProjects, userRepoIds)
         } catch (permErr) {
           if (permErr instanceof UserPermissionsAuthError) {
