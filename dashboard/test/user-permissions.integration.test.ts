@@ -115,7 +115,7 @@ function setupAppModeFixture(installationId = 1, githubRepoId = 101) {
   }
 }
 
-describe("GET / — 401 from /user/installations degrades to empty list (not 500)", async (assert) => {
+describe("GET / — 401 from /user/installations returns HTTP 401 (expired token, not degradation)", async (assert) => {
   const { configPath, dbPath, cleanup } = setupAppModeFixture()
 
   // Mock server always returns 401 on /user/installations
@@ -158,10 +158,10 @@ describe("GET / — 401 from /user/installations degrades to empty list (not 500
     )
 
     assert({
-      given: "GET /user/installations returns 401",
-      should: "return HTTP 200 (graceful degradation — empty project list, not a crash)",
+      given: "GET /user/installations returns 401 (expired token)",
+      should: "return HTTP 401 to the browser (treat as invalid session, prompt re-auth)",
       actual: response.status,
-      expected: 200,
+      expected: 401,
     })
   } finally {
     await server.close()

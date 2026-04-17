@@ -1,6 +1,19 @@
 import { parseLinkHeader } from "./github-client.server.js"
 
 /**
+ * Typed error thrown when the GitHub API returns 401 on user-permissions
+ * endpoints, indicating the user's access token is expired or revoked.
+ * Callers can use `instanceof UserPermissionsAuthError` to distinguish
+ * auth failures from transient errors.
+ */
+export class UserPermissionsAuthError extends Error {
+  constructor(status: number) {
+    super(`GET /user/installations failed: ${status}`)
+    this.name = "UserPermissionsAuthError"
+  }
+}
+
+/**
  * Pure: returns the subset of `allProjects` whose `githubRepoId` appears
  * in `userRepoIds`. Projects with a null `githubRepoId` are excluded.
  */
@@ -48,6 +61,9 @@ export async function fetchUserAccessibleRepoIds(
     })
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new UserPermissionsAuthError(response.status)
+      }
       throw new Error(`GET /user/installations failed: ${response.status}`)
     }
 

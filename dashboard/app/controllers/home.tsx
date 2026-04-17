@@ -12,6 +12,7 @@ import {
 import {
   fetchUserAccessibleRepoIds,
   filterProjectsByUserAccess,
+  UserPermissionsAuthError,
 } from "../lib/permissions.server.js"
 import { syncRepo } from "../lib/sync.server.js"
 
@@ -252,6 +253,9 @@ export async function home(options: HomeOptions = {}): Promise<Response> {
           )
           repos = filterProjectsByUserAccess(appProjects, userRepoIds)
         } catch (permErr) {
+          if (permErr instanceof UserPermissionsAuthError) {
+            return new Response("Unauthorized", { status: 401 })
+          }
           console.warn(
             `[sync] WARNING: failed to fetch user accessible repos: ${permErr instanceof Error ? permErr.message : String(permErr)}`,
           )
