@@ -2,7 +2,13 @@ import type { Handle } from "remix/component"
 import { renderToStream } from "remix/component/server"
 import { loadConfig } from "../lib/config.server.js"
 import type { OrgOverview, ProjectSummary } from "../lib/db.server.js"
-import { getAppDiscoveredProjects, getOrgOverview, getProjects, initDb } from "../lib/db.server.js"
+import {
+  getAppDiscoveredProjects,
+  getManualProjects,
+  getOrgOverview,
+  getProjects,
+  initDb,
+} from "../lib/db.server.js"
 import {
   fetchUserAccessibleRepoIds,
   filterProjectsByUserAccess,
@@ -222,6 +228,15 @@ export async function home(options: HomeOptions = {}): Promise<Response> {
             )
           }
         }
+      }
+    }
+
+    if (config.source === "github-app" && token) {
+      const manualProjects = getManualProjects(handle.raw)
+      const nowForManual = new Date()
+      const fetchFnForManual = options.fetchFn ?? fetch
+      for (const { owner, repo } of manualProjects) {
+        await syncRepo(owner, repo, token, handle, nowForManual, fetchFnForManual, console.warn)
       }
     }
 

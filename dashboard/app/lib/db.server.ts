@@ -467,6 +467,20 @@ export async function getProjectTrend(
 }
 
 /**
+ * I/O: returns all projects that were manually configured (installation_id IS NULL).
+ * These repos use PAT-based authentication for artifact polling.
+ */
+export function getManualProjects(raw: RawDatabase): Array<{
+  id: number
+  owner: string
+  repo: string
+}> {
+  return raw
+    .prepare("SELECT id, owner, repo FROM projects WHERE installation_id IS NULL")
+    .all() as Array<{ id: number; owner: string; repo: string }>
+}
+
+/**
  * I/O: returns all projects that were discovered via GitHub App installation
  * (i.e., have a non-null installation_id).
  */
