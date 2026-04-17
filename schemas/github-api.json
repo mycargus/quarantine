@@ -839,6 +839,60 @@
         }
       }
     },
+    "/user/installations/{installation_id}/repositories": {
+      "get": {
+        "summary": "List repositories accessible to the user for an installation",
+        "description": "Lists the repositories accessible to the authenticated user for a specific GitHub App installation. Used by the dashboard to resolve which repos a user can access.",
+        "tags": ["apps"],
+        "operationId": "apps/list-installation-repos-for-authenticated-user",
+        "parameters": [
+          { "$ref": "#/components/parameters/installation-id" },
+          { "$ref": "#/components/parameters/per-page" },
+          { "$ref": "#/components/parameters/page" }
+        ],
+        "responses": {
+          "200": {
+            "description": "The repositories the user has access to in the installation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["total_count", "repositories"],
+                  "properties": {
+                    "total_count": { "type": "integer" },
+                    "repositories": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/repository" }
+                    }
+                  }
+                },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/user-installation-repos" }
+                }
+              },
+              "application/vnd.github+json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["total_count", "repositories"],
+                  "properties": {
+                    "total_count": { "type": "integer" },
+                    "repositories": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/repository" }
+                    }
+                  }
+                },
+                "examples": {
+                  "default": { "$ref": "#/components/examples/user-installation-repos" }
+                }
+              }
+            }
+          },
+          "403": { "$ref": "#/components/responses/forbidden" },
+          "404": { "$ref": "#/components/responses/not-found" }
+        }
+      }
+    },
     "/repos/{owner}/{repo}/actions/artifacts": {
       "get": {
         "summary": "List artifacts for a repository",
@@ -1093,7 +1147,15 @@
           "full_name": { "type": "string", "example": "octocat/Hello-World" },
           "private": { "type": "boolean" },
           "default_branch": { "type": "string", "example": "main" },
-          "description": { "type": "string", "nullable": true }
+          "description": { "type": "string", "nullable": true },
+          "owner": {
+            "type": "object",
+            "properties": {
+              "login": { "type": "string", "example": "octocat" },
+              "id": { "type": "integer", "example": 1 },
+              "type": { "type": "string", "example": "User" }
+            }
+          }
         }
       },
       "git-ref": {
@@ -1507,7 +1569,25 @@
               "full_name": "octocat/Hello-World",
               "private": false,
               "default_branch": "main",
-              "description": "This your first repo!"
+              "description": "This your first repo!",
+              "owner": { "login": "octocat", "id": 1, "type": "Organization" }
+            }
+          ]
+        }
+      },
+      "user-installation-repos": {
+        "value": {
+          "total_count": 1,
+          "repositories": [
+            {
+              "id": 1296269,
+              "node_id": "MDEwOlJlcG9zaXRvcnkxMjk2MjY5",
+              "name": "Hello-World",
+              "full_name": "octocat/Hello-World",
+              "private": false,
+              "default_branch": "main",
+              "description": "This your first repo!",
+              "owner": { "login": "octocat", "id": 1, "type": "User" }
             }
           ]
         }

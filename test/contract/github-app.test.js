@@ -7,7 +7,8 @@
  * scripts/run-contract-tests.sh).
  *
  * Covers: create installation access token (201, 401, 403, 404, 422),
- *         list installations (200), list installation repos (200).
+ *         list installations (200), list installation repos (200),
+ *         list user installation repos (200, 403, 404).
  */
 
 import { assert } from "riteway/vitest"
@@ -207,6 +208,121 @@ describe("GitHub Apps API — list installations", () => {
       given: "first installation in list response",
       should: "have suspended_at field (string or null)",
       actual: first.suspended_at === null || typeof first.suspended_at === "string",
+      expected: true,
+    })
+  })
+})
+
+describe("GitHub Apps API — list user installation repositories", () => {
+  test("GET /user/installations/{id}/repositories returns 200 with total_count and repositories array including owner", async () => {
+    const res = await fetch(`${PRISM_URL}/user/installations/1/repositories`, {
+      headers: {
+        Authorization: "Bearer contract-test-token",
+        Accept: "application/vnd.github+json",
+      },
+    })
+
+    assert({
+      given: "GET /user/installations/{id}/repositories",
+      should: "return HTTP 200",
+      actual: res.status,
+      expected: 200,
+    })
+
+    const body = await res.json()
+
+    assert({
+      given: "list user installation repos 200 response",
+      should: "have a numeric total_count",
+      actual: typeof body.total_count === "number",
+      expected: true,
+    })
+    assert({
+      given: "list user installation repos 200 response",
+      should: "have a repositories array",
+      actual: Array.isArray(body.repositories),
+      expected: true,
+    })
+    assert({
+      given: "list user installation repos 200 response",
+      should: "return at least one repository",
+      actual: body.repositories.length >= 1,
+      expected: true,
+    })
+
+    const first = body.repositories[0]
+    assert({
+      given: "first repository in user installation repos response",
+      should: "have a numeric id",
+      actual: typeof first.id === "number",
+      expected: true,
+    })
+    assert({
+      given: "first repository in user installation repos response",
+      should: "have a string name",
+      actual: typeof first.name === "string",
+      expected: true,
+    })
+    assert({
+      given: "first repository in user installation repos response",
+      should: "have an owner object",
+      actual: typeof first.owner === "object" && first.owner !== null,
+      expected: true,
+    })
+    assert({
+      given: "first repository in user installation repos response",
+      should: "have owner.login as a string",
+      actual: typeof first.owner.login === "string",
+      expected: true,
+    })
+  })
+
+  test("GET /user/installations/{id}/repositories returns 403 when user lacks access (Prefer: code=403)", async () => {
+    const res = await fetch(`${PRISM_URL}/user/installations/1/repositories`, {
+      headers: {
+        Authorization: "Bearer contract-test-token",
+        Accept: "application/vnd.github+json",
+        Prefer: "code=403",
+      },
+    })
+
+    assert({
+      given: "GET /user/installations/{id}/repositories with Prefer: code=403",
+      should: "return HTTP 403",
+      actual: res.status,
+      expected: 403,
+    })
+
+    const body = await res.json()
+    assert({
+      given: "forbidden 403 response",
+      should: "have a message field",
+      actual: typeof body.message === "string",
+      expected: true,
+    })
+  })
+
+  test("GET /user/installations/{id}/repositories returns 404 when installation deleted (Prefer: code=404)", async () => {
+    const res = await fetch(`${PRISM_URL}/user/installations/1/repositories`, {
+      headers: {
+        Authorization: "Bearer contract-test-token",
+        Accept: "application/vnd.github+json",
+        Prefer: "code=404",
+      },
+    })
+
+    assert({
+      given: "GET /user/installations/{id}/repositories with Prefer: code=404",
+      should: "return HTTP 404",
+      actual: res.status,
+      expected: 404,
+    })
+
+    const body = await res.json()
+    assert({
+      given: "not found 404 response",
+      should: "have a message field",
+      actual: typeof body.message === "string",
       expected: true,
     })
   })
