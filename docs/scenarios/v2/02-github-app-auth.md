@@ -626,3 +626,81 @@ Removed: no refresh tokens. Session cookie expires after 8 hours. No concurrent 
 **Given** `GET /app/installations?per_page=100` returns 3 installations with no `Link` response header
 **When** `syncInstallations()` runs
 **Then** no additional page request is made; all 3 installations are discovered and upserted; `GET /app/installations` is called exactly once
+
+---
+
+## filterProjectsByUserAccess Pure Function (M15)
+
+### Scenario 167: filterProjectsByUserAccess returns empty when allProjects is empty [M15]
+
+**Risk:** An empty all-projects list causes a null-pointer exception or returns an unexpected non-empty result, breaking the empty-dashboard state for newly configured App installations.
+
+**Given** `allProjects` is an empty array and `userRepoIds` is a non-empty `Set` containing repo IDs `[1, 2, 3]`
+**When** `filterProjectsByUserAccess([], userRepoIds)` is called
+**Then** it returns an empty array without throwing
+
+---
+
+### Scenario 168: filterProjectsByUserAccess returns empty when userRepoIds is empty [M15]
+
+**Risk:** A user with no accessible repos gets all App-discovered projects returned instead of none, leaking repo data across org boundaries.
+
+**Given** `allProjects` contains 3 App-discovered projects with `github_repo_id` values `[101, 102, 103]` and `userRepoIds` is an empty `Set`
+**When** `filterProjectsByUserAccess(allProjects, new Set())` is called
+**Then** it returns an empty array
+
+---
+
+### Scenario 169: filterProjectsByUserAccess returns only matching projects [M15]
+
+**Risk:** The intersection logic returns the full project list or the full user repo set instead of only the overlap, leaking data to users who should not see certain repos.
+
+**Given** `allProjects` contains 4 App-discovered projects with `github_repo_id` values `[101, 102, 103, 104]`, and `userRepoIds` is a `Set` containing `[102, 104, 105]` (repo 105 is not in `allProjects`)
+**When** `filterProjectsByUserAccess(allProjects, userRepoIds)` is called
+**Then** it returns exactly the 2 projects whose `github_repo_id` is `102` or `104`; projects `101` and `103` are excluded; repo `105` is not present in the output
+
+---
+
+### Scenario 170: filterProjectsByUserAccess returns empty when there is no overlap [M15]
+
+**Risk:** When a user's accessible repos are completely disjoint from App-discovered projects, the function returns a non-empty result instead of empty, exposing unrelated data.
+
+**Given** `allProjects` contains 2 App-discovered projects with `github_repo_id` values `[101, 102]`, and `userRepoIds` is a `Set` containing `[201, 202]` (no overlap)
+**When** `filterProjectsByUserAccess(allProjects, userRepoIds)` is called
+**Then** it returns an empty array
+
+---
+
+## User Permission Auth Errors (M15)
+
+### Scenario 171: Expired user access token on GET /user/installations returns 401 [M15]
+
+**Risk:** An expired OAuth session continues to make GitHub API calls with a stale token, silently returning empty results or errors instead of surfacing the auth failure so the user can re-authenticate.
+
+**Given** a logged-in user's session cookie holds a GitHub access token that GitHub now considers expired (GitHub returns 401 Unauthorized when the token is used)
+**When** the dashboard calls `GET /user/installations` with that token to build the user's filtered project list
+**Then** the dashboard returns HTTP 401 to the user's browser (the expired token is treated as an invalid session), prompting the user to re-authenticate via OAuth
+
+---
+
+## User Permission Caching (M15)
+
+### Scenario 172: User permission results are cached for 5 minutes per user [M15]
+
+**Risk:** Every page load triggers a fresh set of `GET /user/installations` + per-installation `GET /user/installations/{id}/repositories` calls, exhausting the user's rate limit and adding O(N) latency on every request proportional to installation count.
+
+**Given** a logged-in user (user ID: 42) has already loaded the dashboard, which triggered `GET /user/installations` and per-installation `GET /user/installations/{id}/repositories` calls; a mock GitHub API server records call counts per access token
+**When** the same user loads the dashboard again within 5 minutes
+**Then** the dashboard returns the filtered project list without making any additional `GET /user/installations` calls to the mock server for user 42's access token (the call counter for that token does not increase)
+
+---
+
+## Installation Token Refresh Observability (M15)
+
+### Scenario 173: Installation token refresh is logged with timestamp and new expiry [M15]
+
+**Risk:** Silent token refreshes make it impossible to audit App auth behavior, diagnose token exchange failures, or verify that the 5-minute refresh threshold is working correctly.
+
+**Given** `InstallationTokenProvider` has a cached installation token for installation ID `123` that expires in 4 minutes (less than the 5-minute refresh threshold)
+**When** a caller requests `getToken(123)` and the provider generates a new JWT, exchanges it for a fresh installation token, and caches the result
+**Then** a log entry is written that includes the event type (e.g., `"installation_token_refreshed"`), an ISO 8601 timestamp of when the refresh occurred, the installation ID, and the new token's `expires_at` value; no token value (the actual bearer string) appears in the log output
