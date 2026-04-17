@@ -2,7 +2,7 @@ import type { Handle } from "remix/component"
 import { renderToStream } from "remix/component/server"
 import { loadConfig } from "../lib/config.server.js"
 import type { OrgOverview, ProjectSummary } from "../lib/db.server.js"
-import { getOrgOverview, getProjects, initDb } from "../lib/db.server.js"
+import { getAppDiscoveredProjects, getOrgOverview, getProjects, initDb } from "../lib/db.server.js"
 import { syncRepo } from "../lib/sync.server.js"
 
 function ProjectRow(_handle: Handle, project: ProjectSummary) {
@@ -153,6 +153,7 @@ interface HomeOptions {
   configPath?: string
   dbPath?: string
   token?: string
+  getInstallationToken?: (installationId: number) => Promise<string>
 }
 
 export async function home(options: HomeOptions = {}): Promise<Response> {
@@ -185,6 +186,36 @@ export async function home(options: HomeOptions = {}): Promise<Response> {
       const fetchFn = options.fetchFn ?? fetch
       for (const { owner, repo } of repos) {
         await syncRepo(owner, repo, token, handle, now, fetchFn, console.warn)
+      }
+    }
+
+    if (config.source === "github-app") {
+      if (!options.getInstallationToken) {
+        console.warn(
+          "[sync] WARNING: github-app mode configured but getInstallationToken not provided; skipping artifact sync",
+        )
+      } else {
+        const appProjects = getAppDiscoveredProjects(handle.raw)
+        const now = new Date()
+        const fetchFn = options.fetchFn ?? fetch
+        for (const project of appProjects) {
+          try {
+            const installationToken = await options.getInstallationToken(project.installationId)
+            await syncRepo(
+              project.owner,
+              project.repo,
+              installationToken,
+              handle,
+              now,
+              fetchFn,
+              console.warn,
+            )
+          } catch (tokenErr) {
+            console.warn(
+              `[sync] WARNING: failed to get installation token for installation ${project.installationId}: ${tokenErr instanceof Error ? tokenErr.message : String(tokenErr)}`,
+            )
+          }
+        }
       }
     }
 

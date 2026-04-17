@@ -460,6 +460,20 @@ export async function getProjectTrend(
 }
 
 /**
+ * I/O: returns all projects that were discovered via GitHub App installation
+ * (i.e., have a non-null installation_id).
+ */
+export function getAppDiscoveredProjects(
+  raw: RawDatabase,
+): Array<{ id: number; owner: string; repo: string; installationId: number }> {
+  return raw
+    .prepare(
+      "SELECT id, owner, repo, installation_id as installationId FROM projects WHERE installation_id IS NOT NULL",
+    )
+    .all() as Array<{ id: number; owner: string; repo: string; installationId: number }>
+}
+
+/**
  * I/O: inserts or replaces a quarantine_state row for the given project + suite.
  * Uses INSERT OR REPLACE to atomically upsert.
  */

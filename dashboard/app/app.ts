@@ -24,6 +24,7 @@ export interface AppOptions {
   oauthClientSecret?: string
   oauthOrigin?: string
   clock?: () => number
+  getInstallationToken?: (installationId: number) => Promise<string>
 }
 
 const DEFAULT_SECRET = "dev-secret-change-in-production"
