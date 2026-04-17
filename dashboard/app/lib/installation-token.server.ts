@@ -10,6 +10,7 @@ export interface TokenProviderOptions {
   privateKeyPEM: string
   baseUrl?: string
   warn?: (message: string) => void
+  log?: (message: string) => void
 }
 
 export class InstallationTokenProvider {
@@ -17,6 +18,7 @@ export class InstallationTokenProvider {
   private privateKeyPEM: string
   private baseUrl: string
   private warn: (message: string) => void
+  private log: (message: string) => void
   private cache: Map<number, InstallationToken> = new Map()
   private pending: Map<number, Promise<InstallationToken>> = new Map()
 
@@ -25,6 +27,7 @@ export class InstallationTokenProvider {
     this.privateKeyPEM = options.privateKeyPEM
     this.baseUrl = options.baseUrl ?? "https://api.github.com"
     this.warn = options.warn ?? console.warn
+    this.log = options.log ?? console.log
   }
 
   async getToken(installationId: number): Promise<InstallationToken> {
@@ -69,6 +72,9 @@ export class InstallationTokenProvider {
         expiresAt: new Date(data.expires_at),
       }
       this.cache.set(installationId, token)
+      this.log(
+        `installation_token_refreshed installationId=${installationId} expiresAt=${token.expiresAt.toISOString()} at=${new Date().toISOString()}`,
+      )
       return token
     } catch (error) {
       const detail = (error as Error).message
