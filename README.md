@@ -9,8 +9,6 @@ Quarantine automatically detects, quarantines, and tracks flaky (non-determinist
 
 [Eradicating Non-Determinism in Tests]: https://martinfowler.com/articles/nonDeterminism.html
 
-Quarantining flaky tests manually is tedious and error-prone, especially as a test suite grows. Quarantine automates it.
-
 ## How It Works
 
 ```mermaid
