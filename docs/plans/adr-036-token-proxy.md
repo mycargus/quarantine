@@ -1,275 +1,409 @@
-# Plan: v2 CLI Auth — GITHUB_TOKEN Default + Dashboard Token Proxy
+# Plan: v2 CLI Auth — GITHUB_TOKEN Default + Server-Side Writes
 
 > **Status:** approved
 > **Created:** 2026-04-20
-> **Source:** [ADR-036](../adr/036-v2-cli-auth-github-token-default.md),
-> [v2-auth-token-proxy.md](../specs/v2-auth-token-proxy.md)
+> **Amends:** Original plan (token proxy) replaced after security review
+> **Source:** [ADR-036 amendment](../adr/036-v2-cli-auth-github-token-default.md#amendment-2026-04-20-server-side-writes-replace-token-proxy),
+> [v2-auth-token-proxy.md](../specs/v2-auth-token-proxy.md) (SEC-7, SEC-9 only)
 
 ## Context
 
 v1 requires users to create a PAT and store it as a CI secret. v2 eliminates
-this friction: `GITHUB_TOKEN` (auto-provisioned by GitHub Actions) is the
-default. For repos that hit the 1,000 req/hr limit, the dashboard provides an
-optional token proxy — the CLI sends `GITHUB_TOKEN` to the dashboard, which
-mints a scoped installation token with 5,000-12,500 req/hr. If the proxy
-fails, the CLI falls back to `GITHUB_TOKEN`. The build never breaks.
+this friction entirely: `GITHUB_TOKEN` (auto-provisioned by GitHub Actions)
+is used for read-only operations (state branch). The dashboard processes
+artifacts and performs all GitHub writes (state updates, issue creation, PR
+comments) using its own App installation tokens. No `permissions:` block,
+no secrets, no env vars in the user's CI workflow.
+
+The original plan proposed a dashboard token proxy (`/api/ci-token`) for
+rate-limit upgrades. Security and architecture review (2026-04-20) identified
+that: (1) the `permissions:` block has an unacceptable all-or-nothing cost,
+(2) sending `GITHUB_TOKEN` to a third party is a novel pattern with no
+industry precedent, and (3) all CLI writes are post-hoc reporting that can
+be performed server-side.
 
 ## Requirements
 
-| ID | Summary | Source | FR/NFR | Priority |
-|----|---------|--------|--------|----------|
-| R-1 | GITHUB_TOKEN as default CLI auth | ADR-036 #decision | Revises FR-1.11.1 | must |
-| R-2 | Token resolution: QUARANTINE_GITHUB_TOKEN → proxy → GITHUB_TOKEN → exit 2 | ADR-036 #token-resolution-order | NEW | must |
-| R-3 | Dashboard POST /api/ci-token endpoint | ADR-036 #apici-token-security-model | NEW | must |
-| R-4 | Two-phase token verification (soft prefix + behavioral) | ADR-036 #apici-token-security-model | NEW | must |
-| R-5 | Proxy timeout: 3s default/minimum, via QUARANTINE_DASHBOARD_TIMEOUT | ADR-036 #dashboard-proxy-timeout | NFR-2.1.1 | must |
-| R-6 | HTTPS enforcement for QUARANTINE_DASHBOARD_URL | ADR-036 #https-enforcement | NEW (NFR-2.3.x) | must |
-| R-7 | Dashboard URL env-var only (QUARANTINE_DASHBOARD_URL) | ADR-036 #dashboard-env-vars | SEC-4 | must |
-| SEC-1 | Token handling hygiene: never log, never persist, discard | v2-auth-token-proxy #sec-1 | NEW (NFR-2.7.x) | must |
-| SEC-2 | Verification cache: SHA-256 keyed, 15s TTL, with eviction | v2-auth-token-proxy #sec-2 | NEW (NFR-2.8.x) | must |
-| SEC-3 | App permissions MUST NOT exceed CLI requirements | v2-auth-token-proxy #sec-3 | Extends NFR-2.7.1 | must |
-| SEC-5 | Localhost HTTPS exception disabled when CI=true | v2-auth-token-proxy #sec-5 | NEW (NFR-2.3.x) | must |
-| SEC-6 | Rate limiting: per-repo + per-token-fingerprint (no per-IP) | v2-auth-token-proxy #sec-6 | Extends NFR-2.3.3 | must |
-| SEC-6a | Scoped token minting with repositories parameter | v2-auth-token-proxy #sec-6a | NEW | must |
-| SEC-6b | SSRF protection: behavioral check target URL hardcoded | v2-auth-token-proxy #sec-6b | NEW | must |
-| SEC-7 | CLI skips quarantine on fork PRs | v2-auth-token-proxy #sec-7 | NEW (NFR-2.3.x) | must |
-| SEC-8 | Revocation procedure documented | v2-auth-token-proxy #sec-8 | — | should |
-| SEC-9 | Event payload parsing hardening | v2-auth-token-proxy #sec-9 | NEW | must |
-| UX-1 | Missing permissions block: actionable 403 error + GHA annotation | v2-auth-token-proxy #ux-1 | NEW (NFR-2.11.x) | must |
-| UX-2 | Error messages differentiated by token resolution step | v2-auth-token-proxy #ux-2 | NFR-2.11.4 | must |
-| UX-3 | Proxy failure warning with URL + fallback rate limit | v2-auth-token-proxy #ux-3 | NFR-2.11.4 | must |
-| UX-4 | Notice when QUARANTINE_GITHUB_TOKEN skips proxy | v2-auth-token-proxy #ux-4 | — | should |
-| UX-5 | Notice when timeout clamped to 3s minimum | v2-auth-token-proxy #ux-5 | — | should |
-| UX-6 | Context-aware missing-token message (GHA vs non-GHA) | v2-auth-token-proxy #ux-6 | NFR-2.11.4 | must |
-| UX-8 | Dashboard proxy discoverability via rate limit warning | v2-auth-token-proxy #ux-8 | — | should |
-| ERR-1 | "No token" changes from degraded mode to exit 2 | v2-auth-token-proxy #4 | Revises error-handling.md | must |
-| ERR-2 | New error category: Dashboard Proxy Errors | v2-auth-token-proxy #4 | Extends error-handling.md | must |
-| ERR-3 | Proxy-minted token 401 gets distinct message | v2-auth-token-proxy #4 | Extends error-handling.md | must |
-| OPS-1 | App permission verification at dashboard startup | v2-auth-token-proxy #ops-1 | NEW (NFR-2.9.x) | must |
-| OPS-2 | pull_request_target warning in setup guide | v2-auth-token-proxy #ops-2 | — | should |
-| UX-7 | Quick-start docs: init → permissions → run | v2-auth-token-proxy #ux-7 | — | should (doc review) |
-| E2E-1 | CLI + dashboard proxy round-trip E2E test | v2-auth-token-proxy #e2e-1 | — | must |
+| ID | Summary | Source | Priority |
+|----|---------|--------|----------|
+| R-1 | GITHUB_TOKEN as default CLI auth (read-only) | ADR-036 amendment | must |
+| R-2 | Token resolution: QUARANTINE_GITHUB_TOKEN -> GITHUB_TOKEN -> exit 2 | ADR-036 amendment | must |
+| R-3 | v2 mode: CLI skips all write API calls, writes results to disk only | ADR-036 amendment | must |
+| R-4 | Dashboard processes artifacts and performs state/issue/comment writes | ADR-036 amendment | must |
+| R-5 | Results JSON contains all data needed for dashboard writes, including `cli_mode` field (`"v1"` or `"v2"`) so dashboard knows whether writes were already performed | ADR-036 amendment | must |
+| R-6 | Dashboard creates state branch on first artifact processing if absent | ADR-036 amendment | must |
+| SEC-3 | App permissions MUST NOT exceed CLI requirements (active for dashboard writes) | v2-auth-token-proxy SEC-3 | must |
+| SEC-7 | CLI skips quarantine on fork PRs | v2-auth-token-proxy SEC-7 | must |
+| SEC-9 | Event payload parsing hardening | v2-auth-token-proxy SEC-9 | must |
+| SEC-10 | Dashboard sanitizes artifact string fields before rendering into GitHub markdown | New | must |
+| SEC-11 | Dashboard cross-checks artifact `repo` field against download source repo | New | must |
+| ERR-1 | No token -> exit 2 (not degraded mode) | ADR-036 amendment | must |
+| UX-1 | 403 on state read -> actionable error message (mode-aware: v1 vs v2) | ADR-036 | must |
+| UX-6 | Context-aware missing-token message (GHA vs non-GHA) | v2-auth-token-proxy UX-6 | must |
 
-**Excluded:** R-8 (bot identity — automatic, not implemented).
-**Deferred:** OPS-3 (GHES note), OPS-4 (actions:read note), SEC-4 item 3 (CLI URL change warning).
+**Removed (token proxy retired):** R-3/R-4 (proxy endpoint), R-5/R-6/R-7
+(proxy config), SEC-1 through SEC-6b, SEC-8, UX-2 through UX-5, UX-7, UX-8,
+ERR-2, ERR-3, OPS-1 through OPS-4, E2E-1.
 
 ## Milestones
 
-### M17: CLI v2 Token Resolution
+### M17: CLI v2 Read-Only Mode
 
-**Dependencies:** M15 (github-app mode complete)
+**Dependencies:** M16 (App E2E verified). M17 has no code dependency on M16
+but is sequenced after it for organizational clarity. M17 and M18 MAY be
+developed in parallel since they touch disjoint codebases (Go CLI vs
+TypeScript dashboard).
 
-**Scope — included:**
-- R-1, R-2: GITHUB_TOKEN default, four-step token resolution order
-- R-5, R-6, R-7: Proxy timeout, HTTPS enforcement, env-var-only dashboard URL
-- SEC-5: Localhost exception restricted to CI
-- SEC-7: Fork PR detection → skip quarantine
-- SEC-9: Event payload parsing hardening
-- UX-1 through UX-6, UX-8: All error messages and notices
-- ERR-1, ERR-2, ERR-3: Error handling spec updates
-- OPS-2: pull_request_target warning (doc review)
-- UX-7: Quick-start docs update (doc review)
+**Scope -- included:**
+- R-1, R-2: GITHUB_TOKEN default, simplified two-step token resolution
+- R-3: v2 write skip -- when `QUARANTINE_GITHUB_TOKEN` is NOT set, skip all
+  GitHub write calls (state update, issue creation, PR comment); write results
+  to disk only
+- R-5: results.json includes `cli_mode: "v2"` field (or `"v1"` when PAT is
+  used) so dashboard knows whether writes were already performed
+- SEC-7: Fork PR detection -> skip quarantine, exec raw command
+- SEC-9: Event payload parsing hardening (malformed/missing GITHUB_EVENT_PATH)
+- ERR-1: No token -> exit 2 (not degraded mode)
+- UX-1: 403 on state read -> mode-aware actionable error
+- UX-6: Context-aware missing-token message (GHA vs non-GHA)
+- v2 state branch missing: CLI treats as empty state (no exclusions), runs all
+  tests. Does NOT exit 2 — the dashboard creates the state branch on first
+  artifact processing.
+- Verbose logging: `--verbose` shows which token path was taken
+  (e.g., `"Token resolved via GITHUB_TOKEN (v2 mode)"`)
+- Spec updates: error-handling.md (exit 2 for no-token), cli-spec.md (v2
+  token resolution, v2 write behavior) — *verified by doc review*
+- Doc updates: CI integration guide with zero-config workflow snippet —
+  *verified by doc review*
 
-**Scope — excluded:**
-- Dashboard proxy endpoint (M18)
+**Scope -- excluded:**
+- Dashboard write processing (M18)
 - E2E round-trip testing (M19)
-- GHES rate limit note, actions:read note (deferred)
+- Token proxy (retired)
 
 **Acceptance criteria:**
-1. `GITHUB_TOKEN` is used by default when no other token is configured (R-1, FR-1.11.1 revised)
-2. Token resolution follows four-step order and stops at first success (R-2)
-3. `QUARANTINE_DASHBOARD_URL` must use HTTPS; rejected otherwise (R-6)
-4. Localhost HTTPS exception allowed only when `CI` is not set (SEC-5)
-5. `QUARANTINE_DASHBOARD_TIMEOUT` defaults to 3s, minimum 3s, values below clamped with notice (R-5, UX-5)
-6. Dashboard URL only from `QUARANTINE_DASHBOARD_URL` env var — no config file option (R-7)
-7. Fork PR detected → quarantine skipped, raw test command executed (SEC-7)
-8. Malformed/missing `GITHUB_EVENT_PATH` → fork detection skipped, quarantine runs normally (SEC-9)
-9. 403 on write → actionable "add permissions: block" error with SSO/IP fallback hint + GHA `::error` annotation (UX-1)
-10. Each token resolution failure path produces a distinct, actionable error message (UX-2)
-11. Proxy failure warning includes URL, reason, fallback rate limit + GHA `::warning` annotation (UX-3)
-12. No token available → exit 2 (not degraded mode) (ERR-1)
-13. Error-handling spec updated: degraded mode trigger 3 changed, Category 4 added, proxy-minted 401 distinct (ERR-1, ERR-2, ERR-3)
-14. `quarantine doctor` mentions `QUARANTINE_DASHBOARD_URL` upgrade path when rate limit is low (UX-8)
-15. CI integration docs updated with `pull_request_target` warning and full onboarding sequence (OPS-2, UX-7 — verified by doc review)
+1. `GITHUB_TOKEN` is used by default when no other token is configured (R-1)
+2. Token resolution follows two-step order: QUARANTINE_GITHUB_TOKEN ->
+   GITHUB_TOKEN -> exit 2 (R-2)
+3. When QUARANTINE_GITHUB_TOKEN is NOT set, CLI makes zero GitHub write API
+   calls -- no state updates, no issue creation, no PR comments (R-3)
+4. `.quarantine/results.json` written to disk with full data needed for
+   dashboard processing, including `cli_mode` field (R-5)
+5. CLI logs artifact upload note in v2 mode:
+   `[quarantine] NOTE: Results written to .quarantine/results.json. Upload as
+   an artifact for dashboard processing. See: <docs-url>`
+   Suppressed when `--quiet` is set. (R-3)
+6. Fork PR detected (`pull_request` event, head != base repo) -> quarantine
+   skipped, raw test command executed (SEC-7)
+7. Fork detection also checks `pull_request_target` event name (SEC-7)
+8. Same-repo PR (`pull_request` or `pull_request_target`, head == base repo) ->
+   quarantine runs normally (SEC-7)
+9. Malformed/missing GITHUB_EVENT_PATH -> fork detection skipped, quarantine
+   runs normally (SEC-9)
+10. No token available -> exit 2 with context-aware message (ERR-1, UX-6):
+    - In GHA: `"No GitHub token available. Ensure 'actions/checkout' runs
+      before 'quarantine run'. If the problem persists, set
+      QUARANTINE_GITHUB_TOKEN."`
+    - Non-GHA: `"No GitHub token found. Set QUARANTINE_GITHUB_TOKEN or
+      GITHUB_TOKEN."`
+11. 403 on state branch read -> mode-aware actionable error (UX-1):
+    - v1 (PAT): `"QUARANTINE_GITHUB_TOKEN lacks read access to the state
+      branch (403). Check the token has 'contents: read' scope."`
+    - v2 (GITHUB_TOKEN): `"Cannot read quarantine state (403). Check for
+      SAML SSO enforcement or IP allowlist restrictions on this repository."`
+12. v1 PAT mode: QUARANTINE_GITHUB_TOKEN set -> CLI does all reads AND writes
+    (backward compatible, no behavioral change)
+13. v2 state branch missing (404) -> CLI proceeds with empty state, runs all
+    tests with no exclusions (R-6)
+14. `--verbose` shows token resolution path:
+    `"Token resolved via GITHUB_TOKEN (v2 mode)"` or
+    `"Token resolved via QUARANTINE_GITHUB_TOKEN (v1 mode)"` (R-2)
+15. `make cli-build && make cli-test && make cli-lint` pass
+16. Spec and doc updates verified by doc review
 
 **Scenario outlines:**
 
 Token resolution:
-- Given QUARANTINE_GITHUB_TOKEN set → uses it, skips proxy + GITHUB_TOKEN → R-2
-- Given proxy configured + returns valid token → uses proxy token → R-2
-- Given proxy fails (timeout/4xx/5xx) → falls back to GITHUB_TOKEN → R-2
-- Given no proxy, GITHUB_TOKEN set → uses GITHUB_TOKEN → R-1, R-2
-- Given no token anywhere → exit 2 with error → R-2, ERR-1
+- Given QUARANTINE_GITHUB_TOKEN set -> v1 mode, CLI reads and writes -> R-1, R-2
+- Given GITHUB_TOKEN set (no PAT) -> v2 mode, CLI reads only -> R-2, R-3
+- Given no token -> exit 2 with error -> R-2, ERR-1
+- Given no token + GITHUB_ACTIONS=true -> GHA-specific error message -> UX-6
+- Given no token + not in GHA -> generic error message -> UX-6
 
-Config + HTTPS:
-- Given QUARANTINE_DASHBOARD_URL is https → accepted → R-6
-- Given QUARANTINE_DASHBOARD_URL is http (not localhost) → rejected → R-6
-- Given QUARANTINE_DASHBOARD_URL is http://localhost, CI not set → accepted → R-6
-- Given QUARANTINE_DASHBOARD_URL is http://localhost, CI=true → rejected → SEC-5
-- Given QUARANTINE_DASHBOARD_TIMEOUT is 1s → clamped to 3s with notice → R-5, UX-5
-- Given QUARANTINE_DASHBOARD_TIMEOUT is invalid (e.g., "abc") → default 3s used → R-5
+v1-to-v2 migration:
+- Given user previously used QUARANTINE_GITHUB_TOKEN, now removes it, GITHUB_TOKEN available -> v2 mode, CLI reads only, writes results to disk -> R-2, R-3
+
+v2 write skip:
+- Given v2 mode + flaky test detected -> results.json written (with cli_mode: v2), no issue created, no state update, no PR comment -> R-3, R-5
+- Given v2 mode + quarantine state read succeeds -> exclusions applied correctly -> R-1
+- Given v2 mode + quarantine state read fails (404, no state branch) -> all tests run, no exclusions -> R-6
+- Given v2 mode + quarantine state read fails (403) -> v2-specific error message -> UX-1
 
 Fork PR detection:
-- Given pull_request event, head repo != base repo → skip quarantine, exec raw command → SEC-7
-- Given pull_request event, head repo == base repo → quarantine runs normally → SEC-7
-- Given push event → fork detection does not apply → SEC-7
-- Given GITHUB_EVENT_PATH is malformed JSON → skip detection, quarantine runs → SEC-9
-- Given GITHUB_EVENT_PATH unset → skip detection, quarantine runs → SEC-9
-- Given event payload missing head.repo.full_name → skip detection → SEC-9
-
-Error messages:
-- Given GITHUB_TOKEN resolved, first write returns 403 → permissions block error + GHA annotation → UX-1
-- Given QUARANTINE_GITHUB_TOKEN returns 401 → "invalid or expired" message → UX-2
-- Given proxy-minted token returns 401 → "Dashboard-minted token rejected" → ERR-3
-- Given proxy times out → warning with URL + timeout duration + GHA annotation → UX-3
-- Given QUARANTINE_GITHUB_TOKEN set + QUARANTINE_DASHBOARD_URL set → "proxy skipped" notice → UX-4
-- Given QUARANTINE_DASHBOARD_URL set, no GITHUB_TOKEN, GITHUB_ACTIONS=true → "check permissions block" → UX-6
-- Given QUARANTINE_DASHBOARD_URL set, no GITHUB_TOKEN, not in GHA → "set token or run in GHA" → UX-6
-
-**Spec references:**
-
-| What | Reference |
-|------|-----------|
-| Token resolution (v1) | cli-spec.md (token resolution section) |
-| Exit codes | error-handling.md#exit-codes |
-| Degraded mode triggers | error-handling.md#degraded-mode-triggers |
-| GHA annotations | error-handling.md#degraded-mode-communication |
-| Error prefixes | non-functional-requirements.md NFR-2.11.4 |
-| CLI overhead budget | non-functional-requirements.md NFR-2.1.1 |
-| v2 auth requirements | v2-auth-token-proxy.md |
-| ADR-036 decision | adr/036-v2-cli-auth-github-token-default.md |
+- Given pull_request event, head repo != base repo -> skip quarantine -> SEC-7
+- Given pull_request_target event, head repo != base repo -> skip quarantine -> SEC-7
+- Given pull_request event, head repo == base repo -> quarantine runs normally -> SEC-7
+- Given pull_request_target event, head repo == base repo -> quarantine runs normally -> SEC-7
+- Given push event -> fork detection does not apply -> SEC-7
+- Given GITHUB_EVENT_PATH malformed -> skip detection, quarantine runs -> SEC-9
+- Given GITHUB_EVENT_PATH unset -> skip detection, quarantine runs -> SEC-9
 
 ---
 
-### M18: Dashboard Token Proxy
+### M18: Dashboard Write Processing
 
-**Dependencies:** M15 (installation token infrastructure exists)
+**Dependencies:** M15 (installation token infrastructure), M6/M7 (artifact
+processing pipeline). M17 and M18 MAY be developed in parallel since they
+touch disjoint codebases (Go CLI vs TypeScript dashboard).
 
-**Scope — included:**
-- R-3, R-4: POST /api/ci-token endpoint, two-phase verification
-- SEC-1: Token handling hygiene
-- SEC-2: Verification cache (SHA-256 keyed, 15s TTL, with eviction)
-- SEC-3: App permission parity (hard requirement)
-- SEC-6: Rate limiting (per-repo + per-fingerprint, no per-IP)
-- SEC-6a: Scoped token minting with repositories parameter
-- SEC-6b: SSRF protection on behavioral check
-- SEC-8: Revocation procedure (doc review)
-- OPS-1: App permission verification at startup
+**Scope -- included:**
+- R-4: Artifact processing pipeline extended to perform GitHub writes
+- R-6: State branch creation -- if state branch does not exist on first
+  artifact processing, create it with initial empty state
+- State update: read current state from state branch, merge new flaky tests,
+  write via CAS (maximum 3 retries on 409 conflict, exponential backoff
+  with jitter) using dashboard's App installation token
+- Issue creation: for each new flaky test in artifact, check dedup via search
+  API, create issue with title/body/labels matching CLI v1 format. Respect
+  `issue_skipped_reason` field from results JSON (ADR-022): when set to
+  `"new_file_in_pr"` or `"new_test_in_pr"`, skip issue creation for that test.
+- Unquarantine: batch check closed issues via Search API **during artifact
+  processing** (as part of the state merge step, before writing state).
+  Remove tests whose tracking issues are closed.
+- PR comment: post or update quarantine summary comment on the PR using the
+  suite-specific marker (`<!-- quarantine:<suite-name> -->`). If `pr_number`
+  is null (non-PR build), skip the PR comment step entirely. In v2 mode,
+  append a note: `"Note: Quarantine changes take effect on the next CI run,
+  not this one."` (stale-state communication)
+- R-5: Results JSON schema validation -- ensure suite_name, pr_number,
+  commit_sha, branch, cli_mode, and per-test data (retry details, failure
+  messages) are present and sufficient for rendering. When `cli_mode` is
+  `"v1"`, skip all writes (CLI already performed them).
+- SEC-3: App permission parity -- the dashboard's App MUST NOT have permissions
+  beyond what the CLI requires (contents:rw, issues:rw, pull-requests:w,
+  actions:r). Verify at startup, log warning for excess permissions.
+- SEC-10: Sanitize `failure_message`, `name`, and `test_id` fields before
+  rendering into GitHub issue/comment markdown. Escape characters that could
+  be interpreted as markdown/HTML injection.
+- SEC-11: Cross-check that the artifact's `repo` field matches the
+  `owner/repo` the artifact was downloaded from. Reject mismatches with a
+  warning.
+- Resource bounds: reject artifacts with `tests` arrays exceeding 100,000
+  entries. Truncate string fields exceeding 64KB before rendering.
+- Issue dedup: search for existing open issue with
+  `quarantine:<suite>:<hash>` label before creating
+- State CAS: SHA-based compare-and-swap with maximum 3 retries on 409
+  conflict, exponential backoff with jitter to reduce thundering-herd effects
+  from concurrent artifact processing
+- State merge: quarantine-wins semantics (per ADR-012)
+- Validation ordering: schema validation (required fields, types) MUST run
+  before the SEC-11 repo cross-check, so a missing `repo` field is caught
+  as a schema error rather than a cross-check failure
+- Write error handling: all writes are best-effort; failures logged as
+  warnings, never crash the processing pipeline
+- Write processing rate limiting: not required for v2 (polling-based
+  ingestion naturally throttles). Revisit when webhook-triggered processing
+  is added in v3 (see `docs/plans/webhooks.md`).
+- Rendering parity contract tests: issue body and PR comment rendering
+  verified against shared fixtures. Definition of "matches": given identical
+  input data, dashboard output must be **byte-for-byte identical** to CLI v1
+  output (excluding trailing whitespace). Shared fixtures in `testdata/`.
 
-**Scope — excluded:**
-- CLI token resolution changes (M17)
+**Scope -- excluded:**
+- CLI code changes (M17)
 - E2E round-trip testing (M19)
-- Reuse of existing InstallationTokenProvider without modification (SEC-6a explicitly prohibits this)
+- Webhook-triggered processing (v3)
 
 **Acceptance criteria:**
-1. POST /api/ci-token accepts tokens, returns scoped installation tokens (R-3)
-2. Known-bad prefixes (ghp_, github_pat_, ghu_, gho_) rejected with 404 immediately; unknown prefixes fall through to behavioral check (R-4)
-3. Behavioral check calls GET /installation/repositories on hardcoded GitHub API base URL (R-4, SEC-6b)
-4. Received GITHUB_TOKEN never logged, never persisted, discarded after verification (SEC-1)
-5. Verification cache keyed by SHA-256(token)[0:16]:owner/repo, 15s TTL, expired entries evicted (SEC-2)
-6. Installation token minting passes repositories: ["<repo>"] to scope token to single repo (SEC-6a)
-7. Installation token cache per repo, 1hr TTL, proactive refresh at <5min (R-3)
-8. Rate limiting: 10/min per repo, 10/min per token fingerprint; 429 with Retry-After on excess (SEC-6)
-9. Rate limit counters evict expired entries to prevent memory leak (SEC-6)
-10. App permissions beyond SEC-3 table logged as warning at startup (OPS-1)
-11. App permissions exactly matching SEC-3 table: no warning (OPS-1)
-12. 404 returned for non-matching repos — no info leakage (R-3)
-13. Revocation procedure documented in operational runbook (SEC-8 — doc review)
+1. Dashboard processes a quarantine artifact and writes updated state to the
+   state branch via CAS with maximum 3 retries (R-4)
+2. Dashboard creates state branch with initial empty state if absent on first
+   artifact processing (R-6)
+3. Dashboard creates issues for new flaky tests with correct title, body,
+   labels matching CLI v1 format (R-4)
+4. Dashboard dedup: no duplicate issue created when one already exists (R-4)
+5. Dashboard respects `issue_skipped_reason`: tests with `"new_file_in_pr"` or
+   `"new_test_in_pr"` skip issue creation (R-4, ADR-022)
+6. Dashboard posts/updates PR comment with quarantine summary (R-4)
+7. When `pr_number` is null (non-PR build), PR comment step is skipped (R-4)
+8. Dashboard uses suite-specific markers and labels (per ADR-032) (R-4)
+9. Results JSON missing required fields -> artifact skipped with warning (R-5)
+10. When `cli_mode` is `"v1"`, dashboard skips all writes (CLI already
+    performed them) (R-5)
+11. State CAS conflict -> retry with merge (quarantine wins), max 3 retries,
+    exponential backoff with jitter (R-4)
+12. Issue creation failure -> logged, state still updated (R-4)
+13. PR comment failure -> logged, does not affect state or issues (R-4)
+14. Closed-issue check (during artifact processing): quarantined tests with
+    closed tracking issues are removed from state (R-4)
+15. `failure_message`, `name`, and `test_id` fields sanitized before markdown
+    rendering -- no HTML/markdown injection possible (SEC-10)
+16. Artifact `repo` field cross-checked against download source repo; mismatch
+    -> artifact rejected with warning (SEC-11)
+17. Artifacts with >100,000 test entries rejected; string fields exceeding
+    64KB truncated before rendering (resource bounds)
+18. App permissions beyond SEC-3 table logged as warning at startup; verified
+    via `GET /app` API call comparing configured vs required permissions (SEC-3)
+19. Issue body and PR comment output matches CLI v1 rendering byte-for-byte
+    (excluding trailing whitespace) for the same input data (contract test)
+    (R-4)
+20. `make dash-test && make dash-lint && make dash-typecheck` pass
 
 **Scenario outlines:**
 
-Endpoint + verification:
-- Given valid ghs_ token for repo with App installed → returns scoped installation token → R-3, R-4
-- Given ghp_-prefixed token → 404 immediately (known-bad prefix) → R-4
-- Given token with unrecognized prefix → falls through to behavioral check → R-4
-- Given ghs_ token for repo NOT in any installation → 404 → R-3
-- Given no Authorization header → 404 → R-3
+State write:
+- Given artifact with new flaky test, state branch exists -> state updated via CAS -> R-4
+- Given artifact with new flaky test, state branch does not exist -> state branch created, initial state written -> R-6
+- Given CAS 409 conflict -> re-read, merge (quarantine wins), retry (max 3) -> R-4
+- Given CAS exhausted after 3 retries -> warning logged, artifact processing continues -> R-4
 
-Token hygiene + caching:
-- Given a valid request → received GITHUB_TOKEN never appears in logs → SEC-1
-- Given same token, same repo within 15s → verification cache hit → SEC-2
-- Given same token, different repo → verification cache miss → SEC-2
-- Given different token, same repo → verification cache miss → SEC-2
-- Given same token, same repo after 15s → verification cache miss (expired) → SEC-2
+Issue creation:
+- Given new flaky test, no existing issue -> issue created with v1-format title/body/labels -> R-4
+- Given new flaky test, existing open issue with dedup label -> no duplicate issue created -> R-4
+- Given new flaky test with issue_skipped_reason = "new_file_in_pr" -> no issue created -> R-4, ADR-022
+- Given issue creation returns 410 (issues disabled) -> skip all issue creation for this run -> R-4
+- Given issue creation fails (5xx) -> warning logged, state still updated -> R-4
 
-Token minting:
-- Given verified request, no cached installation token → mints with repositories: ["<repo>"] → SEC-6a
-- Given cached installation token with >5min remaining → returns cached token → R-3
-- Given two concurrent requests for same repo → second receives cached token, no double-mint → R-3
+PR comment:
+- Given artifact with pr_number set -> PR comment posted/updated with suite marker -> R-4
+- Given artifact with pr_number null -> PR comment step skipped entirely -> R-4
+- Given existing quarantine comment on PR -> comment updated (PATCH), not duplicated -> R-4
+- Given PR comment fails -> warning logged, does not affect state or issues -> R-4
 
-Rate limiting:
-- Given 11th request for same repo in one minute → 429 with Retry-After → SEC-6
-- Given 11th request with same token fingerprint in one minute → 429 → SEC-6
+Unquarantine:
+- Given quarantined test with closed tracking issue -> removed from state during processing -> R-4
+- Given quarantined test with open tracking issue -> remains in state -> R-4
 
-Permission verification:
-- Given App has administration:write (beyond SEC-3 table) → startup warning names the excess permission → OPS-1
-- Given App has exactly required permissions → no warning → OPS-1
-
-SSRF protection:
-- Given behavioral check → target URL is hardcoded GitHub API base, not influenced by request input → SEC-6b
+Validation + security:
+- Given artifact with cli_mode = "v1" -> all writes skipped -> R-5
+- Given artifact missing required fields -> artifact skipped with warning -> R-5
+- Given artifact repo field != download source repo -> artifact rejected -> SEC-11
+- Given artifact with >100,000 test entries -> artifact rejected -> SEC-11
+- Given failure_message containing markdown injection -> sanitized before rendering -> SEC-10
 
 **Spec references:**
 
 | What | Reference |
 |------|-----------|
-| Installation token provider (existing) | non-functional-requirements.md NFR-2.8.1 |
-| Rate limiting | non-functional-requirements.md NFR-2.3.3 |
-| App auth security | non-functional-requirements.md NFR-2.7.x |
-| Token proxy requirements | v2-auth-token-proxy.md#1-security-requirements |
-| Dashboard error handling | error-handling.md#category-3-dashboard-errors |
-| ADR-036 security model | adr/036-v2-cli-auth-github-token-default.md#apici-token-security-model |
-| GitHub API inventory | github-api-inventory.md |
+| State merge semantics | cli/internal/quarantine/state.go |
+| Issue body rendering | cli/cmd/quarantine/run_notifications.go |
+| PR comment rendering | cli/cmd/quarantine/run_notifications.go |
+| CAS write logic | cli/internal/cas/cas.go |
+| Issue dedup | cli/internal/github/issues_ops.go |
+| Results JSON schema | schemas/test-result.schema.json |
+| State schema | schemas/quarantine-state.schema.json |
+| Per-suite isolation | ADR-032 |
+| Issue skip (new-to-PR) | ADR-022 |
+| App permission parity | SEC-3 in v2-auth-token-proxy.md |
 
 ---
 
-### M19: v2 Auth E2E
+### M19: v2 Server-Side Writes E2E
 
 **Dependencies:** M17 + M18
 
-**Scope — included:**
-- E2E-1: Full round-trip and fallback tests
+**Scope -- included:**
+- E2E tests observe **pre-seeded fixture data**: the fixture repo
+  (`mycargus/quarantine-app-test-fixture`) runs CI periodically with
+  deliberately flaky tests. The dashboard has already processed these runs.
+  E2E tests observe the outcomes (state on the state branch, issues,
+  PR comments) without waiting for real-time processing.
+- E2E: v2 flow -- observe that the dashboard created state updates, issues,
+  and PR comments for fixture CI runs (App bot identity)
+- E2E: v1 backward compat -- observe that CLI-created issues/comments have
+  PAT owner identity (from fixture runs using QUARANTINE_GITHUB_TOKEN)
+- E2E: CLI exit code correctness -- fixture CI runs in v2 mode exit 0 (all
+  pass) or exit 1 (test failures) regardless of dashboard processing state
 
-**Scope — excluded:**
+**Scope -- excluded:**
 - CLI or dashboard code changes (those are complete in M17/M18)
+- Webhook-triggered processing (v3)
+- Real-time artifact processing observation (not needed with pre-seeded data)
 
 **Acceptance criteria:**
-1. E2E test verifies full round-trip: CLI → proxy → installation token → API calls succeed with quarantine[bot] identity (E2E-1)
-2. E2E test verifies fallback: dashboard unreachable → CLI uses GITHUB_TOKEN within timeout window (E2E-1)
-3. E2E test verifies fallback: dashboard returns 404 (repo not in installation) → CLI uses GITHUB_TOKEN (E2E-1)
-
-**Scenario outlines:**
-- Given CLI with QUARANTINE_DASHBOARD_URL, fixture repo with App installed → obtains proxy token, API calls use quarantine[bot] identity → E2E-1
-- Given CLI with QUARANTINE_DASHBOARD_URL, dashboard unreachable → falls back to GITHUB_TOKEN → E2E-1
-- Given CLI with QUARANTINE_DASHBOARD_URL, repo not in App installation → falls back to GITHUB_TOKEN → E2E-1
+1. E2E: fixture repo has dashboard-processed v2 runs; state branch contains
+   at least one quarantined test entry written by the dashboard; issues
+   created by the App bot identity (verify `creator.type == "Bot"`); PR
+   comments contain suite-specific `<!-- quarantine:<suite> -->` markers
+   (E2E-1 revised)
+2. E2E: fixture repo has v1 PAT runs; CLI-created issues have PAT owner
+   identity (`creator.type == "User"`); CLI-created comments have PAT owner
+   identity (backward compat)
+3. E2E: fixture repo v2 CI workflow runs completed with expected conclusion
+   (`success` for exit 0, `failure` for exit 1) regardless of dashboard
+   processing state; verified via `GET /repos/.../actions/runs` API
+4. E2E: `make e2e-test` passes (existing E2E tests unbroken)
 
 **Spec references:**
 
 | What | Reference |
 |------|-----------|
 | E2E test conventions | test/e2e/README.md |
-| E2E requirements | v2-auth-token-proxy.md#5-e2e-test-coverage |
 | Test strategy | test-strategy.md#test-layers |
 
 ## Spec updates required
 
-- **error-handling.md**: Change degraded mode trigger 3 to exit 2; add Category 4 (Dashboard Proxy Errors); add proxy-minted token 401 message variant
-- **cli-spec.md**: Update token resolution section for v2 order
-- **non-functional-requirements.md**: Add NFR entries for SEC-2, SEC-5, SEC-6, SEC-6a, SEC-6b, SEC-7, SEC-9, UX-1, OPS-1
-- **github-api-inventory.md**: Add GET /installation/repositories (verification call)
-- **functional-requirements.md**: Revise FR-1.11.1 (GITHUB_TOKEN default); add FR for token resolution order, proxy endpoint, fork PR skip
+- **error-handling.md**: Change degraded mode trigger 3 (no token) to exit 2.
+  Note: this is a behavioral change from v1 where no-token entered degraded
+  mode. Document migration impact. — *verified by doc review*
+- **cli-spec.md**: Update token resolution to two-step order; document v2
+  write-skip behavior; document v2 state-branch-missing handling (empty state,
+  not exit 2) — *verified by doc review*
+- **github-api-inventory.md**: Note that write operations are dashboard-side
+  in v2 mode — *verified by doc review*
+- **schemas/test-result.schema.json**: `cli_mode` field added (`"v1"` or `"v2"`) ✓
 
-## Risks and open questions
+## Risks
 
-- **Risk:** The existing `InstallationTokenProvider` does not pass `repositories` when minting tokens. M18 must modify it or create a separate code path. If reused incorrectly, tokens grant access to all repos in the installation (privilege escalation). Mitigated by SEC-6a as explicit acceptance criterion.
-- **Risk:** `ghs_` prefix is observed behavior, not a GitHub guarantee. If GitHub changes token formats, the soft prefix gate falls through to the behavioral check (by design). No action needed but worth monitoring.
-- **Risk:** Rate limit counter Maps can grow unboundedly. SEC-6 requires eviction. The existing `createIpRateLimiter`/`createUserRateLimiter` middleware has the same issue — fix as part of M18.
-- **Open question:** Session secret defaults to hardcoded string in `app/app.ts`. Not directly related to /api/ci-token but shared router. Dashboard should refuse to start without SESSION_SECRET in production. Address in M18 or separately.
+- **Dashboard required for quarantine management in v2.** Without the dashboard,
+  the CLI still runs tests and detects flaky tests, but state is never updated.
+  Acceptable because v2 is the "GitHub App + dashboard" phase.
+- **Stale state window.** If the dashboard is slow to process an artifact, the
+  next CLI run reads stale state. A flaky test detected in run N might not be
+  excluded until run N+2. CAS merge handles concurrent updates correctly.
+  The v2 PR comment (posted by dashboard) should note that quarantine takes
+  effect on the next run, not the current one.
+- **Write logic migration.** Issue body rendering, PR comment rendering, state
+  merge, CAS, and dedup must be reimplemented in TypeScript. Contract tests
+  against shared fixtures verify byte-for-byte parity (excluding trailing
+  whitespace) with CLI v1 output.
+- **`quarantine init` in v2.** Init is run by users locally (never in CI) and
+  creates `.quarantine/config.yml` plus the state branch. In v2, users running
+  init locally may authenticate with a PAT or `gh auth` — init is not
+  affected by the read-only CI constraint. If init has not been run, the
+  dashboard creates the state branch on first artifact processing (R-6).
+  The CLI handles a missing state branch by running all tests (R-6).
 
 ## Review summary
 
+### Re-review 2 (2026-04-20)
+
+| Reviewer | Verdict | Blockers | Observations |
+|----------|---------|----------|--------------|
+| Acceptance test | approve | 0 | 5 |
+| Architecture | approve | 0 | 4 |
+| UX | approve | 0 | 5 |
+| Security | approve | 0 | 5 |
+
+All previous blockers verified as resolved. Observations addressed in this revision:
+- `cli_mode` field added to `schemas/test-result.schema.json` (cross-cutting)
+- M18 AC#15: `test_id` added to sanitization scope (SEC-10 completeness)
+- M18 AC#17: 64KB string truncation added to resource bounds criterion
+- M18 AC#18: `GET /app` mechanism specified for permission verification
+- M17: v1-to-v2 migration scenario added (user removes QUARANTINE_GITHUB_TOKEN)
+- M18: stale-state PR comment wording specified
+- M18: validation ordering constraint added (schema before SEC-11 cross-check)
+- M18: write processing rate limiting noted as v3 concern
+- M19: acceptance criteria made more specific (creator.type checks, workflow conclusion API)
+- M19: AC#4 added (existing E2E tests unbroken)
+- `docs/milestones/index.md`: Phase 6b corrected to show M17/M18 as parallel
+- M18 manifest: `artifact-poller.server.ts` reference corrected to `sync.server.ts`
+
+### Review 1
+
 | Reviewer | Verdict | Key findings |
 |----------|---------|-------------|
-| Acceptance test | needs-revision → addressed | Missing cache scenarios added (4 quadrants); concurrent minting scenario added; doc-only items marked; OPS-1 boundary clarified; invalid timeout scenario added |
-| Architecture | approve | M17 fork detection is natural split seam if scope feels large; per-token-fingerprint rate limit reconciled in ADR; Phase 6 index.md needs update when milestones added |
-| UX | approve | 403 message now includes SSO/IP fallback; fork PR message says "Tests run normally"; timeout clamp uses env var name; dashboard proxy discoverability via UX-8 |
-| Security | needs-revision → addressed | Prefix check now soft gate; cache TTL reduced to 15s; repositories parameter explicit (SEC-6a); SSRF protection added (SEC-6b); per-IP rate limiting removed |
+| Acceptance test | needs-revision -> addressed | M18 scenario outlines added; UX-1/UX-6 message text specified; CAS retry count added (3); unquarantine trigger specified (during artifact processing); same-repo PR scenario added; pr_number null scenario added; issue_skipped_reason handling added; rendering parity defined (byte-for-byte); doc items marked "verified by doc review" |
+| Architecture | approve | M17/M18 parallelism opportunity noted; dependency normalized to M16; CAS backoff/jitter specified; quarantine[bot] identity clarified (App bot identity from dashboard installation token) |
+| UX | needs-revision -> addressed | ERR-1/UX-6 v2 message text specified; UX-1 v2 vs v1 messages specified; artifact upload note includes doc link + --quiet suppression; init in v2 clarified (local-only, dashboard creates state branch); cli_mode field added to results JSON; verbose token resolution logging added; stale-state communication addressed in PR comment |
+| Security | approve | SEC-3 relabeled active for dashboard writes; SEC-10 (markdown sanitization) added; SEC-11 (artifact repo cross-check) added; resource bounds added (100K tests, 64KB strings); pull_request_target same-repo scenario added |

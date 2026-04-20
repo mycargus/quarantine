@@ -7,6 +7,7 @@
   "required": [
     "version",
     "suite_name",
+    "cli_mode",
     "run_id",
     "repo",
     "branch",
@@ -61,6 +62,11 @@
       "pattern": "^[a-z0-9][a-z0-9-]*$",
       "maxLength": 30,
       "description": "Name of the test suite that produced this result, matching test_suites[].name in .quarantine/config.yml. Used by the dashboard to associate results with the correct suite."
+    },
+    "cli_mode": {
+      "type": "string",
+      "enum": ["v1", "v2"],
+      "description": "CLI auth mode. 'v1': CLI used QUARANTINE_GITHUB_TOKEN (PAT) and performed all GitHub writes itself. 'v2': CLI used GITHUB_TOKEN (read-only) and writes are deferred to the dashboard via artifact processing."
     },
     "cli_version": {
       "type": "string",

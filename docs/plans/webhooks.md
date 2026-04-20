@@ -10,6 +10,13 @@
 
 v2 uses API polling for both installation discovery (15-minute background loop) and artifact ingestion (5-minute debounced polling). Webhooks would reduce artifact ingestion latency from ~5 minutes to ~30 seconds and enable real-time unquarantine on issue close.
 
+**Updated 2026-04-20:** With the ADR-036 amendment (server-side writes),
+webhooks become significantly more valuable. In v2, the dashboard performs all
+GitHub writes (state updates, issue creation, PR comments) after ingesting
+artifacts. The `workflow_run.completed` webhook is the path to immediate
+feedback (~30 seconds from CI completion) without any CI-side configuration
+changes. This webhook should be prioritized as the first webhook in v3 scope.
+
 ## Prerequisites
 
 Before implementation, an ADR is needed for **public endpoint exposure**. The v1 dashboard is internal-only (behind a reverse proxy). Webhooks require a publicly accessible URL. Options to evaluate:
@@ -45,7 +52,7 @@ Before implementation, an ADR is needed for **public endpoint exposure**. The v1
 - `installation` + `deleted`: stop polling, remove installation record. Preserve historical data.
 - `installation` + `suspended`/`unsuspended`: pause/resume polling.
 - `issues` + `closed`: if issue has quarantine labels, record unquarantine event for dashboard display. Note: actual `quarantine.json` update still happens on next CLI run.
-- `workflow_run` + `completed`: check for quarantine artifacts, download and ingest immediately. Supplements polling.
+- `workflow_run` + `completed`: check for quarantine artifacts, download and ingest immediately. **Priority 1 for v3** -- this webhook enables immediate state updates, issue creation, and PR comments (~30s from CI completion) per the ADR-036 amendment (server-side writes). Supplements polling.
 
 **Observability:**
 - Log webhook events: event type, action, delivery GUID, processing outcome.
