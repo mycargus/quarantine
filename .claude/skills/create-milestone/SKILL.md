@@ -1,7 +1,7 @@
 ---
 name: create-milestone
 description: Generate a milestone manifest file — a lightweight routing document that points agents to source docs
-argument-hint: "<milestone-number> | --validate [N]"
+argument-hint: "<milestone-number> [--plan <path>] | --validate [N]"
 model: sonnet
 effort: max
 disable-model-invocation: false
@@ -12,6 +12,24 @@ allowed-tools: Read, Grep, Glob, Write, Bash, Agent, AskUserQuestion
 ## Mode detection
 
 If `$1` is `--validate` or starts with `--validate`, run **validation mode** (see [Validation Mode](#validation-mode) at the end). Otherwise, generate a new manifest for M$1 at `docs/milestones/m$1.md`.
+
+### Plan-assisted mode
+
+If `--plan <path>` is provided, read the plan file first. Use its milestone
+section (matching M$1) as the primary source for scope, acceptance criteria,
+and scenario outlines — instead of relying solely on `docs/milestones/index.md`.
+The plan file is produced by `/plan` and has a defined structure with
+`## Milestones` containing per-milestone scope, criteria, and scenario outlines.
+
+When a plan is provided:
+- Step 1a uses the plan's milestone section for scope and acceptance criteria.
+- Step 1b uses the plan's scenario outlines to locate or create scenarios.
+- Steps 2-6 proceed normally (the plan supplements, not replaces, the
+  standard manifest generation flow).
+
+If the plan's milestone section conflicts with `index.md`, prefer the plan
+(it is the more recent, reviewed artifact). Flag the discrepancy in the
+report (step 7).
 
 Milestone manifests are routing tables, NOT content copies. They point agents to existing source docs with specific anchors. The only inline content allowed is scope boundaries (MUST/MUST NOT) and acceptance criteria summaries. Everything else MUST be a link.
 

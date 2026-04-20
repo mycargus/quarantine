@@ -60,6 +60,8 @@ See `docs/specs/architecture.md` for full design. See `cli/CLAUDE.md` and `dashb
 
 Project skills (invoke with `/skill-name`):
 
+- `/plan` -- Create a structured implementation plan from an ADR or description
+- `/review` -- Run four review agents (acceptance, architecture, UX, security) against a plan file
 - `/implement-milestone` -- Implement a milestone using TDD and atomic commits
 - `/verify-milestone` -- Verify implementation against a milestone manifest
 - `/create-milestone` -- Generate a milestone manifest routing document
