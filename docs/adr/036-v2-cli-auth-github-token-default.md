@@ -1,6 +1,6 @@
-# ADR-036: Use GITHUB_TOKEN as Default CLI Auth; Dashboard Token Proxy for Rate-Limit Upgrade
+# ADR-036: Use GITHUB_TOKEN as Default CLI Auth; Server-Side Writes via Dashboard
 
-**Status:** Proposed
+**Status:** Proposed (amended 2026-04-20)
 **Date:** 2026-04-19
 **Supersedes:** [ADR-026](026-v2-cli-external-token-injection.md)
 **Revises:** [ADR-008](008-auth-strategy.md), [ADR-011](011-system-architecture.md)
@@ -325,3 +325,215 @@ No App ID or private key in the user's CI workflow.
   per request is near zero.
 - (-) Implementation requirements for security, UX, and operational concerns
   are specified in `docs/specs/v2-auth-token-proxy.md`.
+
+## Amendment (2026-04-20): Server-Side Writes Replace Token Proxy
+
+### Motivation
+
+Security and architecture review identified three problems with the token proxy
+approach:
+
+1. **The `permissions:` block cost is unacceptable.** Specifying `permissions:`
+   in a GitHub Actions workflow triggers an all-or-nothing reset: all
+   unspecified permissions become `none` (only `metadata: read` is retained).
+   This breaks other workflow steps (checkout, caching, deployments) unless the
+   user audits and re-adds every permission. No surveyed product (Codecov,
+   Snyk, Renovate, Dependabot) imposes this cost -- they either run server-side
+   or use dedicated tokens. `GITHUB_TOKEN` write access requires
+   `contents: write`, `issues: write`, and `pull-requests: write`, but even
+   `contents: read` (needed for `actions/checkout`) is lost unless explicitly
+   listed.
+
+2. **The token proxy is a novel pattern with no industry precedent.** Sending
+   `GITHUB_TOKEN` to a third party for credential exchange has no parallel in
+   Codecov, Snyk, Renovate, or any surveyed tool. OIDC verification (the
+   industry standard, used by Codecov, Chainguard Octo STS, and cloud
+   providers) is more secure but still requires `id-token: write` in the
+   `permissions:` block, triggering the same all-or-nothing problem. The proxy
+   also introduces privilege escalation: the recommended `permissions:` block
+   omits `actions: read`, but the minted installation token inherits it from
+   the App registration.
+
+3. **All CLI writes are post-hoc reporting.** The CI exit code (pass/fail) is
+   determined locally before any GitHub API write. State updates, issue
+   creation, and PR comments are bookkeeping that does not affect the build
+   outcome. Moving them server-side eliminates all write credentials from CI
+   without changing the developer experience for the most critical signal (did
+   CI pass or fail?).
+
+### Revised decision
+
+**Replace the token proxy with server-side writes. The CLI uses `GITHUB_TOKEN`
+for reads only. The dashboard performs all GitHub writes using its own App
+installation tokens.**
+
+#### v2 default path (zero config)
+
+```yaml
+# .github/workflows/ci.yml
+steps:
+  - uses: actions/checkout@v4
+  - run: quarantine run unit
+  - uses: actions/upload-artifact@v4
+    if: always()
+    with:
+      name: quarantine-results-${{ github.run_id }}
+      path: .quarantine/results.json
+```
+
+No `permissions:` block. No secrets. No env vars. The CLI reads quarantine
+state using the default `GITHUB_TOKEN` (`contents: read`, granted by default
+on all repos including restricted-default repos created after Feb 2023). The
+CLI writes results to disk. The workflow uploads the artifact. The dashboard
+processes the artifact and performs all writes (state updates, issue creation,
+PR comments) using its own App installation tokens from M12-M15.
+
+#### Token resolution (simplified)
+
+1. **`QUARANTINE_GITHUB_TOKEN`** (if set) -- v1 PAT mode. CLI does all reads
+   AND writes itself. Dashboard not involved. Backward-compatible.
+2. **`GITHUB_TOKEN`** (if set) -- v2 mode. CLI reads state, runs tests, writes
+   results to disk. No GitHub write API calls. Dashboard handles writes.
+3. **Neither** -- exit 2 with error.
+
+The four-step resolution order from the original decision is replaced by this
+two-step order. The dashboard proxy step and all associated machinery
+(`/api/ci-token`, HTTPS enforcement, proxy timeout, rate limiting, behavioral
+check, verification cache, scoped token minting) are removed.
+
+#### CLI behavioral modes
+
+| Token available | Mode | CLI reads | CLI writes to GitHub | Dashboard writes |
+|-----------------|------|-----------|---------------------|-----------------|
+| `QUARANTINE_GITHUB_TOKEN` | v1 (PAT) | State branch, closed issues | State, issues, PR comment | Not involved |
+| `GITHUB_TOKEN` only | v2 (server-side) | State branch | Nothing -- results to disk only | State, issues, PR comment (from artifact) |
+| Neither | Error | -- | -- | -- |
+
+In v2 mode the CLI:
+1. Reads quarantine state from the state branch (read-only, `GITHUB_TOKEN`).
+   If the state branch does not exist (404), proceeds with empty state (no
+   exclusions) -- does NOT exit 2.
+2. Runs tests, retries failures, classifies flaky/genuine/unresolved
+3. Writes `.quarantine/results.json` to disk (includes `cli_mode: "v2"` so
+   the dashboard knows writes were not performed by the CLI)
+4. Exits with appropriate code (0/1/2)
+5. Does NOT call any GitHub write APIs
+
+#### `quarantine init` in v2
+
+`quarantine init` is run by users locally (never in CI). It creates
+`.quarantine/config.yml` (local file) and the `quarantine/state` branch
+(GitHub API write). Users running init locally authenticate with a PAT,
+`gh auth`, or other local credential -- init is not affected by the read-only
+CI constraint.
+
+If init has not been run, the dashboard creates the state branch on first
+artifact processing. The CLI handles a missing state branch by running all
+tests with no exclusions (empty state). This means v2 users can start using
+quarantine without running init at all -- the dashboard handles setup.
+
+#### Immediate feedback via webhooks (v3)
+
+v2 writes are delayed by the artifact polling interval (~5 minutes). For
+near-instant feedback (~30 seconds), the `workflow_run.completed` webhook
+(deferred to v3 per [ADR-027](027-v2-webhooks-deferred.md)) is the natural
+solution:
+
+1. GitHub sends `workflow_run.completed` to the dashboard
+2. Dashboard fetches the quarantine artifact from the completed run
+3. Dashboard writes state, creates issues, posts PR comment
+
+This requires zero CI-side configuration changes -- the webhook fires
+automatically for any workflow run in a repo where the App is installed.
+
+**Upgrade path timeline:**
+- v2: Artifact polling (~5 min delay). Zero CI config.
+- v3: `workflow_run.completed` webhook (~30s delay). Still zero CI config.
+
+#### Fork PR handling (retained from original)
+
+Fork PR detection ([SEC-7](../specs/v2-auth-token-proxy.md)) is retained. On
+fork PRs, the CLI skips quarantine processing entirely, executing the raw test
+command without quarantine wrapping. This prevents JUnit XML injection into
+results that the dashboard would process. Event payload parsing hardening
+(SEC-9) is also retained.
+
+### What this replaces
+
+**Removed from original decision:**
+- The `/api/ci-token` endpoint and all token proxy machinery
+- The four-step token resolution order (proxy step removed)
+- `QUARANTINE_DASHBOARD_URL` and `QUARANTINE_DASHBOARD_TIMEOUT` env vars
+- HTTPS enforcement for dashboard URL, localhost exception
+- Proxy rate limiting (per-repo, per-fingerprint)
+- Token verification (prefix check, behavioral check, verification cache)
+- Scoped token minting (`repositories` parameter)
+- Bot identity upgrade via installation token
+- SEC-1 through SEC-6b from the companion spec
+- All proxy-related UX messages (UX-3, UX-4, UX-5, UX-8)
+- Proxy error handling (ERR-2, ERR-3, Category 4)
+
+**Retained from original decision:**
+- `GITHUB_TOKEN` as default auth (the core insight)
+- `QUARANTINE_GITHUB_TOKEN` backward compatibility (v1 PAT mode)
+- Fork PR detection (SEC-7) and event payload hardening (SEC-9)
+- Exit 2 on no token (ERR-1)
+- UX-1 (403 detection) for v1 PAT mode and state read errors
+
+### Revised ADR-008 and ADR-011 impact
+
+**ADR-008 revision (updated):** The App provides: (a) dashboard OAuth login,
+auto-discovery, and permission filtering, and (b) server-side GitHub writes
+(state, issues, PR comments) on behalf of CLI runs. The CLI never uses App
+credentials, directly or indirectly.
+
+**ADR-011 revision (updated):** The principle "CLI never needs to know the
+dashboard exists" is fully preserved in v2. The CLI has no dashboard dependency
+-- it reads state from GitHub and writes results to disk. The dashboard
+processes artifacts independently. This is a stronger separation than the
+original decision, which introduced a soft dashboard dependency via the proxy.
+
+### Revised consequences
+
+**Positive (changes from original):**
+
+- (+) Zero CI configuration. No `permissions:` block, no secrets, no env vars.
+- (+) No write-capable credentials in CI at all. The `GITHUB_TOKEN` used for
+  state reads is read-only by default.
+- (+) No new public endpoint on the dashboard (no `/api/ci-token`).
+- (+) CLI has zero dashboard dependency. Dashboard outage does not affect CI in
+  any way -- builds run normally, results are written to disk, dashboard
+  catches up when it recovers.
+- (+) Simpler implementation: no proxy, no OIDC, no behavioral check, no token
+  caching, no verification cache, no HTTPS enforcement, no rate limiting.
+- (+) Aligns with industry practice: server-side writes are how Dependabot,
+  Renovate (hosted), and Codecov handle GitHub API writes.
+
+**Negative (changes from original):**
+
+- (-) State updates, issue creation, and PR comments are delayed by the
+  artifact polling interval (~5 minutes in v2). The CI exit code (pass/fail)
+  is still immediate. Webhooks in v3 reduce this to ~30 seconds.
+- (-) Dashboard is required for quarantine management in v2. Without the
+  dashboard, the CLI runs tests and detects flaky tests, but state is never
+  updated, issues are never created, and PR comments are never posted. The
+  quarantine function degrades to retry-only mode.
+- (-) Write logic (issue body rendering, PR comment rendering, state merge,
+  CAS, dedup) must be reimplemented in TypeScript for the dashboard. Parity
+  with CLI behavior must be verified via contract tests against shared fixtures.
+- (-) Slightly wider stale-state window between runs. A test detected as flaky
+  in run N may not be excluded until run N+2 (instead of N+1) if the dashboard
+  has not processed run N's artifact before run N+1 starts. The CAS merge
+  mechanism handles concurrent updates correctly.
+- (-) No `quarantine[bot]` identity upgrade path in v2. Issues and PR comments
+  are created by the App's bot identity (determined by the dashboard's
+  installation token), not configurable by the user. In v1 PAT mode, they
+  appear as the PAT owner.
+
+### Alternatives reconsidered
+
+The original "Alternatives Considered" section rejected the webhook-driven
+model as a "major architecture change." This amendment adopts a variant of
+that model (artifact-based, not webhook-triggered) as the v2 approach, with
+webhooks as the v3 optimization. The key insight: the CLI's writes are all
+post-hoc reporting that can be deferred without affecting CI correctness.

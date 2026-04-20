@@ -1,11 +1,14 @@
-# v2 Auth Token Proxy: Implementation Requirements
+# v2 Auth: Implementation Requirements
 
 > Companion to [ADR-036](../adr/036-v2-cli-auth-github-token-default.md).
-> This document captures security, UX, and operational requirements for the
-> dashboard token proxy (`/api/ci-token`) and the CLI's v2 token resolution.
-> ADR-036 records the decision; this spec records how to implement it safely.
 >
-> Last updated: 2026-04-19
+> **Status: Partially retired (2026-04-20).** The ADR-036 amendment replaced
+> the token proxy with server-side writes. Sections SEC-1 through SEC-6b,
+> SEC-8, UX-1 through UX-8, OPS-1 through OPS-4, ERR-1 through ERR-3, and
+> E2E-1 are retired. **SEC-7 (fork PR skip) and SEC-9 (event payload
+> hardening) remain active** as CLI-level requirements for v2.
+>
+> Last updated: 2026-04-20
 
 ---
 
