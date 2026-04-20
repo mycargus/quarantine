@@ -1,7 +1,7 @@
 ---
 name: create-milestone
 description: Generate a milestone manifest file — a lightweight routing document that points agents to source docs
-argument-hint: "<milestone-number> [--plan <path>] | --validate [N]"
+argument-hint: "[--plan <path>]"
 model: sonnet
 effort: max
 disable-model-invocation: false
@@ -9,17 +9,20 @@ user-invocable: true
 allowed-tools: Read, Grep, Glob, Write, Bash, Agent, AskUserQuestion
 ---
 
-## Mode detection
+## Milestone number auto-detection
 
-If `$1` is `--validate` or starts with `--validate`, run **validation mode** (see [Validation Mode](#validation-mode) at the end). Otherwise, generate a new manifest for M$1 at `docs/milestones/m$1.md`.
+Glob for `docs/milestones/m*.md`, extract the numeric suffixes, and set N to
+max + 1. This is the milestone number for the new manifest. The output file
+is `docs/milestones/m{N}.md` and the title heading is `# M{N}: ...`.
 
 ### Plan-assisted mode
 
-If `--plan <path>` is provided, read the plan file first. Use its milestone
-section (matching M$1) as the primary source for scope, acceptance criteria,
-and scenario outlines — instead of relying solely on `docs/milestones/index.md`.
-The plan file is produced by `/plan` and has a defined structure with
-`## Milestones` containing per-milestone scope, criteria, and scenario outlines.
+If `--plan <path>` is provided, read the plan file first. Find the milestone
+section matching M{N} (e.g., `### M17: ...` when N=17). Use it as the primary
+source for scope, acceptance criteria, and scenario outlines — instead of
+relying solely on `docs/milestones/index.md`. The plan file is produced by
+`/plan` and has a defined structure with `## Milestones` containing
+per-milestone scope, criteria, and scenario outlines.
 
 When a plan is provided:
 - Step 1a uses the plan's milestone section for scope and acceptance criteria.
@@ -55,9 +58,9 @@ These principles are grounded in published research on AI agent context engineer
 
 Use the Agent tool (subagent_type: Explore) to run steps 1a–1c in parallel, keeping the heavy file reads out of main context:
 
-**1a. Milestone definition:** Read `docs/milestones/index.md` and extract for M$1: title, scope, acceptance criteria, exclusions, and dependencies on prior milestones.
+**1a. Milestone definition:** Read `docs/milestones/index.md` and extract for M{N}: title, scope, acceptance criteria, exclusions, and dependencies on prior milestones.
 
-**1b. Scenarios:** Read `docs/scenarios/index.md` and find ALL scenarios tagged with M$1. Group by scenario file. Note number ranges and topics. Check whether any scenarios in other files are partially tagged with M$1 (some files span multiple milestones — include only the M$1 scenarios).
+**1b. Scenarios:** Read `docs/scenarios/index.md` and find ALL scenarios tagged with M{N}. Group by scenario file. Note number ranges and topics. Check whether any scenarios in other files are partially tagged with M{N} (some files span multiple milestones — include only the M{N} scenarios).
 
 **1c. Relevant ADRs:** Read `docs/adr/*.md` and identify only the ADRs directly relevant to this milestone's scope.
 
@@ -107,14 +110,14 @@ Verification MUST contain specific invariants, NOT vague statements. Good: "MUST
 
 ### 5. Generate the manifest
 
-Write the file to `docs/milestones/m$1.md` using this exact structure:
+Write the file to `docs/milestones/m{N}.md` using this exact structure:
 
 ```markdown
 ---
 status: planned
 ---
 
-# M$1: [Title from milestones.md]
+# M{N}: [Title from milestones.md]
 
 ## Workflow
 
@@ -182,72 +185,49 @@ and [NFR-X.Y.Z] in [non-functional-requirements.md](../specs/non-functional-requ
 **Build:** `make cli-build && make cli-test && make cli-lint` MUST pass.
 ```
 
-### 6. Validate the result
+### 6. Validate and fix (loop until clean)
 
-After writing, verify:
-- Line count is between 60 and 110 lines
-- No content is duplicated from source docs (only scope and acceptance criteria are inline)
-- Every link has a specific anchor that exists in the target file
-- MUST/MUST NOT language is used for all constraints
-- The six sections appear in exact order: Workflow, Scope, Acceptance criteria, Specifications, Acceptance scenarios, Verification
+After writing the manifest, run all checks below. If any fail, fix the
+manifest and re-run. Repeat until every check passes.
 
-### 7. Report
-
-Print a summary:
-- Milestone title
-- Number of acceptance criteria
-- Number of scenario files referenced (and total scenario count)
-- Number of specification links
-- Number of verification invariants
-- Final line count
-
----
-
-## Validation Mode
-
-Triggered by `/create-milestone --validate` or `/create-milestone --validate N`.
-
-- `--validate` (no number): validate ALL manifests in `docs/milestones/m*.md`
-- `--validate N`: validate only `docs/milestones/mN.md`
-
-### Validation checks
-
-For each manifest file, run these checks and report pass/fail:
-
-1. **Line count.** SHOULD NOT exceed 100 lines.
-2. **Section order.** MUST contain exactly these 6 `##` sections in order:
-   Workflow, Scope, Acceptance criteria, Specifications, Acceptance scenarios,
-   Verification. No extra `##` sections allowed.
-3. **Workflow template.** Workflow section MUST match the standard 5-step
-   template (steps 1-5 from the generation template). Custom workflows fail.
-4. **RFC 2119 language.** Scope and Verification sections MUST contain at least
-   one MUST or MUST NOT. Soft language ("try to", "ideally", "should consider")
-   MUST NOT appear anywhere in the manifest.
+**Checks:**
+1. **Line count.** 80–100 lines. If over, cut duplicated content. If under,
+   check for missing sections.
+2. **Section order.** Exactly these 6 `##` sections in order: Workflow, Scope,
+   Acceptance criteria, Specifications, Acceptance scenarios, Verification.
+   No extra `##` sections.
+3. **Workflow template.** Must match the standard 5-step template. No custom
+   workflows.
+4. **RFC 2119 language.** Scope and Verification MUST each contain at least one
+   MUST or MUST NOT. Soft language ("try to", "ideally", "should consider")
+   must not appear anywhere.
 5. **Anchor verification.** For every markdown link in the Specifications table
-   and Verification section, verify the target anchor exists in the target file.
-   Use Grep to check for the heading text that would produce the slug. Report
-   broken links.
+   and Verification section, Grep the target file for the heading that produces
+   the slug. Fix or replace broken anchors.
 6. **FR/NFR traceability.** Acceptance criteria MUST contain at least one
    `(FR-X.Y.Z)` or `(NFR-X.Y.Z)` reference. Verify each referenced ID exists
    in `functional-requirements.md` or `non-functional-requirements.md`.
-7. **Scenario coverage.** Every scenario tagged with this milestone's `[MN]`
-   tag in `docs/scenarios/v1/*.md` MUST appear in the Acceptance scenarios
-   table (directly or within a range). Report any missing scenarios.
-8. **No content duplication.** Flag any block of 3+ consecutive lines in the
-   Scope section that appears verbatim in a source doc (cli-spec, milestones,
-   error-handling, etc.). Scope should summarize, not copy.
+7. **Scenario coverage.** Every scenario tagged with M{N} in
+   `docs/scenarios/**/*.md` MUST appear in the Acceptance scenarios table.
+8. **No content duplication.** No block of 3+ consecutive lines in the Scope
+   section should appear verbatim in a source doc.
 
-### Validation output
-
-For each manifest, print:
+Print the check results in this format, then fix and re-check if needed:
 
 ```
 M{N}: {title}
-  ✓ Line count: {count} (60-110)
-  ✗ Anchor broken: {link} → {file} has no heading matching "{slug}"
-  ✓ Sections: 6/6 in order
+  ✓ Line count: {count}
+  ✗ Anchor broken: {link} → {file} has no heading "{slug}"
   ...
   Result: PASS | FAIL ({count} issues)
 ```
 
-At the end, print a summary: `{pass}/{total} manifests passed validation.`
+### 7. Report
+
+Print a final summary:
+- Milestone title and number
+- Acceptance criteria count
+- Scenario files referenced (and total scenario count)
+- Specification links count
+- Verification invariants count
+- Final line count
