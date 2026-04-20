@@ -63,9 +63,17 @@ Phase 6 -- GitHub App Integration (v2, depends on M10 complete)
     M15: github-app mode integration + user permission filtering (depends on M14)
     M16: E2E integration + CI (depends on M15)
 
+Phase 6b -- Server-Side Writes (v2, depends on M16; ADR-036 amendment)
+  Parallel (disjoint codebases: Go CLI vs TypeScript dashboard):
+    M17: CLI v2 read-only mode (GITHUB_TOKEN for reads, no writes, fork PR detection)
+    M18: Dashboard write processing (state updates, issue creation, PR comments from artifacts)
+  Sequential (depends on M17 + M18):
+    M19: v2 server-side writes E2E
+
 Phase 7 -- Webhooks (v3, depends on M16 and public endpoint ADR)
-  issue.closed, installation lifecycle, artifact ingestion,
-    state consolidation webhooks
+  Immediate feedback: workflow_run.completed triggers instant artifact
+    processing (state + issues + PR comments within ~30s)
+  issue.closed, installation lifecycle, state consolidation webhooks
     (see docs/plans/webhooks.md)
 ```
 
@@ -1038,6 +1046,20 @@ M15 (github-app mode integration)
   |
   v
 M16 (E2E integration + CI)
+
+--- server-side writes (ADR-036 amendment) ---
+
+M17 (CLI v2 read-only mode)    M18 (dashboard write processing)
+  |                               |   (also depends on M6/M7 artifact
+  |                               |    pipeline + M15 installation tokens)
+  +---------------+---------------+
+                  |
+                  v
+        M19 (v2 server-side writes E2E)
+
+--- v3: webhooks for immediate feedback ---
+
+workflow_run.completed -> instant artifact processing (~30s)
 ```
 
 ---
