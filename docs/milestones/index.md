@@ -1060,6 +1060,12 @@ M17 (CLI v2 read-only mode)    M18 (dashboard write processing)
 --- v3: webhooks for immediate feedback ---
 
 workflow_run.completed -> instant artifact processing (~30s)
+
+--- Jenkins / non-GitHub-origin support (v1, parallel to v2) ---
+
+M20 (relax origin constraint: non-github.com origins, init partial-success,
+     config-based owner/repo, Jenkins integration guide)
+     depends on: M9 (multi-suite config format)
 ```
 
 ---
@@ -1110,6 +1116,28 @@ GitHub App auth.
   CI support. See `docs/plans/cli-native-app-auth.md`.
 - Webhooks (real-time unquarantine, instant artifact ingestion): deferred to v3.
   See `docs/plans/webhooks.md`.
+
+---
+
+## Phase 7 — Jenkins / Non-GitHub-Origin Support
+
+### M20: Relax Git Origin Constraint
+
+**Owner:** `cli-dev`
+
+**Dependencies:** M9 (multi-suite config format; `.quarantine/config.yml` with `test_suites`).
+
+**Scope:** See [docs/milestones/m20.md](m20.md) and [ADR-037](../adr/037-relax-origin-host-constraint.md).
+
+- Removes git-remote scanning from `run` and `doctor`; `.quarantine/config.yml` is the sole authoritative source of `github.owner`/`github.repo`.
+- `quarantine init` becomes a two-phase flow: phase 1 writes a partial config with an empty `github` block and exits 2 with hand-edit instructions; phase 2 (re-run after edit) validates the token, creates `quarantine/state`, and exits 0.
+- `quarantine init` phase 1 emits non-authoritative YAML comments listing detected github.com remotes (e.g., `# origin -> owner/repo`, `# upstream -> owner/repo`) so fork+upstream users see both candidates rather than getting one silently chosen. Comments are ignored by all other code paths.
+- `quarantine run` and `quarantine doctor` exit 2 with `Error [config]:` when `github.owner` or `github.repo` is missing or empty.
+- `quarantine doctor` performs a single `GET /repos/{owner}/{repo}` reachability check; does not inspect git origin, token scopes, or feature flags.
+- Jenkins integration guide added.
+- Amends ADR-013 and ADR-019.
+
+**Acceptance criteria:** See [m20.md](m20.md#acceptance-criteria).
 
 ---
 

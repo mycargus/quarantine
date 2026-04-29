@@ -26,6 +26,7 @@ Each v1 scenario is tagged with the milestone where it first becomes testable.
 | [Quarantine Status](v1/18-quarantine-status.md) | M10 |
 | [Timeout Enforcement](v1/19-timeouts.md) | M10 |
 | [Quarantined Files List](v1/20-quarantined-files.md) | M10 |
+| [Jenkins / Non-GitHub-Origin Support](v1/24-jenkins-non-github-origin.md) | M20 |
 
 ## v2+ Scenarios
 
