@@ -1,18 +1,26 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/mycargus/quarantine/cli/internal/config"
-	"github.com/mycargus/quarantine/cli/internal/git"
 	ghclient "github.com/mycargus/quarantine/cli/internal/github"
 	"github.com/spf13/cobra"
 )
 
-// runDoctor implements the doctor command logic.
+// runDoctor implements the `quarantine doctor` command per ADR-037.
+//
+// Doctor MUST:
+//  1. Read `github.owner` and `github.repo` from `.quarantine/config.yml`
+//     only — it MUST NOT inspect the git origin URL.
+//  2. Make a single `GET /repos/{owner}/{repo}` reachability call.
+//  3. Exit 0 on 200; surface the GitHub status on 4xx and exit 2.
+//  4. NOT introspect `response.permissions` or `response.has_issues` — those
+//     are token-scope diagnostics and out of doctor's scope.
 func runDoctor(cmd *cobra.Command, args []string) error {
 	cfg, err := config.Load(".quarantine/config.yml")
 	if err != nil {
@@ -27,11 +35,6 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Validate test_suites when present.
 	if len(cfg.TestSuites) > 0 {
 		errs = append(errs, config.ValidateSuites(cfg.TestSuites)...)
-	}
-
-	// Check for GitHub token — append warning if missing.
-	if ghclient.ResolveToken() == "" {
-		warns = append(warns, "No GitHub token found in environment. 'quarantine run' will fail unless QUARANTINE_GITHUB_TOKEN or GITHUB_TOKEN is set.")
 	}
 
 	if len(errs) > 0 {
@@ -52,18 +55,6 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	cmd.Printf("quarantine.yml is valid.\n\nResolved configuration:\n")
 	cmd.Printf("  version:         %d\n", cfg.Version)
 	cmd.Printf("  retries:         %d\n", cfg.Retries)
-
-	// github.owner / github.repo — auto-detect if not set from config.
-	var detectedOwner, detectedRepo string
-	if cfg.GitHub.Owner == "" || cfg.GitHub.Repo == "" {
-		if cwd, cwdErr := os.Getwd(); cwdErr == nil {
-			detectedOwner, detectedRepo, _ = git.ParseRemote(cwd)
-		}
-	}
-	owner, repo, ownerNote, repoNote := resolveDisplayOwnerRepo(cfg.GitHub.Owner, cfg.GitHub.Repo, detectedOwner, detectedRepo)
-	cmd.Printf("  github.owner:    %s%s\n", owner, ownerNote)
-	cmd.Printf("  github.repo:     %s%s\n", repo, repoNote)
-
 	cmd.Printf("  issue_tracker:   %s\n", cfg.IssueTracker)
 	cmd.Printf("  labels:          [%s]\n", strings.Join(cfg.Labels, ", "))
 
@@ -85,14 +76,48 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		cmd.Printf("\nWarning: %s contains 'retryTimes'. Framework-level retries hide\nfailures from JUnit XML, preventing quarantine from detecting flaky tests.\nRemove retryTimes before using quarantine.\n", strings.Join(retryHits, ", "))
 	}
 
-	if len(warns) > 0 {
-		cmd.Printf("\nWarnings:\n")
-		for _, w := range warns {
-			cmd.Printf("  - %s\n", w)
-		}
+	// Validate github.owner / github.repo per ADR-037 — required, no auto-detect.
+	if err := validateGitHubFields(cfg); err != nil {
+		cmd.Printf("\n%s\n", err.Error())
+		return exitCodeError(2)
 	}
 
+	// Validate token — surface canonical missing-token error and exit 2.
+	if err := validateGitHubToken(); err != nil {
+		cmd.Printf("\n%s\n", err.Error())
+		return exitCodeError(2)
+	}
+
+	// Single reachability call: GET /repos/{owner}/{repo}.
+	client, err := ghclient.NewClient(cfg.GitHub.Owner, cfg.GitHub.Repo)
+	if err != nil {
+		cmd.Printf("\nError: %v\n", err)
+		return exitCodeError(2)
+	}
+	if _, err := client.GetRepo(context.Background()); err != nil {
+		cmd.Printf("\nError: %v\n", err)
+		return exitCodeError(2)
+	}
+
+	cmd.Printf("\n%s", formatDoctorReachableSummary(cfg.GitHub.Owner, cfg.GitHub.Repo))
+
 	return nil
+}
+
+// formatDoctorReachableSummary returns the M20 success summary printed by
+// `quarantine doctor` after a successful reachability check. Per ADR-037, the
+// summary explicitly notes the owner/repo were read from config (not detected
+// from origin) and that the target is reachable.
+//
+// This is a pure function — no I/O.
+func formatDoctorReachableSummary(owner, repo string) string {
+	return fmt.Sprintf(
+		"github.owner:  %s (from config)\n"+
+			"github.repo:   %s (from config)\n"+
+			"token:         authenticated\n"+
+			"target:        reachable\n",
+		owner, repo,
+	)
 }
 
 // detectRetryTimesInRepo reads known jest config files and top-level test files
@@ -137,24 +162,3 @@ func detectRetryTimesInRepo(configPath string) []string {
 
 	return detectRetryTimes(files)
 }
-
-// resolveDisplayOwnerRepo determines owner/repo display values with annotation notes.
-// This is a pure function — no I/O.
-func resolveDisplayOwnerRepo(cfgOwner, cfgRepo, detectedOwner, detectedRepo string) (owner, repo, ownerNote, repoNote string) {
-	owner, repo = cfgOwner, cfgRepo
-	if owner == "" {
-		owner = detectedOwner
-		if owner != "" {
-			ownerNote = " (auto-detected)"
-		}
-	}
-	if repo == "" {
-		repo = detectedRepo
-		if repo != "" {
-			repoNote = " (auto-detected)"
-		}
-	}
-	return
-}
-
-

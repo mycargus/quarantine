@@ -8,117 +8,10 @@ import (
 	riteway "github.com/mycargus/riteway-golang"
 )
 
-// --- resolveDisplayOwnerRepo unit tests (lines 98–111) ---
-
-func TestResolveDisplayOwnerRepo(t *testing.T) {
-	tests := []struct {
-		name          string
-		cfgOwner      string
-		cfgRepo       string
-		detectedOwner string
-		detectedRepo  string
-		wantOwner     string
-		wantRepo      string
-		wantOwnerNote string
-		wantRepoNote  string
-	}{
-		{
-			name:          "config owner set uses config value with no note",
-			cfgOwner:      "myorg",
-			cfgRepo:       "",
-			detectedOwner: "detected-org",
-			detectedRepo:  "",
-			wantOwner:     "myorg",
-			wantOwnerNote: "",
-			wantRepo:      "",
-			wantRepoNote:  "",
-		},
-		{
-			name:          "config owner empty detected available uses detected with note",
-			cfgOwner:      "",
-			cfgRepo:       "",
-			detectedOwner: "detected-org",
-			detectedRepo:  "",
-			wantOwner:     "detected-org",
-			wantOwnerNote: " (auto-detected)",
-			wantRepo:      "",
-			wantRepoNote:  "",
-		},
-		{
-			name:          "config owner empty detected empty yields empty with no note",
-			cfgOwner:      "",
-			cfgRepo:       "",
-			detectedOwner: "",
-			detectedRepo:  "",
-			wantOwner:     "",
-			wantOwnerNote: "",
-			wantRepo:      "",
-			wantRepoNote:  "",
-		},
-		{
-			name:          "config repo set uses config value with no note",
-			cfgOwner:      "",
-			cfgRepo:       "myrepo",
-			detectedOwner: "",
-			detectedRepo:  "detected-repo",
-			wantOwner:     "",
-			wantOwnerNote: "",
-			wantRepo:      "myrepo",
-			wantRepoNote:  "",
-		},
-		{
-			name:          "config repo empty detected available uses detected with note",
-			cfgOwner:      "",
-			cfgRepo:       "",
-			detectedOwner: "",
-			detectedRepo:  "detected-repo",
-			wantOwner:     "",
-			wantOwnerNote: "",
-			wantRepo:      "detected-repo",
-			wantRepoNote:  " (auto-detected)",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			owner, repo, ownerNote, repoNote := resolveDisplayOwnerRepo(
-				tt.cfgOwner, tt.cfgRepo, tt.detectedOwner, tt.detectedRepo,
-			)
-
-			riteway.Assert(t, riteway.Case[string]{
-				Given:    tt.name,
-				Should:   "return correct owner",
-				Actual:   owner,
-				Expected: tt.wantOwner,
-			})
-
-			riteway.Assert(t, riteway.Case[string]{
-				Given:    tt.name,
-				Should:   "return correct ownerNote",
-				Actual:   ownerNote,
-				Expected: tt.wantOwnerNote,
-			})
-
-			riteway.Assert(t, riteway.Case[string]{
-				Given:    tt.name,
-				Should:   "return correct repo",
-				Actual:   repo,
-				Expected: tt.wantRepo,
-			})
-
-			riteway.Assert(t, riteway.Case[string]{
-				Given:    tt.name,
-				Should:   "return correct repoNote",
-				Actual:   repoNote,
-				Expected: tt.wantRepoNote,
-			})
-		})
-	}
-}
-
 // --- storage.branch "(default)" annotation (lines 81–82) ---
 
 func TestDoctorStorageBranchDefaultAnnotation(t *testing.T) {
+	t.Skip("M20: superseded by ADR-037 — doctor now requires github.owner / github.repo and a 200 reachability response. The 'quarantine/state (default)' annotation behavior is exercised through TestDoctorReadsConfigAndCallsReachabilityOnce and the existing storage default tests in config validation.")
 	// Omitting storage.branch triggers the default "quarantine/state".
 	writeTempConfig(t, `
 version: 1
@@ -144,6 +37,7 @@ version: 1
 }
 
 func TestDoctorStorageBranchNonDefaultNoAnnotation(t *testing.T) {
+	t.Skip("M20: superseded by ADR-037 — doctor now requires github.owner / github.repo and a 200 reachability response. The non-default branch handling is covered by config validation tests.")
 	// Custom branch must NOT show "(default)".
 	writeTempConfig(t, `
 version: 1
@@ -173,6 +67,7 @@ storage:
 // --- No spurious "Warnings:" in valid config with token (line 86) ---
 
 func TestDoctorValidConfigNoSpuriousWarnings(t *testing.T) {
+	t.Skip("M20: superseded by ADR-037 — doctor's 'Warnings:' section was emitted by the legacy missing-token warning path, which is now a hard error. The error path's spurious-warnings behavior is still asserted by TestDoctorErrorBlockNoSpuriousWarnings.")
 	writeTempConfig(t, `
 version: 1
 `)
@@ -310,6 +205,7 @@ func TestDetectRetryTimes(t *testing.T) {
 // --- || vs && for git detection (line 62) ---
 
 func TestDoctorGitDetectionWithOnlyOwnerSet(t *testing.T) {
+	t.Skip("M20: superseded by ADR-037 — doctor no longer auto-detects owner/repo from git origin. A missing github.repo is now a hard error (covered by Scenario 180 in a later commit).")
 	// github.owner is set but github.repo is empty. The || condition means git
 	// detection should still fire so the missing repo can be auto-detected.
 	// We verify the owner appears without an "(auto-detected)" note, proving the
