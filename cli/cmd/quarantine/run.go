@@ -17,7 +17,6 @@ import (
 
 	"github.com/mycargus/quarantine/cli/internal/cas"
 	"github.com/mycargus/quarantine/cli/internal/config"
-	"github.com/mycargus/quarantine/cli/internal/git"
 	gh "github.com/mycargus/quarantine/cli/internal/github"
 	"github.com/mycargus/quarantine/cli/internal/parser"
 	qstate "github.com/mycargus/quarantine/cli/internal/quarantine"
@@ -647,16 +646,12 @@ type branchCheckResult struct {
 	apiErr   error         // non-fatal GetRef error
 }
 
-// resolveOwnerRepo returns the GitHub owner and repo from config, falling back
-// to the git remote in the current working directory.
+// resolveOwnerRepo returns the GitHub owner and repo from config.
+// Per ADR-037, the run command never inspects the git origin URL — only the
+// values in `.quarantine/config.yml` are honored. Init phase 1 may scan
+// origin for hint comments, but no other code path consults it.
 func resolveOwnerRepo(cfg *config.Config) (owner, repo string) {
-	owner, repo = cfg.GitHub.Owner, cfg.GitHub.Repo
-	if owner == "" || repo == "" {
-		if cwd, err := os.Getwd(); err == nil {
-			owner, repo, _ = git.ParseRemote(cwd)
-		}
-	}
-	return owner, repo
+	return cfg.GitHub.Owner, cfg.GitHub.Repo
 }
 
 // checkBranchExists verifies the quarantine/state branch exists via GitHub API.

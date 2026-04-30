@@ -11,9 +11,15 @@ import (
 // --- resolveOwnerRepo: git detection fallback ---
 // Tests verify that git remote detection fires when owner or repo is absent.
 // Kills mutations on the owner == "" || repo == "" condition.
+//
+// Skipped per ADR-037 / Scenario 176: the git-remote fallback is removed from
+// `quarantine run`. Run now reads `github.owner` and `github.repo` solely from
+// `.quarantine/config.yml`. Scenario 177 will tighten partial config to "exit 2
+// immediately" rather than degrading silently.
 
 // TestRunGitDetectionFillsMissingRepo: config has owner but no repo.
 func TestRunGitDetectionFillsMissingRepo(t *testing.T) {
+	t.Skip("ADR-037 / Scenario 176: git-remote fallback removed from `quarantine run`. Partial config is handled by Scenario 177.")
 	dir := t.TempDir()
 	gitInit(t, dir, "git@github.com:mycargus/quarantine.git")
 
@@ -64,6 +70,7 @@ test_suites:
 
 // TestRunGitDetectionFillsMissingOwner: config has repo but no owner.
 func TestRunGitDetectionFillsMissingOwner(t *testing.T) {
+	t.Skip("ADR-037 / Scenario 176: git-remote fallback removed from `quarantine run`. Partial config is handled by Scenario 177.")
 	dir := t.TempDir()
 	gitInit(t, dir, "git@github.com:mycargus/quarantine.git")
 
