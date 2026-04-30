@@ -7,7 +7,6 @@
   "required": [
     "version",
     "suite_name",
-    "cli_mode",
     "run_id",
     "repo",
     "branch",
@@ -66,7 +65,7 @@
     "cli_mode": {
       "type": "string",
       "enum": ["v1", "v2"],
-      "description": "CLI auth mode. 'v1': CLI used QUARANTINE_GITHUB_TOKEN (PAT) and performed all GitHub writes itself. 'v2': CLI used GITHUB_TOKEN (read-only) and writes are deferred to the dashboard via artifact processing."
+      "description": "CLI auth mode. 'v1': CLI used QUARANTINE_GITHUB_TOKEN (PAT) and performed all GitHub writes itself. 'v2': CLI used GITHUB_TOKEN (read-only) and writes are deferred to the dashboard via artifact processing. Optional for backward compatibility with pre-M17 artifacts; the dashboard treats missing values as 'v1' (skip writes — safe default)."
     },
     "cli_version": {
       "type": "string",
