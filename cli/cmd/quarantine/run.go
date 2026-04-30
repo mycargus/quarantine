@@ -86,20 +86,22 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		return exitCodeError(2)
 	}
 
-	check, checkErr := checkBranchExists(cfg)
-	if checkErr != nil {
-		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
-		return checkErr
-	}
+	// checkBranchExists' error path (owner/repo empty) is unreachable here:
+	// validateGitHubFields ran above and exited 2 when either field is empty.
+	check, _ := checkBranchExists(cfg)
 	if check.warnMsg != "" {
 		cmd.PrintErrf("[quarantine] WARNING: %s\n", check.warnMsg)
 	}
-	if !check.skipped && check.apiErr == nil && !check.exists {
-		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
-		return fmt.Errorf("not initialized")
-	}
 
 	ctx := context.Background()
+
+	// Per ADR-038: when the state branch is missing on a first `quarantine run`,
+	// bootstrap it (idempotently) instead of erroring with "not initialized."
+	// 422 (race with another shard) is benign; other failures fall into degraded
+	// mode and the run continues.
+	if !check.skipped && check.apiErr == nil && !check.exists {
+		bootstrapStateBranch(ctx, cmd, cfg)
+	}
 
 	// Create a shared GitHub client.
 	var ghClient *gh.Client
@@ -714,6 +716,66 @@ func checkBranchExists(cfg *config.Config) (branchCheckResult, error) {
 		elapsed:  elapsed,
 		exists:   exists,
 	}, nil
+}
+
+// bootstrapStateBranch creates the `quarantine/state` branch on a first
+// `quarantine run` when the branch does not yet exist (per ADR-038). It mirrors
+// the idempotent flow used by `init` phase 2:
+//
+//  1. GET /repos/{owner}/{repo} — learn the default branch.
+//  2. GET /repos/{owner}/{repo}/git/ref/heads/{default_branch} — fetch its SHA.
+//  3. POST /repos/{owner}/{repo}/git/refs — create `quarantine/state`.
+//
+// On 201 (Created), the function prints
+// `[quarantine] State branch 'quarantine/state' created.` and returns.
+//
+// On 422 (Unprocessable Entity) from CreateRef, the function treats the
+// response as "another shard already created the branch" and returns silently
+// — the run continues normally with no warning.
+//
+// On any other failure (failed GetRepo, failed GetRef, non-422 CreateRef
+// failure, network error), the function emits a `[quarantine] WARNING: Cannot
+// create state branch ...` message and returns. The caller continues, but
+// downstream state operations will degrade because the branch is still missing.
+//
+// This is an I/O orchestrator — pure logic lives in
+// `formatStateBranchCreatedMessage` and `formatStateBranchCreationFailedWarning`.
+func bootstrapStateBranch(ctx context.Context, cmd *cobra.Command, cfg *config.Config) {
+	branch := cfg.Storage.Branch
+	owner, repo := resolveOwnerRepo(cfg)
+
+	// NewClient cannot fail here: validateGitHubToken (called earlier) ensures
+	// a token is present, which is the only reason NewClient returns an error.
+	client, _ := gh.NewClient(owner, repo)
+
+	warn := func(reason string) {
+		cmd.PrintErrf("[quarantine] WARNING: %s\n", formatStateBranchCreationFailedWarning(branch, reason))
+	}
+
+	repoInfo, repoErr := client.GetRepo(ctx)
+	if repoErr != nil {
+		warn(repoErr.Error())
+		return
+	}
+
+	baseSHA, _, refErr := client.GetRef(ctx, repoInfo.DefaultBranch)
+	if refErr != nil {
+		warn(refErr.Error())
+		return
+	}
+
+	createErr := client.CreateRef(ctx, branch, baseSHA)
+	if createErr == nil {
+		cmd.PrintErrf("%s\n", formatStateBranchCreatedMessage(branch))
+		return
+	}
+
+	var apiErr *gh.APIError
+	if errors.As(createErr, &apiErr) && apiErr.StatusCode == http.StatusUnprocessableEntity {
+		// 422 — concurrent shard already created the branch. Continue silently.
+		return
+	}
+	warn(createErr.Error())
 }
 
 // xmlFileExists reports whether a file exists at path (non-glob, exact path).

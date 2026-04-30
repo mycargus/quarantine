@@ -168,9 +168,17 @@ func TestRunTestFailuresExitOne(t *testing.T) {
 	}
 }
 
-// --- Scenario 51 (verbose output): branch not found logs 404 ---
+// --- Scenario 188 / ADR-038: branch missing on first run triggers bootstrap ---
+//
+// Per ADR-038, a 404 on the branch existence check no longer surfaces as
+// "Quarantine is not initialized." The CLI attempts to create the branch.
+// `fakeGitHubAPI` does not implement the bootstrap endpoints (GET /repos,
+// POST /git/refs), so this test exercises the degraded-mode path: a
+// `[quarantine] WARNING:` is emitted and the run continues normally.
+// (The full happy-path bootstrap is covered by Scenario 188 in
+// run_self_bootstrap_test.go.)
 
-func TestRunBranchNotFound(t *testing.T) {
+func TestRunBranchNotFoundFallsIntoDegradedMode(t *testing.T) {
 	dir := t.TempDir()
 	xmlPath := filepath.Join(dir, "junit.xml")
 	scriptPath := writeTestScript(t, dir, "", "", 0)
@@ -187,18 +195,25 @@ func TestRunBranchNotFound(t *testing.T) {
 		"QUARANTINE_GITHUB_API_BASE_URL": server.URL,
 	})
 
+	riteway.Assert(t, riteway.Case[int]{
+		Given:    "the state branch is missing and bootstrap endpoints are unavailable",
+		Should:   "exit with code 0 (degraded mode keeps the build green)",
+		Actual:   extractExitCode(t, err),
+		Expected: 0,
+	})
+
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "quarantine/state branch does not exist (404)",
-		Should:   "return an error",
-		Actual:   err != nil,
+		Given:    "branch creation cannot proceed (mock returns 404 for /repos)",
+		Should:   "emit a [quarantine] WARNING: Cannot create state branch '...'",
+		Actual:   strings.Contains(output, "[quarantine] WARNING: Cannot create state branch 'quarantine/state'"),
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "quarantine/state branch does not exist",
-		Should:   "print 'not initialized' error message",
+		Given:    "ADR-038 replaces the 'not initialized' exit on branch-missing",
+		Should:   "no longer print the legacy 'quarantine init first' error",
 		Actual:   strings.Contains(output, "Run 'quarantine init' first"),
-		Expected: true,
+		Expected: false,
 	})
 }
 

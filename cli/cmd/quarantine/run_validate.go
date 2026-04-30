@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/mycargus/quarantine/cli/internal/config"
 	gh "github.com/mycargus/quarantine/cli/internal/github"
@@ -61,4 +62,26 @@ func formatRunMissingTokenError() string {
 // to that decision.
 func validateGitHubToken() error {
 	return tokenMissingError(gh.ResolveToken())
+}
+
+// formatStateBranchCreatedMessage returns the canonical stderr message printed
+// by `quarantine run` after it has successfully created the state branch on a
+// first invocation (per ADR-038).
+//
+// This is a pure function — no I/O.
+func formatStateBranchCreatedMessage(branch string) string {
+	return fmt.Sprintf("[quarantine] State branch '%s' created.", branch)
+}
+
+// formatStateBranchCreationFailedWarning returns the body of the
+// `[quarantine] WARNING:` printed by `quarantine run` when self-bootstrap
+// branch creation fails for non-benign reasons (403, 5xx, network) and the
+// run continues in degraded mode (per ADR-038).
+//
+// The caller is responsible for prefixing the result with `[quarantine] WARNING: `
+// when emitting it to stderr (matching the existing degraded-mode warning style).
+//
+// This is a pure function — no I/O.
+func formatStateBranchCreationFailedWarning(branch, reason string) string {
+	return fmt.Sprintf("Cannot create state branch '%s': %s. Continuing in degraded mode.", branch, reason)
 }
