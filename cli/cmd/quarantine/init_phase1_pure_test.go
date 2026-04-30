@@ -100,7 +100,7 @@ func TestFormatPartialConfigWithHints(t *testing.T) {
 // --- formatPhase1ExitMessage unit tests ---
 
 func TestFormatPhase1ExitMessageHasErrorPrefix(t *testing.T) {
-	msg := formatPhase1ExitMessage()
+	msg := formatPhase1ExitMessage(true)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "phase 1 exit message",
@@ -111,7 +111,7 @@ func TestFormatPhase1ExitMessageHasErrorPrefix(t *testing.T) {
 }
 
 func TestFormatPhase1ExitMessageInstructsHandEdit(t *testing.T) {
-	msg := formatPhase1ExitMessage()
+	msg := formatPhase1ExitMessage(true)
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "phase 1 exit message",
@@ -123,6 +123,49 @@ func TestFormatPhase1ExitMessageInstructsHandEdit(t *testing.T) {
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "phase 1 exit message",
 		Should:   "instruct the user to re-run 'quarantine init' to complete setup",
+		Actual:   strings.Contains(msg, "Then re-run 'quarantine init' to complete setup."),
+		Expected: true,
+	})
+}
+
+func TestFormatPhase1ExitMessageWithTokenSetOmitsNote(t *testing.T) {
+	msg := formatPhase1ExitMessage(true)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "phase 1 exit message when a GitHub token is set",
+		Should:   "omit the token note (token is already configured)",
+		Actual:   strings.Contains(msg, "Note: You will also need a GitHub token."),
+		Expected: false,
+	})
+}
+
+func TestFormatPhase1ExitMessageWithoutTokenIncludesNote(t *testing.T) {
+	msg := formatPhase1ExitMessage(false)
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "phase 1 exit message when no GitHub token is set",
+		Should:   "include the token note alerting the user it will be required",
+		Actual:   strings.Contains(msg, "Note: You will also need a GitHub token."),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "phase 1 exit message when no GitHub token is set",
+		Should:   "name both env var fallbacks for setting the token",
+		Actual:   strings.Contains(msg, "QUARANTINE_GITHUB_TOKEN") && strings.Contains(msg, "GITHUB_TOKEN"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "phase 1 exit message when no GitHub token is set",
+		Should:   "tell the user the required token scope",
+		Actual:   strings.Contains(msg, "required scope: repo"),
+		Expected: true,
+	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "phase 1 exit message when no GitHub token is set",
+		Should:   "still include the canonical hand-edit instructions",
 		Actual:   strings.Contains(msg, "Then re-run 'quarantine init' to complete setup."),
 		Expected: true,
 	})

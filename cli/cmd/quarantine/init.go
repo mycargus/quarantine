@@ -73,7 +73,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 			cmd.Printf("Error: failed to write .quarantine/.gitignore: %v\n", err)
 			return fmt.Errorf("write gitignore: %w", err)
 		}
-		cmd.Printf("%s", formatPhase1ExitMessage())
+		tokenSet := ghclient.ResolveToken() != ""
+		cmd.Printf("%s", formatPhase1ExitMessage(tokenSet))
 		return exitCodeError(2)
 	}
 
@@ -101,7 +102,7 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 		return exitCodeError(2)
 	}
 	if cfg.GitHub.Owner == "" || cfg.GitHub.Repo == "" {
-		cmd.Printf("%s", formatPhase1ExitMessage())
+		cmd.Printf("%s", formatPhase1ExitMessage(true))
 		return exitCodeError(2)
 	}
 	owner := cfg.GitHub.Owner
@@ -383,9 +384,13 @@ func formatPartialConfig(frameworks []string, hints []git.GitHubRemoteHint) stri
 // formatPhase1ExitMessage returns the user-facing message printed when
 // `quarantine init` phase 1 has written a partial config and the developer
 // must hand-edit `github.owner` and `github.repo` before re-running.
+//
+// When tokenSet is false, the message includes an additional note alerting
+// the user that a GitHub token will also be required before re-running init,
+// so that both problems (missing owner/repo + missing token) surface at once.
 // This is a pure function — no I/O.
-func formatPhase1ExitMessage() string {
-	return `Error [config]: github.owner and github.repo are required.
+func formatPhase1ExitMessage(tokenSet bool) string {
+	msg := `Error [config]: github.owner and github.repo are required.
 .quarantine/config.yml has been created. Edit it to set:
 
   github:
@@ -394,6 +399,13 @@ func formatPhase1ExitMessage() string {
 
 Then re-run 'quarantine init' to complete setup.
 `
+	if !tokenSet {
+		msg += `
+Note: You will also need a GitHub token. Set QUARANTINE_GITHUB_TOKEN or
+GITHUB_TOKEN before re-running init (required scope: repo).
+`
+	}
+	return msg
 }
 
 // joinQuoted returns a comma-separated, double-quoted list of strings for

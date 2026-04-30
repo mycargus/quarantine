@@ -71,7 +71,7 @@ func TestInitPhase1EmitsHintsForForkAndUpstreamGitHubRemotes(t *testing.T) {
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "init phase 1 has finished",
 		Should:   "print the phase-1 hand-edit message to stdout",
-		Actual:   strings.Contains(stdout, formatPhase1ExitMessage()),
+		Actual:   strings.Contains(stdout, formatPhase1ExitMessage(true)),
 		Expected: true,
 	})
 
