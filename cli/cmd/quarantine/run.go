@@ -67,6 +67,15 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 
 	// Check quarantine/state branch exists.
 	cfg.ApplyDefaults()
+
+	// Per ADR-037: fail fast when the config is missing github.owner or
+	// github.repo. This catches the partial config left by `quarantine init`
+	// phase 1 before any test command runs or any GitHub API call is made.
+	if err := validateGitHubFields(cfg); err != nil {
+		cmd.PrintErrln(err.Error())
+		return exitCodeError(2)
+	}
+
 	check, checkErr := checkBranchExists(cfg)
 	if checkErr != nil {
 		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
