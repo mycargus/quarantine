@@ -74,6 +74,12 @@ TypeScript dashboard).
 - Spec updates: error-handling.md (exit 2 for no-token), cli-spec.md (v2
   token resolution, v2 write behavior) — *verified by doc review*
 - Doc updates: CI integration guide with zero-config workflow snippet —
+  must include: (a) artifact naming convention
+  `quarantine-results-<suite>-${{ github.run_id }}` (the dashboard's
+  ingest filter requires the `quarantine-results-` prefix; mismatch causes
+  silent ingestion failure), (b) bot identity change notice (issues/comments
+  show `<app-name>[bot]` in v2 vs PAT owner in v1), (c) note that the
+  dashboard must be running for quarantine to take effect in v2 mode —
   *verified by doc review*
 
 **Scope -- excluded:**
@@ -174,11 +180,15 @@ touch disjoint codebases (Go CLI vs TypeScript dashboard).
   suite-specific marker (`<!-- quarantine:<suite-name> -->`). If `pr_number`
   is null (non-PR build), skip the PR comment step entirely. In v2 mode,
   append a note: `"Note: Quarantine changes take effect on the next CI run,
-  not this one."` (stale-state communication)
+  not this one. The dashboard processes results after this run completes."`
+  (stale-state communication — explains both the what and the why)
 - R-5: Results JSON schema validation -- ensure suite_name, pr_number,
-  commit_sha, branch, cli_mode, and per-test data (retry details, failure
-  messages) are present and sufficient for rendering. When `cli_mode` is
-  `"v1"`, skip all writes (CLI already performed them).
+  commit_sha, branch, and per-test data (retry details, failure messages)
+  are present and sufficient for rendering. `cli_mode` is OPTIONAL in the
+  schema for backward compat with pre-M17 artifacts. Dashboard skip logic:
+  when `cli_mode` is `"v1"` OR missing, skip all writes (CLI already
+  performed them or this is a legacy artifact — safe default). Only when
+  `cli_mode == "v2"` does the dashboard perform writes.
 - SEC-3: App permission parity -- the dashboard's App MUST NOT have permissions
   beyond what the CLI requires (contents:rw, issues:rw, pull-requests:w,
   actions:r). Verify at startup, log warning for excess permissions.
@@ -228,8 +238,9 @@ touch disjoint codebases (Go CLI vs TypeScript dashboard).
 7. When `pr_number` is null (non-PR build), PR comment step is skipped (R-4)
 8. Dashboard uses suite-specific markers and labels (per ADR-032) (R-4)
 9. Results JSON missing required fields -> artifact skipped with warning (R-5)
-10. When `cli_mode` is `"v1"`, dashboard skips all writes (CLI already
-    performed them) (R-5)
+10. When `cli_mode` is `"v1"` OR missing, dashboard skips all writes (CLI
+    already performed them, or pre-M17 legacy artifact — safe default).
+    Only `cli_mode == "v2"` triggers writes. (R-5)
 11. State CAS conflict -> retry with merge (quarantine wins), max 3 retries,
     exponential backoff with jitter (R-4)
 12. Issue creation failure -> logged, state still updated (R-4)
@@ -276,7 +287,8 @@ Unquarantine:
 
 Validation + security:
 - Given artifact with cli_mode = "v1" -> all writes skipped -> R-5
-- Given artifact missing required fields -> artifact skipped with warning -> R-5
+- Given artifact with cli_mode missing (pre-M17 legacy) -> all writes skipped (treated as v1) -> R-5
+- Given artifact missing required fields (other than cli_mode) -> artifact skipped with warning -> R-5
 - Given artifact repo field != download source repo -> artifact rejected -> SEC-11
 - Given artifact with >100,000 test entries -> artifact rejected -> SEC-11
 - Given failure_message containing markdown injection -> sanitized before rendering -> SEC-10
@@ -300,46 +312,111 @@ Validation + security:
 
 ### M19: v2 Server-Side Writes E2E
 
-**Dependencies:** M17 + M18
+**Dependencies:** M17 + M18, plus pre-seeding (see Pre-seeding below)
+
+**Test approach:** M19 spawns the dashboard with `source: github-app` mode
+(using the M16 App credentials) so it discovers and monitors both fixture
+repos via `GET /installation/repositories`. The test then triggers sync
+(via `GET /` like the existing `dashboard-sync.test.js`), reads dashboard
+HTML to confirm ingestion happened, and queries the GitHub API to verify
+write outcomes per fixture.
 
 **Scope -- included:**
-- E2E tests observe **pre-seeded fixture data**: the fixture repo
-  (`mycargus/quarantine-app-test-fixture`) runs CI periodically with
-  deliberately flaky tests. The dashboard has already processed these runs.
-  E2E tests observe the outcomes (state on the state branch, issues,
-  PR comments) without waiting for real-time processing.
+- E2E tests observe **pre-seeded fixture data** from two fixture repos.
+  The App is installed on both, so the dashboard discovers and monitors
+  both via the App installation:
+  - `mycargus/quarantine-app-test-fixture`: v2 workflow (GITHUB_TOKEN only,
+    uploads artifact). Dashboard processes artifacts and performs all writes
+    (state, issues, PR comments) using App installation tokens.
+  - `mycargus/quarantine-test-fixture`: existing v1 workflow (PAT, CLI
+    writes, uploads artifact). Dashboard polls and ingests the artifact
+    but skips writes because `cli_mode: "v1"`.
 - E2E: v2 flow -- observe that the dashboard created state updates, issues,
-  and PR comments for fixture CI runs (App bot identity)
-- E2E: v1 backward compat -- observe that CLI-created issues/comments have
-  PAT owner identity (from fixture runs using QUARANTINE_GITHUB_TOKEN)
-- E2E: CLI exit code correctness -- fixture CI runs in v2 mode exit 0 (all
-  pass) or exit 1 (test failures) regardless of dashboard processing state
+  and PR comments for app-test-fixture runs (App bot identity)
+- E2E: v1 cli_mode skip -- two-part verification:
+  (a) Positive signal — dashboard's project detail page for the v1 fixture
+      shows ingested test runs (proves the dashboard saw the artifact, not
+      that it never reached the repo)
+  (b) Negative signal — zero issues with `creator.type == "Bot"` exist on
+      the v1 fixture; zero PR comments authored by the App bot; all
+      CLI-created issues/comments have `creator.type == "User"`
+- E2E: CLI exit code correctness -- v2 fixture CI runs exit 0 (all pass) or
+  exit 1 (test failures) regardless of dashboard processing state
+
+**Pre-seeding (one-time, before M19 E2E tests are meaningful):**
+1. After M17 CLI is released, both fixture repos' workflows pull `latest`
+   on next daily cron — so `cli_mode` will appear in artifacts produced
+   from that day forward.
+2. Trigger `workflow_dispatch` on both fixture repos to seed at least one
+   M17-era run each. Wait for M18 dashboard to poll and ingest both.
+3. Verify pre-seeding is complete:
+   - `quarantine-app-test-fixture` has at least one issue created by the
+     App bot AND at least one entry in its `quarantine/state` branch
+     authored by the App bot (Git commit author).
+   - `quarantine-test-fixture` has CLI-authored issues/comments only
+     (PAT owner identity), and the dashboard's project page renders test
+     runs for it (proving ingestion happened without writes).
+
+**E2E environment variables:**
+
+| Var | Used for |
+|-----|----------|
+| `QUARANTINE_GITHUB_TOKEN` | PAT with read access to BOTH fixture repos (existing var, scope expanded if needed) |
+| `QUARANTINE_TEST_OWNER` / `QUARANTINE_TEST_REPO` | v1 fixture (existing) |
+| `QUARANTINE_GH_APP_TEST_OWNER` / `QUARANTINE_GH_APP_TEST_REPO` | v2 fixture (M16-defined) |
+| `QUARANTINE_APP_PRIVATE_KEY` / `QUARANTINE_APP_CLIENT_ID` / `QUARANTINE_APP_INSTALLATION_ID` | Dashboard App credentials (M16-defined) — required to spawn dashboard in `source: github-app` mode |
+
+**CI job placement:** M19 tests live in `test/e2e/v2-server-side-writes.test.js`
+and run in the M16-introduced `e2e-app` job (which has App credentials).
+They MUST NOT run in the existing `e2e` job (which lacks App credentials
+and would throw on missing required env vars per the existing E2E pattern).
+Update `test/e2e/.env.example` to document all required vars.
 
 **Scope -- excluded:**
 - CLI or dashboard code changes (those are complete in M17/M18)
 - Webhook-triggered processing (v3)
 - Real-time artifact processing observation (not needed with pre-seeded data)
+- Pre-seeding the fixture data itself — that is an operational step, not a
+  test deliverable
 
 **Acceptance criteria:**
-1. E2E: fixture repo has dashboard-processed v2 runs; state branch contains
-   at least one quarantined test entry written by the dashboard; issues
-   created by the App bot identity (verify `creator.type == "Bot"`); PR
-   comments contain suite-specific `<!-- quarantine:<suite> -->` markers
-   (E2E-1 revised)
-2. E2E: fixture repo has v1 PAT runs; CLI-created issues have PAT owner
-   identity (`creator.type == "User"`); CLI-created comments have PAT owner
-   identity (backward compat)
-3. E2E: fixture repo v2 CI workflow runs completed with expected conclusion
-   (`success` for exit 0, `failure` for exit 1) regardless of dashboard
-   processing state; verified via `GET /repos/.../actions/runs` API
-4. E2E: `make e2e-test` passes (existing E2E tests unbroken)
+1. E2E: at least one recent v2 run on `quarantine-app-test-fixture` has
+   produced dashboard-written artifacts:
+   - State branch: at least one commit on `quarantine/state` authored by
+     the App bot (Git commit author email contains `[bot]`); per-suite
+     state file at `.quarantine/<suite>/state.json` contains at least one
+     quarantined test entry
+   - Issues: at least one open issue with `quarantine` label has
+     `creator.type == "Bot"` and `creator.login` matches the App's bot
+     name (e.g., `quarantine-ci[bot]`)
+   - PR comments: at least one comment on the v2 fixture's PR proxy has
+     `<!-- quarantine:<suite> -->` marker AND `user.type == "Bot"`
+2. E2E: `quarantine-test-fixture` (v1) verification (cli_mode skip):
+   - Dashboard ingestion confirmed: `GET /projects/{v1_owner}/{v1_repo}` on
+     a freshly-spawned dashboard renders the "Showing X of Y quarantined
+     tests" phrase with non-zero values (proves the artifact was ingested
+     into SQLite — dashboard saw it)
+   - Skip confirmed: ZERO open or closed issues on the v1 fixture have
+     `creator.type == "Bot"` (all are `creator.type == "User"`)
+   - Skip confirmed: ZERO comments on the v1 fixture's PR proxy have
+     `user.type == "Bot"`
+3. E2E: at least one recent v2 workflow run on `quarantine-app-test-fixture`
+   has `conclusion == "success"` (proves quarantine exclusion worked when
+   dashboard-written state was applied); workflow conclusion is independent
+   of dashboard processing state (verified via `GET /repos/.../actions/runs`)
+4. E2E: existing `make e2e-test` (v1 fixture, single-token tests) continues
+   to pass; new tests live under the `e2e-app` job and are gated by App
+   credential env vars
 
 **Spec references:**
 
 | What | Reference |
 |------|-----------|
 | E2E test conventions | test/e2e/README.md |
+| Existing dashboard E2E pattern | test/e2e/dashboard-sync.test.js |
 | Test strategy | test-strategy.md#test-layers |
+| M16 App credential setup | docs/milestones/m16.md |
+| GITHUB_APP_SETUP.md | App installation on both fixtures |
 
 ## Spec updates required
 
@@ -375,6 +452,37 @@ Validation + security:
   The CLI handles a missing state branch by running all tests (R-6).
 
 ## Review summary
+
+### Re-review 3 (2026-04-22) — M19 E2E scrutiny
+
+| Reviewer | Verdict | Blockers | Observations |
+|----------|---------|----------|--------------|
+| Acceptance test | needs-revision -> addressed | 4 | 5 |
+| Architecture | approve | 0 | 5 |
+| UX | approve | 0 | 5 |
+| Security | approve | 0 | 5 |
+
+Blockers addressed:
+- M19 AC#2 negative-assertion strategy: now uses two-part verification
+  (positive ingestion signal via dashboard project page rendering, plus
+  negative GitHub API checks for `creator.type == "Bot"` count == 0)
+- Pre-M17 artifact handling: schema makes `cli_mode` optional; dashboard
+  treats missing as v1 (skip writes — safe default). M18 AC#10 and
+  scenarios updated.
+- M19 env vars: explicit table added. Reuses M16 vars
+  (`QUARANTINE_GH_APP_TEST_OWNER`/`REPO`) for the v2 fixture.
+- M19 PAT scope: documented requirement that `QUARANTINE_GITHUB_TOKEN`
+  has read access to BOTH fixture repos.
+
+Observations addressed:
+- M19 AC#1: state branch attribution via Git commit author check spelled out
+- M19 AC#3: clarified expectation (at least one recent run with
+  `conclusion == "success"`)
+- M19 manifest: `make e2e-app-test` reference clarified (M16 prerequisite)
+- Pre-seeding checklist added to M19 scope
+- Stale-state PR comment wording expanded with "why" clause
+- M17 scope: bot identity change documented for CI integration guide
+- M17 scope: artifact naming convention (`quarantine-results-<suite>-<run_id>`) precision noted
 
 ### Re-review 2 (2026-04-20)
 
