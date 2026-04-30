@@ -354,3 +354,155 @@ choice is explicit and version-controlled.
 If `git remote -v` fails (not a git repo, command unavailable, etc.) or no
 remotes are github.com URLs, init proceeds with the empty `github` block
 and no hint comments — Scenario 174's behavior.
+
+---
+
+### Scenario 185: quarantine init — phase 1 with single github.com remote (one hint) [M20]
+
+**Risk:** The one-hint case (origin is github.com, no upstream) is the most
+common developer path. If the hint logic silently produces zero hints or two
+hints when there is exactly one github.com remote, the user gets incorrect
+guidance at first setup.
+
+**Given** a developer is working in a git repository with no
+`.quarantine/config.yml`
+**And** `git remote -v` returns exactly one github.com remote:
+```
+origin    https://github.com/my-org/my-project.git (fetch)
+origin    https://github.com/my-org/my-project.git (push)
+```
+**And** `QUARANTINE_GITHUB_TOKEN` is set
+
+**When** the developer runs `quarantine init`
+
+**Then** the CLI:
+1. Writes `.quarantine/config.yml` with empty `github.owner` and `github.repo`
+   and exactly one hint comment for the detected remote:
+   ```yaml
+   github:
+     owner: # set to your GitHub organization or user
+     repo:  # set to your GitHub repository name
+     # detected GitHub remotes (review before using):
+     #   origin -> my-org/my-project
+   ```
+2. Does NOT pre-fill `github.owner` or `github.repo`.
+3. Exits with code 2 and the same hand-edit instructions as Scenario 174.
+
+---
+
+### Scenario 186: quarantine init — phase 1 with no GitHub token set [M20]
+
+**Risk:** If phase 1 requires a token (as init previously did), a developer
+running `quarantine init` for the first time in a Jenkins environment — before
+they have set up `QUARANTINE_GITHUB_TOKEN` — gets a "no token" error and no
+partial config is written. The user has two problems to fix but gets no config
+scaffold to work from.
+
+**Given** a developer is working in a git repository with no
+`.quarantine/config.yml`
+**And** neither `QUARANTINE_GITHUB_TOKEN` nor `GITHUB_TOKEN` is set
+
+**When** the developer runs `quarantine init`
+
+**Then** the CLI:
+1. Detects test frameworks and scans `git remote -v` for github.com hints
+   (best-effort, same as Scenario 174).
+2. Writes `.quarantine/config.yml` with the empty `github` block and any
+   detected hints (same as Scenario 174) — the missing token does NOT prevent
+   the partial config from being written.
+3. Prints the hand-edit instructions (same as Scenario 174) **plus** a note
+   that a GitHub token will be required on the next run:
+   ```
+   Error [config]: github.owner and github.repo are required.
+   .quarantine/config.yml has been created. Edit it to set:
+
+     github:
+       owner: <your-github-org-or-user>
+       repo:  <your-github-repo-name>
+
+   Then re-run 'quarantine init' to complete setup.
+
+   Note: You will also need a GitHub token. Set QUARANTINE_GITHUB_TOKEN or
+   GITHUB_TOKEN before re-running init (required scope: repo).
+   ```
+4. Exits with code 2.
+
+Phase 1 never talks to the GitHub API, so no token is needed to write the
+partial config. Token validation is deferred to phase 2.
+
+---
+
+### Scenario 187: quarantine init — re-run on partial config with owner/repo still empty [M20]
+
+**Risk:** A developer who ran `quarantine init` (phase 1) but has not yet
+hand-edited the config re-runs init accidentally. Init should not overwrite the
+partial config (which may have been partially edited), and should give the same
+clear hand-edit instructions rather than silently no-op or create a confusing
+error.
+
+**Given** `.quarantine/config.yml` exists from a prior `quarantine init` but
+`github.owner` and `github.repo` are still empty (the user has not yet
+hand-edited the file)
+**And** `QUARANTINE_GITHUB_TOKEN` is set
+
+**When** the developer runs `quarantine init` again
+
+**Then** the CLI:
+1. Reads the existing `.quarantine/config.yml`.
+2. Detects that `github.owner` and `github.repo` are missing or empty.
+3. Does NOT overwrite the existing config file.
+4. Prints the same hand-edit instructions as Scenario 174:
+   ```
+   Error [config]: github.owner and github.repo are required.
+   .quarantine/config.yml has been created. Edit it to set:
+
+     github:
+       owner: <your-github-org-or-user>
+       repo:  <your-github-repo-name>
+
+   Then re-run 'quarantine init' to complete setup.
+   ```
+5. Exits with code 2.
+
+The existing config is preserved intact. Any partial edits the user has made
+are not lost.
+
+---
+
+### Scenario 188: quarantine run — creates state branch on first invocation when missing [M20]
+
+**Risk:** A developer who has completed phase 1 of init (config written,
+`github.owner`/`github.repo` set) but skipped phase 2 cannot run their first
+CI build — `quarantine run` fails with "Quarantine is not initialized" and
+there is no obvious unblocking step short of running `quarantine init` again.
+This is especially painful in Jenkins environments where the developer may not
+have repo write access on their laptop.
+
+**Given** `.quarantine/config.yml` has valid `github.owner: my-org` and
+`github.repo: my-project`
+**And** `QUARANTINE_GITHUB_TOKEN` is set
+**And** the `quarantine/state` branch does NOT exist on `my-org/my-project`
+
+**When** Jenkins runs `quarantine run backend`
+
+**Then** the CLI:
+1. Reads owner/repo from config, detects the missing branch.
+2. Fetches the default branch HEAD SHA via
+   `GET /repos/my-org/my-project/git/ref/heads/{default_branch}`.
+3. Creates the `quarantine/state` branch via
+   `POST /repos/my-org/my-project/git/refs`.
+4. Prints to stderr: `[quarantine] State branch 'quarantine/state' created.`
+5. Continues the run normally — loads empty quarantine state, executes the
+   suite, parses JUnit XML, writes state, creates issues, writes results.json.
+6. Exits with the appropriate code (0 = pass, 1 = genuine failures,
+   2 = quarantine error).
+
+**Concurrent-run robustness:** if two CI shards run simultaneously before the
+branch exists, the second attempt receives a 422 from GitHub. `run` treats 422
+as "branch already exists" and continues normally. Neither shard is blocked.
+
+**Branch creation failure (degraded mode):** if branch creation fails (403
+token lacks write scope, 5xx, network error), `run` emits
+`[quarantine] WARNING: Cannot create state branch 'quarantine/state': <reason>. Continuing in degraded mode.`
+and proceeds without quarantine awareness. The build is never broken by branch
+creation failure.
