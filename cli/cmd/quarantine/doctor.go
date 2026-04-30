@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -95,7 +96,12 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		return exitCodeError(2)
 	}
 	if _, err := client.GetRepo(context.Background()); err != nil {
-		cmd.Printf("\nError: %v\n", err)
+		var apiErr *ghclient.APIError
+		if errors.As(err, &apiErr) {
+			cmd.Printf("\n%s\n", formatDoctorUnreachableError(cfg.GitHub.Owner, cfg.GitHub.Repo, apiErr.StatusCode))
+		} else {
+			cmd.Printf("\nError: %v\n", err)
+		}
 		return exitCodeError(2)
 	}
 
@@ -117,6 +123,25 @@ func formatDoctorReachableSummary(owner, repo string) string {
 			"token:         authenticated\n"+
 			"target:        reachable\n",
 		owner, repo,
+	)
+}
+
+// formatDoctorUnreachableError returns the canonical user-facing 4xx error
+// block printed by `quarantine doctor` when `GET /repos/{owner}/{repo}` fails
+// with a 4xx status (401, 403, or 404). Per Scenario 181 / ADR-037, GitHub
+// does not distinguish "repo missing" from "token cannot see it", so the
+// message guides the developer to check both `github.owner` / `github.repo`
+// and `QUARANTINE_GITHUB_TOKEN`.
+//
+// This is a pure function — no I/O.
+func formatDoctorUnreachableError(owner, repo string, statusCode int) string {
+	return fmt.Sprintf(
+		"Error: Cannot reach %s/%s on GitHub (%d).\n"+
+			"Either the repository does not exist or the configured token does not\n"+
+			"have access to it. Verify github.owner and github.repo in\n"+
+			".quarantine/config.yml, and confirm QUARANTINE_GITHUB_TOKEN has access\n"+
+			"to the repository.",
+		owner, repo, statusCode,
 	)
 }
 
