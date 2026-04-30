@@ -86,7 +86,7 @@ Project skills (invoke with `/skill-name`):
 Do not expand without discussion:
 
 - **v1 frameworks:** RSpec, Jest, Vitest only (ADR-016)
-- **v1 CI:** GitHub Actions only for full features
+- **v1 CI:** Full features (PR comments, dashboard ingestion) require GitHub Actions; core CLI (state CAS, issue create/dedup, JUnit parsing, retries, results.json) works on any CI runner with `QUARANTINE_GITHUB_TOKEN` and network access to GitHub
 - **v1 tickets:** GitHub Issues only (no Jira)
 - **v1 auth:** PAT via `QUARANTINE_GITHUB_TOKEN` (falls back to `GITHUB_TOKEN`)
 - **No auto-healing (ADR-017).** Unquarantine only when a human closes the Issue.

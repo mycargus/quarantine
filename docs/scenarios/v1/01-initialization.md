@@ -227,7 +227,13 @@ Exits with code 2.
 
 ---
 
-### Scenario 9: quarantine init with non-GitHub remote [M1]
+### Scenario 9: quarantine init with non-GitHub remote [M1] — SUPERSEDED BY M20
+
+> **Superseded by M20 / [ADR-037](../../adr/037-relax-origin-host-constraint.md).**
+> The git origin host is no longer required to be `github.com`. `quarantine
+> init` ignores the origin URL entirely (except for best-effort hint comments
+> in phase 1). See [Scenario 174](v1/24-jenkins-non-github-origin.md#scenario-174-quarantine-init--first-run-writes-partial-config-exits-2-m20)
+> for the M20 replacement behavior.
 
 **Risk:** A non-GitHub remote URL is misinterpreted as GitHub, causing the CLI to target the wrong repository or fail with a misleading error.
 
