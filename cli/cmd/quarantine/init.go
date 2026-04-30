@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mycargus/quarantine/cli/internal/config"
 	"github.com/mycargus/quarantine/cli/internal/detect"
 	"github.com/mycargus/quarantine/cli/internal/git"
 	ghclient "github.com/mycargus/quarantine/cli/internal/github"
@@ -76,10 +77,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return exitCodeError(2)
 	}
 
-	// Phase 2 (config exists): validate token and complete GitHub-side setup.
-	// NOTE: This branch retains the legacy origin-driven flow; the M20 work
-	// item that moves owner/repo resolution to config (Scenario 175) replaces
-	// it. Phase 2 is unreachable from any test in the current scenario.
+	// Phase 2 (config exists): read owner/repo from config (NOT git origin),
+	// validate token, create the quarantine/state branch (idempotent), exit 0.
 
 	// Step 3: Validate GitHub token.
 	token := ghclient.ResolveToken()
@@ -94,13 +93,19 @@ Required token scope: repo (read/write contents, create issues, post PR comments
 		return fmt.Errorf("no GitHub token")
 	}
 
-	// Step 5: Detect owner/repo from git remote.
-
-	owner, repo, err := git.ParseRemote(cwd)
+	// Step 5: Read owner/repo from .quarantine/config.yml. Per ADR-037, the
+	// CLI MUST NOT inspect the git origin URL in phase 2.
+	cfg, err := config.Load(".quarantine/config.yml")
 	if err != nil {
-		cmd.Printf("%s\n", classifyGitRemoteError(err))
-		return fmt.Errorf("git remote: %w", err)
+		cmd.Printf("Error [config]: failed to read .quarantine/config.yml: %v\n", err)
+		return exitCodeError(2)
 	}
+	if cfg.GitHub.Owner == "" || cfg.GitHub.Repo == "" {
+		cmd.Printf("%s", formatPhase1ExitMessage())
+		return exitCodeError(2)
+	}
+	owner := cfg.GitHub.Owner
+	repo := cfg.GitHub.Repo
 
 	// Step 6: Create GitHub client and validate token.
 	client, err := ghclient.NewClient(owner, repo)
@@ -203,15 +208,28 @@ Do not edit files on this branch manually.
 
 	cmd.Printf("GitHub token validated.\n")
 
-	if configSkipped && gitignoreSkipped && branchExists {
-		cmd.Printf("\n%s", formatAlreadyInitializedSummary())
-	} else if recoveryMode {
-		cmd.Printf("\n%s", formatRecoverySummary())
-	} else {
-		cmd.Printf("%s", formatInitSummary(owner, repo, frameworks, branchExists))
-	}
+	cmd.Printf("%s", formatPhase2Summary(owner, repo, branchExists))
 
 	return nil
+}
+
+// formatPhase2Summary returns the M20 phase-2 setup-complete summary printed
+// when `quarantine init` re-runs against an existing `.quarantine/config.yml`
+// with valid `github.owner` and `github.repo`. The branch parenthetical is
+// "created" when init created `quarantine/state` and "already exists" when
+// the branch was already present (idempotent re-run, NFR-2.2.4).
+// This is a pure function — no I/O.
+func formatPhase2Summary(owner, repo string, branchExists bool) string {
+	branchStatus := "created"
+	if branchExists {
+		branchStatus = "already exists"
+	}
+	return fmt.Sprintf(`
+Quarantine initialized.
+  github.owner:  %s (from config)
+  github.repo:   %s (from config)
+  Branch:        quarantine/state (%s)
+`, owner, repo, branchStatus)
 }
 
 // buildSuiteEntry returns the default SuiteEntry for a given framework name.
@@ -399,49 +417,11 @@ func formatQuarantineGitignore() string {
 `
 }
 
-// formatAlreadyInitializedSummary returns the output when all quarantine
-// artifacts already exist and no changes were made.
-// This is a pure function — no I/O.
-func formatAlreadyInitializedSummary() string {
-	return "Quarantine is already initialized. Edit .quarantine/config.yml to add test suites.\n"
-}
-
 // isRecoveryMode returns true when config and .gitignore were already present
 // but the quarantine/state branch did not exist — indicating a recovery scenario.
 // This is a pure function — no I/O.
 func isRecoveryMode(configSkipped, gitignoreSkipped, branchExists bool) bool {
 	return configSkipped && gitignoreSkipped && !branchExists
-}
-
-// formatRecoverySummary returns the output when the quarantine/state branch was
-// recreated because it was missing while config and .gitignore already existed.
-// This is a pure function — no I/O.
-func formatRecoverySummary() string {
-	return `Quarantine recovered. The state branch has been recreated.
-Previous quarantine state was on the deleted branch and is not recoverable.
-`
-}
-
-// formatInitSummary returns the success output for quarantine init.
-// This is a pure function — no I/O.
-func formatInitSummary(owner, repo string, frameworks []string, branchExists bool) string {
-	branchStatus := "created"
-	if branchExists {
-		branchStatus = "already exists"
-	}
-	var nextStep string
-	if len(frameworks) == 0 {
-		nextStep = "Next step: edit .quarantine/config.yml to add your test suites,\nthen run `quarantine doctor` to validate."
-	} else {
-		nextStep = "Next step: review .quarantine/config.yml, adjust suite names and commands,\nthen run `quarantine doctor` to validate."
-	}
-	return fmt.Sprintf(`
-Quarantine initialized.
-  Config:   .quarantine/config.yml (created)
-  Branch:   quarantine/state (%s)
-
-%s
-`, branchStatus, nextStep)
 }
 
 // classifyGitHubError returns a user-facing error message for a GitHub API failure.

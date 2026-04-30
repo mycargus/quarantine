@@ -7,66 +7,23 @@ import (
 	riteway "github.com/mycargus/riteway-golang"
 )
 
-// --- formatInitSummary unit tests ---
+// --- formatPhase2Summary unit tests ---
 
-func TestFormatInitSummaryNewBranch(t *testing.T) {
-	summary := formatInitSummary("my-org", "my-repo", []string{"jest"}, false)
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "jest detected, new branch",
-		Should:   "show config path",
-		Actual:   strings.Contains(summary, ".quarantine/config.yml (created)"),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "jest detected, new branch",
-		Should:   "show branch as created",
-		Actual:   strings.Contains(summary, "quarantine/state (created)"),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "jest detected, new branch",
-		Should:   "contain quarantine doctor next step",
-		Actual:   strings.Contains(summary, "quarantine doctor"),
-		Expected: true,
+func TestFormatPhase2SummaryNewBranch(t *testing.T) {
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "phase 2 with newly created quarantine/state branch",
+		Should:   "render the M20 setup-complete summary with all owner/repo/branch lines",
+		Actual:   formatPhase2Summary("my-org", "my-project", false),
+		Expected: "\nQuarantine initialized.\n  github.owner:  my-org (from config)\n  github.repo:   my-project (from config)\n  Branch:        quarantine/state (created)\n",
 	})
 }
 
-func TestFormatInitSummaryExistingBranch(t *testing.T) {
-	summary := formatInitSummary("my-org", "my-repo", []string{"rspec"}, true)
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "rspec detected, existing branch",
-		Should:   "show branch as already exists",
-		Actual:   strings.Contains(summary, "quarantine/state (already exists)"),
-		Expected: true,
-	})
-}
-
-func TestFormatInitSummaryNoFrameworks(t *testing.T) {
-	summary := formatInitSummary("my-org", "my-repo", []string{}, false)
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "no frameworks detected, new branch",
-		Should:   "show config path as created",
-		Actual:   strings.Contains(summary, ".quarantine/config.yml (created)"),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "no frameworks detected",
-		Should:   "contain 'edit' next-step text (not 'review')",
-		Actual:   strings.Contains(summary, "edit .quarantine/config.yml"),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "no frameworks detected",
-		Should:   "not contain 'adjust suite names' review text",
-		Actual:   !strings.Contains(summary, "adjust suite names"),
-		Expected: true,
+func TestFormatPhase2SummaryExistingBranch(t *testing.T) {
+	riteway.Assert(t, riteway.Case[string]{
+		Given:    "phase 2 with quarantine/state branch already present (idempotent re-run)",
+		Should:   "render the M20 setup-complete summary with branch noted as 'already exists'",
+		Actual:   formatPhase2Summary("my-org", "my-project", true),
+		Expected: "\nQuarantine initialized.\n  github.owner:  my-org (from config)\n  github.repo:   my-project (from config)\n  Branch:        quarantine/state (already exists)\n",
 	})
 }
 
@@ -152,6 +109,13 @@ func TestFormatInitConfigJestAndRSpec(t *testing.T) {
 		Actual:   strings.Contains(cfg, "name: rspec"),
 		Expected: true,
 	})
+
+	riteway.Assert(t, riteway.Case[bool]{
+		Given:    "frameworks slice was [jest, rspec]",
+		Should:   "render jest before rspec (preserve input order)",
+		Actual:   strings.Index(cfg, "name: jest") < strings.Index(cfg, "name: rspec"),
+		Expected: true,
+	})
 }
 
 // --- joinQuoted unit tests ---
@@ -231,35 +195,39 @@ func TestFormatNoFrameworkConfigContainsCommentedExample(t *testing.T) {
 
 	riteway.Assert(t, riteway.Case[bool]{
 		Given:    "no frameworks detected",
-		Should:   "not contain a real suite name entry (only comments)",
-		Actual:   !strings.Contains(cfg, "\n  - name:"),
+		Should:   "include suite-entry markers only inside commented examples",
+		Actual:   uncommentedSuiteEntryCount(cfg) == 0,
 		Expected: true,
 	})
+}
+
+// uncommentedSuiteEntryCount counts lines that look like a live YAML suite
+// entry (`- name:` after optional whitespace, NOT preceded by a `#` on the
+// same line). This is a structural check that survives indentation changes
+// in the formatter — it asserts the rule "no live suites under test_suites"
+// independently of how many spaces the formatter uses.
+// This is a pure function — no I/O.
+func uncommentedSuiteEntryCount(cfg string) int {
+	count := 0
+	for _, line := range strings.Split(cfg, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "- name:") {
+			count++
+		}
+	}
+	return count
 }
 
 // --- formatQuarantineGitignore unit tests ---
 
 func TestFormatQuarantineGitignore(t *testing.T) {
-	content := formatQuarantineGitignore()
-
-	riteway.Assert(t, riteway.Case[bool]{
+	riteway.Assert(t, riteway.Case[string]{
 		Given:    "formatQuarantineGitignore called",
-		Should:   "contain wildcard ignore rule",
-		Actual:   strings.Contains(content, "*"),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "formatQuarantineGitignore called",
-		Should:   "contain !config.yml exception",
-		Actual:   strings.Contains(content, "!config.yml"),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "formatQuarantineGitignore called",
-		Should:   "contain !.gitignore exception",
-		Actual:   strings.Contains(content, "!.gitignore"),
-		Expected: true,
+		Should:   "return the .quarantine/.gitignore body that ignores all runtime files except config.yml and .gitignore",
+		Actual:   formatQuarantineGitignore(),
+		Expected: "# Ignore all runtime files. Only config.yml is source-controlled.\n*\n!.gitignore\n!config.yml\n",
 	})
 }
