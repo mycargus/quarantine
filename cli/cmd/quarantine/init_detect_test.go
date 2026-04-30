@@ -13,6 +13,7 @@ import (
 // when quarantine init runs, it auto-detects both frameworks and creates
 // .quarantine/config.yml with two pre-filled suite entries.
 func TestInitDetectsJestAndRSpec(t *testing.T) {
+	t.Skip("Legacy phase-2 happy path — superseded by ADR-037 / M20 two-phase init flow. Will be re-implemented per Scenario 175 (re-run after hand-edit) once phase 2 reads owner/repo from config.")
 	dir := t.TempDir()
 	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
 

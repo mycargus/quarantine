@@ -21,10 +21,18 @@ func fileExists(path string) bool {
 }
 
 // runInit implements the `quarantine init` command.
-// It auto-detects test frameworks from package.json and Gemfile,
-// creates .quarantine/config.yml with per-suite entries (if not already present),
-// creates .quarantine/.gitignore (if not already present), and sets up the
-// quarantine/state branch. Re-running is safe — existing artifacts are skipped.
+//
+// Per ADR-037, init is a two-phase flow:
+//
+//   - Phase 1 (config does not yet exist): detect frameworks, scan
+//     `git remote -v` for advisory github.com hints, write a partial
+//     `.quarantine/config.yml` with an empty `github` block plus hint comments,
+//     write `.quarantine/.gitignore`, print hand-edit instructions, and exit 2.
+//     Phase 1 makes no GitHub API call and does not require a token.
+//
+//   - Phase 2 (config exists with non-empty `github.owner` and `github.repo`):
+//     validate the GitHub token, create the `quarantine/state` branch
+//     (idempotent), and exit 0.
 func runInit(cmd *cobra.Command, args []string) error {
 	cmd.SetOut(cmd.OutOrStdout())
 
@@ -44,6 +52,34 @@ func runInit(cmd *cobra.Command, args []string) error {
 	} else {
 		cmd.Printf("Detected test frameworks: %s\n", strings.Join(frameworks, ", "))
 	}
+
+	// Phase 1: no .quarantine/config.yml yet — write a partial config with an
+	// empty github block (and any github.com remote hints), print hand-edit
+	// instructions, and exit 2. Phase 1 makes no GitHub API call.
+	if !fileExists(".quarantine/config.yml") {
+		hints := git.ScanGitHubRemotes(cwd)
+		if err := os.MkdirAll(".quarantine", 0755); err != nil {
+			cmd.Printf("Error: failed to create .quarantine directory: %v\n", err)
+			return fmt.Errorf("mkdir .quarantine: %w", err)
+		}
+		configContent := formatPartialConfig(frameworks, hints)
+		if err := os.WriteFile(".quarantine/config.yml", []byte(configContent), 0644); err != nil {
+			cmd.Printf("Error: failed to write .quarantine/config.yml: %v\n", err)
+			return fmt.Errorf("write config: %w", err)
+		}
+		gitignoreContent := formatQuarantineGitignore()
+		if err := os.WriteFile(".quarantine/.gitignore", []byte(gitignoreContent), 0644); err != nil {
+			cmd.Printf("Error: failed to write .quarantine/.gitignore: %v\n", err)
+			return fmt.Errorf("write gitignore: %w", err)
+		}
+		cmd.Printf("%s", formatPhase1ExitMessage())
+		return exitCodeError(2)
+	}
+
+	// Phase 2 (config exists): validate token and complete GitHub-side setup.
+	// NOTE: This branch retains the legacy origin-driven flow; the M20 work
+	// item that moves owner/repo resolution to config (Scenario 175) replaces
+	// it. Phase 2 is unreachable from any test in the current scenario.
 
 	// Step 3: Validate GitHub token.
 	token := ghclient.ResolveToken()
@@ -276,6 +312,70 @@ test_suites:
   #   rerun_command: ["npx", "jest", "--testNamePattern", "{name}"]
   #   retries: 3
 `, owner, repo)
+}
+
+// formatPartialConfig generates the content of `.quarantine/config.yml` for
+// `quarantine init` phase 1. It emits an empty `github` block with placeholder
+// comments, optional github.com hint comments, and the same `test_suites`
+// entries (or commented example) used by the legacy formatters.
+// This is a pure function — no I/O.
+func formatPartialConfig(frameworks []string, hints []git.GitHubRemoteHint) string {
+	var b strings.Builder
+	b.WriteString("version: 1\n\n")
+	b.WriteString("github:\n")
+	b.WriteString("  owner: # set to your GitHub organization or user\n")
+	b.WriteString("  repo:  # set to your GitHub repository name\n")
+	if len(hints) > 0 {
+		b.WriteString("  # detected GitHub remotes (review before using):\n")
+		for _, h := range hints {
+			fmt.Fprintf(&b, "  #   %s -> %s/%s\n", h.Name, h.Owner, h.Repo)
+		}
+	}
+	b.WriteString("\n")
+	b.WriteString("issue_tracker: github\n")
+	b.WriteString("labels:\n")
+	b.WriteString("  - quarantine\n")
+	b.WriteString("notifications:\n")
+	b.WriteString("  github_pr_comment: true\n")
+	b.WriteString("storage:\n")
+	b.WriteString("  branch: quarantine/state\n\n")
+	b.WriteString("test_suites:\n")
+	if len(frameworks) == 0 {
+		b.WriteString("  # Add your test suites here. Example:\n")
+		b.WriteString("  # - name: unit\n")
+		b.WriteString("  #   command: [\"npm\", \"test\"]\n")
+		b.WriteString("  #   junitxml: \"junit.xml\"\n")
+		b.WriteString("  #   rerun_command: [\"npx\", \"jest\", \"--testNamePattern\", \"{name}\"]\n")
+		b.WriteString("  #   retries: 3\n")
+		return b.String()
+	}
+	for _, fw := range frameworks {
+		entry := buildSuiteEntry(fw)
+		cmdParts := entry["command"].([]string)
+		rerun := entry["rerun_command"].([]string)
+		fmt.Fprintf(&b, "  - name: %s\n", entry["name"])
+		fmt.Fprintf(&b, "    command: [%s]\n", joinQuoted(cmdParts))
+		fmt.Fprintf(&b, "    junitxml: %q\n", entry["junitxml"])
+		fmt.Fprintf(&b, "    rerun_command: [%s]\n", joinQuoted(rerun))
+		fmt.Fprintf(&b, "    retries: %d\n", entry["retries"])
+	}
+	return b.String()
+}
+
+// formatPhase1ExitMessage returns the user-facing message printed when
+// `quarantine init` phase 1 has written a partial config and the developer
+// must hand-edit `github.owner` and `github.repo` before re-running.
+// This is a pure function — no I/O.
+func formatPhase1ExitMessage() string {
+	return `Error [config]: github.owner and github.repo are required.
+.quarantine/config.yml has been created. Edit it to set:
+
+  github:
+    owner: <your-github-org-or-user>
+    repo:  <your-github-repo-name>
+
+Then re-run 'quarantine init' to complete setup.
+`
 }
 
 // joinQuoted returns a comma-separated, double-quoted list of strings for

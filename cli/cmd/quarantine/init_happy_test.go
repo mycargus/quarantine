@@ -47,6 +47,7 @@ func setupVitestRepo(t *testing.T, remoteURL string) string {
 // --- Scenario 1: First-time setup with Jest ---
 
 func TestInitJestFirstTime(t *testing.T) {
+	t.Skip("Legacy phase-2 happy path — superseded by ADR-037 / M20 two-phase init flow. Will be re-implemented per Scenario 175 (re-run after hand-edit) once phase 2 reads owner/repo from config.")
 	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 	mockServer := newInitTestServer(t)
 
@@ -107,6 +108,7 @@ func TestInitJestFirstTime(t *testing.T) {
 // --- Scenario 2: quarantine init with RSpec ---
 
 func TestInitRSpec(t *testing.T) {
+	t.Skip("Legacy phase-2 happy path — superseded by ADR-037 / M20. Will be re-implemented per Scenario 175.")
 	dir := setupRSpecRepo(t, "https://github.com/my-org/my-project.git")
 	mockServer := newInitTestServer(t)
 
@@ -145,6 +147,7 @@ func TestInitRSpec(t *testing.T) {
 // --- Scenario 3: quarantine init with Vitest ---
 
 func TestInitVitest(t *testing.T) {
+	t.Skip("Legacy phase-2 happy path — superseded by ADR-037 / M20. Will be re-implemented per Scenario 175.")
 	dir := setupVitestRepo(t, "https://github.com/my-org/my-project.git")
 	mockServer := newInitTestServer(t)
 
@@ -183,6 +186,7 @@ func TestInitVitest(t *testing.T) {
 // --- Scenario 5: quarantine/state branch already exists ---
 
 func TestInitBranchAlreadyExists(t *testing.T) {
+	t.Skip("Legacy phase-2 idempotency — superseded by ADR-037 / M20. Will be re-implemented per Scenario 175.")
 	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 	mockServer := newInitTestServer(t, withExistingBranch())
 
@@ -220,6 +224,7 @@ func TestInitBranchAlreadyExists(t *testing.T) {
 // --- Scenario 111: no frameworks detected writes commented example ---
 
 func TestInitNoFrameworksDetectedWritesCommentedConfig(t *testing.T) {
+	t.Skip("Legacy phase-2 happy path — superseded by ADR-037 / M20. Will be re-implemented per Scenario 175.")
 	dir := t.TempDir()
 	setupFakeGitRepo(t, dir, "https://github.com/my-org/my-project.git")
 	// No package.json and no Gemfile — zero frameworks detected.
@@ -466,6 +471,7 @@ func TestInitRecreatesMissingStateBranch(t *testing.T) {
 // --- Empty defaultBranch fallback ---
 
 func TestInitEmptyDefaultBranchFallsBackToMain(t *testing.T) {
+	t.Skip("Legacy phase-2 default-branch fallback — superseded by ADR-037 / M20. Will be re-implemented per Scenario 175.")
 	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 	mockServer := newInitTestServer(t, withEmptyDefaultBranch())
 

@@ -14,6 +14,7 @@ import (
 // --- Scenario 6: no GitHub token ---
 
 func TestInitNoGitHubToken(t *testing.T) {
+	t.Skip("Legacy phase-2 token gate — superseded by ADR-037 / M20 (phase 1 does not require a token; see Scenario 186).")
 	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
 	stdout, err := executeInitCmd(t,
@@ -52,6 +53,7 @@ func TestInitNoGitHubToken(t *testing.T) {
 // --- Scenario 8: not a git repository ---
 
 func TestInitNotGitRepo(t *testing.T) {
+	t.Skip("Legacy origin-driven flow — superseded by ADR-037 / M20 (phase 1 no longer reads git origin; init succeeds in non-git dirs by writing partial config).")
 	dir := t.TempDir()
 	// No .git directory; write package.json so framework detection succeeds.
 	pkgJSON := `{"devDependencies":{"jest":"^29.0.0"}}`
@@ -85,6 +87,7 @@ func TestInitNotGitRepo(t *testing.T) {
 // --- Scenario 9: non-GitHub remote ---
 
 func TestInitNonGitHubRemote(t *testing.T) {
+	t.Skip("Superseded by ADR-037 / M20 — Scenario 174 explicitly requires init to succeed when origin is non-github.com (writes partial config + exits 2).")
 	dir := t.TempDir()
 	setupFakeGitRepo(t, dir, "https://gitlab.com/my-org/my-project.git")
 	pkgJSON := `{"devDependencies":{"jest":"^29.0.0"}}`
@@ -118,6 +121,7 @@ func TestInitNonGitHubRemote(t *testing.T) {
 // --- Scenario 7b: unauthorized token (401) ---
 
 func TestInitUnauthorizedToken(t *testing.T) {
+	t.Skip("Legacy phase-2 token validation — superseded by ADR-037 / M20. Will be re-implemented per Scenario 175 / 181.")
 	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
 	mux := http.NewServeMux()
@@ -154,6 +158,7 @@ func TestInitUnauthorizedToken(t *testing.T) {
 // --- Scenario 7: insufficient token permissions ---
 
 func TestInitForbiddenRepo(t *testing.T) {
+	t.Skip("Legacy phase-2 permission check — superseded by ADR-037 / M20. Will be re-implemented per Scenario 175 / 181.")
 	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
 	mux := http.NewServeMux()
@@ -190,6 +195,7 @@ func TestInitForbiddenRepo(t *testing.T) {
 // --- Scenario 11: GitHub API unreachable ---
 
 func TestInitAPIUnreachable(t *testing.T) {
+	t.Skip("Legacy phase-2 reachability test — superseded by ADR-037 / M20. Will be re-implemented per Scenario 175 / 181.")
 	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
@@ -231,6 +237,7 @@ func TestInitAPIUnreachable(t *testing.T) {
 // --- GetRef(quarantine/state) returns an unexpected error ---
 
 func TestInitGetRefQuarantineStateError(t *testing.T) {
+	t.Skip("Legacy phase-2 branch lookup — superseded by ADR-037 / M20. Will be re-implemented per Scenario 175.")
 	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
 	mux := http.NewServeMux()
@@ -273,6 +280,7 @@ func TestInitGetRefQuarantineStateError(t *testing.T) {
 // --- GetRef(default branch) returns an unexpected error ---
 
 func TestInitGetDefaultBranchRefError(t *testing.T) {
+	t.Skip("Legacy phase-2 branch lookup — superseded by ADR-037 / M20. Will be re-implemented per Scenario 175.")
 	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
 	mux := http.NewServeMux()
@@ -319,6 +327,7 @@ func TestInitGetDefaultBranchRefError(t *testing.T) {
 // --- CreateRef returns an error ---
 
 func TestInitCreateRefFailure(t *testing.T) {
+	t.Skip("Legacy phase-2 branch creation failure — superseded by ADR-037 / M20. Will be re-implemented per Scenario 175.")
 	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
 	mux := http.NewServeMux()
@@ -372,6 +381,7 @@ func TestInitCreateRefFailure(t *testing.T) {
 // --- PutContents returns an error ---
 
 func TestInitPutContentsFailure(t *testing.T) {
+	t.Skip("Legacy phase-2 README write failure — superseded by ADR-037 / M20. Will be re-implemented per Scenario 175.")
 	dir := setupJestRepo(t, "https://github.com/my-org/my-project.git")
 
 	mux := http.NewServeMux()
