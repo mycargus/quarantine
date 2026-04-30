@@ -124,8 +124,12 @@ func TestRunVerboseAPICallUsesQuarantinePrefix(t *testing.T) {
 	})
 }
 
-// --- Scenario 91: --verbose no token uses [quarantine] prefix ---
-
+// --- Scenario 91: --verbose with degraded mode uses [quarantine] prefix ---
+//
+// Degraded mode is now triggered by an unreachable / failing GitHub API
+// (Scenario 178 / ADR-037 made the no-token case fail-fast, so it no longer
+// reaches degraded-mode output). This test verifies that runtime degraded
+// mode still uses the [quarantine] WARNING: prefix.
 func TestRunVerboseNoTokenUsesQuarantinePrefix(t *testing.T) {
 	dir := t.TempDir()
 	xmlPath := filepath.Join(dir, "junit.xml")
@@ -136,20 +140,20 @@ func TestRunVerboseNoTokenUsesQuarantinePrefix(t *testing.T) {
 	output, err := executeRunCmd(t, []string{
 		"unit",
 	}, map[string]string{
-		"QUARANTINE_GITHUB_TOKEN": "",
-		"GITHUB_TOKEN":            "",
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "no GitHub token (degraded mode continues)",
+		Given:    "valid token but API unreachable (degraded mode continues)",
 		Should:   "exit without error",
 		Actual:   err == nil,
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "no GitHub token",
-		Should:   "print WARNING about missing token with [quarantine] prefix",
+		Given:    "valid token but API unreachable",
+		Should:   "print WARNING with [quarantine] prefix",
 		Actual:   strings.Contains(output, "[quarantine] WARNING:"),
 		Expected: true,
 	})

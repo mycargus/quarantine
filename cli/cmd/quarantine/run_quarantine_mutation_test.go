@@ -67,6 +67,9 @@ func TestRunRemoveUnquarantinedTestsCalledWhenQStateNonNil(t *testing.T) {
 
 // TestRunRSpecFilteringSkippedWhenQStateNil: in suite mode, there is no RSpec
 // post-execution filtering. A failing test exits 1 regardless of qState.
+// Degraded mode (qState=nil) is triggered by an unreachable API (a valid
+// token is required after Scenario 178 / ADR-037 — the no-token case now
+// exits 2 before any test command runs).
 func TestRunRSpecFilteringSkippedWhenQStateNil(t *testing.T) {
 	dir := t.TempDir()
 
@@ -86,12 +89,12 @@ func TestRunRSpecFilteringSkippedWhenQStateNil(t *testing.T) {
 	exitCode := executeRunCmdWithExitCode(t, []string{
 		"unit",
 	}, map[string]string{
-		"QUARANTINE_GITHUB_TOKEN": "",
-		"GITHUB_TOKEN":            "",
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
 	})
 
 	riteway.Assert(t, riteway.Case[int]{
-		Given:    "suite with failing test and no token (degraded mode, qState=nil)",
+		Given:    "suite with failing test and unreachable API (degraded mode, qState=nil)",
 		Should:   "exit 1 (failure not suppressed)",
 		Actual:   exitCode,
 		Expected: 1,

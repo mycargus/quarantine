@@ -30,11 +30,13 @@ func TestRunEmptyResultsWithoutQuarantineStateDoesNotWarn(t *testing.T) {
 	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
 	chdirTest(t, dir)
 
+	// Degraded mode is triggered by an unreachable API (a valid token is
+	// required after Scenario 178 / ADR-037 — the no-token case now exits 2).
 	output, err := executeRunCmd(t, []string{
 		"unit",
 	}, map[string]string{
-		"QUARANTINE_GITHUB_TOKEN": "",
-		"GITHUB_TOKEN":            "",
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{

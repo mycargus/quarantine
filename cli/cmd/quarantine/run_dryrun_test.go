@@ -379,8 +379,11 @@ func TestRunDryRunSkipsNotificationBlockEvenWithNonNilClient(t *testing.T) {
 	})
 }
 
-// TestRunNilClientSkipsNotificationBlockNoPanic: when ghClient is nil (no token),
-// notification block is safely skipped (no panic).
+// TestRunNilClientSkipsNotificationBlockNoPanic: when the GitHub API is
+// unreachable (degraded mode, ghClient created but state load fails), the
+// notification block is safely skipped (no panic). The no-token path is
+// no longer reachable here — Scenario 178 / ADR-037 makes that fail fast
+// before this code path runs.
 func TestRunNilClientSkipsNotificationBlockNoPanic(t *testing.T) {
 	dir := t.TempDir()
 
@@ -395,12 +398,12 @@ func TestRunNilClientSkipsNotificationBlockNoPanic(t *testing.T) {
 	exitCode := executeRunCmdWithExitCode(t, []string{
 		"unit",
 	}, map[string]string{
-		"QUARANTINE_GITHUB_TOKEN": "",
-		"GITHUB_TOKEN":            "",
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
 	})
 
 	riteway.Assert(t, riteway.Case[int]{
-		Given:    "nil ghClient (no token) with dryRun=false",
+		Given:    "valid token but API unreachable (degraded mode) with dryRun=false",
 		Should:   "exit with code 0 (notification block safely skipped)",
 		Actual:   exitCode,
 		Expected: 0,

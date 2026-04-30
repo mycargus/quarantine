@@ -9,8 +9,9 @@ import (
 
 // --- Strict mode: no token (suite mode) ---
 
-// TestRunDegradedNoTokenStrictPrintsError: in suite mode, --strict with no token
-// causes a degraded mode exit, but the error message format is different from legacy.
+// TestRunDegradedNoTokenStrictPrintsError: per Scenario 178 / ADR-037, the
+// no-token case fails fast with exit 2 regardless of --strict — the missing
+// token is detected before strict-mode handling even runs.
 func TestRunDegradedNoTokenStrictPrintsError(t *testing.T) {
 	dir := t.TempDir()
 	xmlPath := filepath.Join(dir, "junit.xml")
@@ -18,7 +19,7 @@ func TestRunDegradedNoTokenStrictPrintsError(t *testing.T) {
 	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
 	chdirTest(t, dir)
 
-	_, err := executeRunCmd(t, []string{
+	exitCode := executeRunCmdWithExitCode(t, []string{
 		"--strict",
 		"unit",
 	}, map[string]string{
@@ -26,13 +27,11 @@ func TestRunDegradedNoTokenStrictPrintsError(t *testing.T) {
 		"GITHUB_TOKEN":            "",
 	})
 
-	// In suite mode, no token → degraded mode (not an error), tests still run.
-	// Suite mode does not implement strict mode, so it runs in degraded mode.
-	riteway.Assert(t, riteway.Case[bool]{
+	riteway.Assert(t, riteway.Case[int]{
 		Given:    "no GitHub token and --strict flag set (suite mode)",
-		Should:   "complete (strict mode not implemented in suite mode)",
-		Actual:   err == nil, // degraded mode succeeds
-		Expected: true,
+		Should:   "exit 2 (fail-fast per Scenario 178 / ADR-037)",
+		Actual:   exitCode,
+		Expected: 2,
 	})
 }
 

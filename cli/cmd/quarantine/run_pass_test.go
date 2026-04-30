@@ -202,8 +202,11 @@ func TestRunBranchNotFound(t *testing.T) {
 	})
 }
 
-// --- Scenario 51 (verbose output): verbose with no token logs skipped ---
-
+// --- Scenario 51 (verbose output): degraded mode logs a [quarantine] WARNING ---
+//
+// Degraded mode is triggered by an unreachable API after Scenario 178 /
+// ADR-037 — the no-token case now exits 2 before any output, so degraded
+// mode warnings can only originate from runtime API failures.
 func TestRunVerboseNoToken(t *testing.T) {
 	dir := t.TempDir()
 	junitXML := `<?xml version="1.0" encoding="UTF-8"?><testsuites tests="1"><testsuite name="s.test.js" tests="1"><testcase classname="S" name="t" file="s.test.js" time="0.001"></testcase></testsuite></testsuites>`
@@ -215,20 +218,20 @@ func TestRunVerboseNoToken(t *testing.T) {
 	output, err := executeRunCmd(t, []string{
 		"unit",
 	}, map[string]string{
-		"QUARANTINE_GITHUB_TOKEN": "",
-		"GITHUB_TOKEN":            "",
+		"QUARANTINE_GITHUB_TOKEN":        "ghp_test",
+		"QUARANTINE_GITHUB_API_BASE_URL": fakeUnreachableAPIURL(t),
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "no GitHub token set",
+		Given:    "valid token but API unreachable",
 		Should:   "exit without error (degraded mode continues)",
 		Actual:   err == nil,
 		Expected: true,
 	})
 
 	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "no GitHub token set",
-		Should:   "print WARNING about missing token",
+		Given:    "valid token but API unreachable",
+		Should:   "print WARNING with [quarantine] prefix",
 		Actual:   strings.Contains(output, "[quarantine] WARNING:"),
 		Expected: true,
 	})

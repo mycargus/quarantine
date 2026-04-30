@@ -24,7 +24,14 @@ func suiteXML() string {
 </testsuites>`
 }
 
-// --- Scenario 35: No GitHub token — degraded mode ---
+// --- Scenario 178 (supersedes Scenario 35 for no-token case): No GitHub token — fail-fast ---
+//
+// Per ADR-037, when neither QUARANTINE_GITHUB_TOKEN nor GITHUB_TOKEN is set,
+// `quarantine run` MUST exit 2 with an explicit error before executing the
+// test command or making any GitHub API call. The original Scenario 35
+// degraded-mode behavior for the no-token case is replaced by this fail-fast
+// gate. Scenario 35 still applies for runtime API failures with a valid
+// token (covered by TestRunDegradedAPIUnreachable below).
 
 func TestRunDegradedNoToken(t *testing.T) {
 	dir := t.TempDir()
@@ -33,32 +40,18 @@ func TestRunDegradedNoToken(t *testing.T) {
 	writeSuiteConfig(t, dir, "unit", scriptPath, xmlPath, "false")
 	chdirTest(t, dir)
 
-	output, err := executeRunCmd(t, []string{
+	exitCode := executeRunCmdWithExitCode(t, []string{
 		"unit",
 	}, map[string]string{
 		"QUARANTINE_GITHUB_TOKEN": "",
 		"GITHUB_TOKEN":            "",
 	})
 
-	riteway.Assert(t, riteway.Case[bool]{
+	riteway.Assert(t, riteway.Case[int]{
 		Given:    "no GitHub token set",
-		Should:   "exit with code 0 when tests pass",
-		Actual:   err == nil,
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "no GitHub token set",
-		Should:   "log WARNING about no GitHub token",
-		Actual:   strings.Contains(output, "[quarantine] WARNING:") && strings.Contains(output, "No GitHub token"),
-		Expected: true,
-	})
-
-	riteway.Assert(t, riteway.Case[bool]{
-		Given:    "no GitHub token set",
-		Should:   "mention degraded mode in warning",
-		Actual:   strings.Contains(output, "degraded mode"),
-		Expected: true,
+		Should:   "exit 2 (fail-fast per Scenario 178 / ADR-037)",
+		Actual:   exitCode,
+		Expected: 2,
 	})
 }
 

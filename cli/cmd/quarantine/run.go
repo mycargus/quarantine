@@ -76,6 +76,16 @@ func runSuiteMode(cmd *cobra.Command, args []string, cfg *config.Config) error {
 		return exitCodeError(2)
 	}
 
+	// Per ADR-037 / Scenario 178: fail fast when neither QUARANTINE_GITHUB_TOKEN
+	// nor GITHUB_TOKEN is present in the environment. On non-GitHub-Actions CI
+	// (e.g. Jenkins) the token is not provided automatically; surface this as
+	// an explicit configuration error before any test command runs or any
+	// GitHub API call is made.
+	if err := validateGitHubToken(); err != nil {
+		cmd.PrintErrln(err.Error())
+		return exitCodeError(2)
+	}
+
 	check, checkErr := checkBranchExists(cfg)
 	if checkErr != nil {
 		cmd.PrintErrln("Error: Quarantine is not initialized for this repository. Run 'quarantine init' first.")
