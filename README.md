@@ -2,10 +2,7 @@
 
 Quarantine automatically detects, quarantines, and tracks flaky (non-deterministic) tests in CI pipelines.
 
-> "A test is non-deterministic when it passes sometimes and fails sometimes,
-> without any noticeable change in the code, tests, or environment. Such tests
-> fail, then you re-run them and they pass. Test failures for such tests are
-> seemingly random." — Martin Fowler, [Eradicating Non-Determinism in Tests]
+> Non-deterministic tests have two problems, firstly they are useless, secondly they are a virulent infection that can completely ruin your entire test suite. As a result they need to be dealt with as soon as you can, before your entire deployment pipeline is compromised." — Martin Fowler, [Eradicating Non-Determinism in Tests]
 
 [Eradicating Non-Determinism in Tests]: https://martinfowler.com/articles/nonDeterminism.html
 
