@@ -2,7 +2,7 @@
 
 Quarantine automatically detects, quarantines, and tracks flaky (non-deterministic) tests in CI pipelines.
 
-> Non-deterministic tests have two problems, firstly they are useless, secondly they are a virulent infection that can completely ruin your entire test suite. As a result they need to be dealt with as soon as you can, before your entire deployment pipeline is compromised." — Martin Fowler, [Eradicating Non-Determinism in Tests]
+> "Non-deterministic tests have two problems, firstly they are useless, secondly they are a virulent infection that can completely ruin your entire test suite. As a result they need to be dealt with as soon as you can, before your entire deployment pipeline is compromised." — Martin Fowler, [Eradicating Non-Determinism in Tests]
 
 [Eradicating Non-Determinism in Tests]: https://martinfowler.com/articles/nonDeterminism.html
 
