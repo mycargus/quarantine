@@ -14,7 +14,7 @@
  */
 
 import { execSync, spawnSync } from "node:child_process"
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { assert } from "riteway/vitest"
@@ -73,8 +73,8 @@ describe("quarantine init — E2E against real GitHub", () => {
     // depends on it to verify real CI output. The init command is idempotent:
     // it skips branch creation if the branch already exists.
 
-    // Create a temp directory with a git repo whose origin points to the
-    // test repository. The init command reads the remote via `git remote get-url`.
+    // Create a temp directory with a git repo whose origin points to the test
+    // repository. Phase 1 scans git remotes to emit advisory hint comments.
     dir = mkdtempSync(join(tmpdir(), "quarantine-e2e-"))
     execSync("git init", { cwd: dir, stdio: "pipe" })
     execSync('git config user.email "test@example.com"', { cwd: dir, stdio: "pipe" })
@@ -84,8 +84,27 @@ describe("quarantine init — E2E against real GitHub", () => {
       stdio: "pipe",
     })
 
-    // Run `quarantine init` — non-interactive, detects framework automatically.
-    // If the state branch already exists, init skips branch creation.
+    // Phase 1: no config yet — init writes a partial .quarantine/config.yml with
+    // an empty github block (plus hint comments for the detected origin) and exits 2.
+    spawnSync(binPath, ["init"], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, QUARANTINE_GITHUB_TOKEN: token },
+      timeout: 60_000,
+    })
+
+    // Simulate the hand-edit step (Scenario 174 → 175): fill in owner/repo.
+    const configPath = join(dir, ".quarantine", "config.yml")
+    const configContent = readFileSync(configPath, "utf8")
+    writeFileSync(
+      configPath,
+      configContent
+        .replace("owner: # set to your GitHub organization or user", `owner: ${owner}`)
+        .replace("repo:  # set to your GitHub repository name", `repo:  ${repo}`),
+    )
+
+    // Phase 2: config now has owner/repo — init validates the token, creates the
+    // state branch (idempotent), and exits 0.
     result = spawnSync(binPath, ["init"], {
       cwd: dir,
       encoding: "utf8",
